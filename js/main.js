@@ -148,8 +148,8 @@ function startGame(load) {
   applyOutfit(P.outfit || 0);
   G.missions.init();
   const sh = G.world.pois.safehouse;
-  P.x = sh.x - 5; P.z = sh.z + 1; P.y = 0; P.yaw = 0; P.state = 'foot'; P.visible = true;
-  G.cam.yaw = 0; G.cam.pitch = -0.2;
+  P.x = sh.x - 5; P.z = sh.z - 2.5; P.y = 0; P.yaw = -Math.PI / 2; P.state = 'foot'; P.visible = true;
+  G.cam.yaw = -Math.PI / 2; G.cam.pitch = -0.2;
   G.traffic.initParked();
   const sc = G.world.pois.safehouseCar;
   const car = G.vm.spawn(load && G.missions.progress >= 2 ? 'zephyra' : 'kiwi', sc.x, sc.z, sc.h, load && G.missions.progress >= 2 ? 0xe63946 : 0x4ecdc4);

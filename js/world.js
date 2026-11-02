@@ -658,7 +658,7 @@ export class World {
         this.B.poolw.box(223, 0.15, -146.5, 245, 0.17, -139.5, { sides: false });
         for (const [px, pz] of [[217, -175], [217, -140], [264, -175], [264, -150]]) this.addPalm(px, pz, rnd);
         this.B.concrete.box(250, 0.0, -150, 262, 0.05, -132, { sides: false, col: rgb(0x55575c), topScale: 4 });
-        this.pois.safehouseCar = { x: 256, z: -141, h: 0 };
+        this.pois.safehouseCar = { x: 231, z: -136, h: 0 };
         break;
       }
       case 'diner': {
