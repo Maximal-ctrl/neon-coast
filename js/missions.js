@@ -125,7 +125,7 @@ export class Missions {
     for (const s of this.serviceMarkers) s.inside = true; // erst nach Verlassen erneut auslösen
     // Pickups
     const P = (x, z, type, data, respawn = 120) => this.addPickup(x, z, type, data, respawn);
-    for (const [x, z] of [[-140, -58], [12, -228], [-252, 12], [148, 172], [392, 82], [600, 60], [-240, -128], [232, -138]]) P(x, z, 'health');
+    for (const [x, z] of [[-140, -58], [12, -228], [-252, 12], [148, 172], [392, 82], [600, 60], [-240, -128], [222, -134]]) P(x, z, 'health');
     for (const [x, z] of [[80, -141], [650, 20], [-240, 345], [-350, 300]]) P(x, z, 'armor');
     P(248, -138, 'weapon', { w: 'pistol', ammo: 36 });
     P(-80, 270, 'weapon', { w: 'smg', ammo: 90 });
