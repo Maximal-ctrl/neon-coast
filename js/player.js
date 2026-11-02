@@ -477,7 +477,7 @@ export class Player {
     const cost = where === 'hospital' ? Math.min(this.money, Math.max(100, Math.floor(this.money * 0.08))) : Math.min(this.money, Math.max(150, Math.floor(this.money * 0.1)));
     this.money -= cost;
     if (where === 'police') { for (const k in this.ammo) if (k !== 'fists') this.ammo[k] = Math.floor(this.ammo[k] / 2); }
-    this.x = poi.x; this.z = poi.z; this.y = 0; this.vx = this.vz = this.vy = 0;
+    this.x = poi.x + (where === 'safehouse' ? -5 : 0); this.z = poi.z; this.y = 0; this.vx = this.vz = this.vy = 0;
     this.yaw = Math.PI;
     this.health = 100; this.state = 'foot'; this.visible = true; this.lie = 0;
     this.anim.handsUp = false; this.anim.tilt = 0; this.anim.lift = 0;

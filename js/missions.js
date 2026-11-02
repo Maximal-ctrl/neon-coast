@@ -122,6 +122,7 @@ export class Missions {
       { kind: 'safehouse', m: new Marker(poi.safehouse.x, poi.safehouse.z, 0x7cff6b, { label: 'H', r: 1.3 }) },
       { kind: 'gunshop', m: new Marker(poi.gunshop.x, poi.gunshop.z, 0xff7b39, { label: 'W', r: 1.3 }) },
     ];
+    for (const s of this.serviceMarkers) s.inside = true; // erst nach Verlassen erneut auslösen
     // Pickups
     const P = (x, z, type, data, respawn = 120) => this.addPickup(x, z, type, data, respawn);
     for (const [x, z] of [[-140, -58], [12, -228], [-252, 12], [148, 172], [392, 82], [600, 60], [-240, -128], [232, -138]]) P(x, z, 'health');

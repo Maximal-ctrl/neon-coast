@@ -148,7 +148,7 @@ function startGame(load) {
   applyOutfit(P.outfit || 0);
   G.missions.init();
   const sh = G.world.pois.safehouse;
-  P.x = sh.x; P.z = sh.z; P.y = 0; P.yaw = Math.PI; P.state = 'foot'; P.visible = true;
+  P.x = sh.x - 5; P.z = sh.z + 1; P.y = 0; P.yaw = 0; P.state = 'foot'; P.visible = true;
   G.cam.yaw = 0; G.cam.pitch = -0.2;
   G.traffic.initParked();
   const sc = G.world.pois.safehouseCar;
