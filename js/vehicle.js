@@ -274,8 +274,8 @@ export class VehicleManager {
         if (v.y > c.y1 || !c.alive) continue;
         const r = circleVsVeh(c.x, c.z, c.r, v);
         if (!r) continue;
-        if (c.kind === 'lamp' && v.speed > 5) {
-          if (W.knockLamp(c, v.vx, v.vz)) {
+        if ((c.kind === 'lamp' || c.kind === 'signal') && v.speed > 5) {
+          if (W.knockPole(c, v.vx, v.vz)) {
             v.vx *= 0.85; v.vz *= 0.85;
             G.audio.crash(0.5, v.x, v.z);
             G.effects.sparks(c.x, v.y + 0.8, c.z, 10);
@@ -283,7 +283,8 @@ export class VehicleManager {
             continue;
           }
         }
-        this.resolveStatic(v, -r.nx, -r.nz, r.depth);
+        // Normale zeigt vom Fahrzeug zum Mast -> Fahrzeug wird davon weggeschoben
+        this.resolveStatic(v, r.nx, r.nz, r.depth, false);
       }
     }
     for (let i = 0; i < vs.length; i++) {
@@ -304,17 +305,19 @@ export class VehicleManager {
     for (const v of vs) v.updateVisual(dt);
   }
 
-  resolveStatic(v, nx, nz, depth) {
+  resolveStatic(v, nx, nz, depth, spin = true) {
     v.x -= nx * depth; v.z -= nz * depth;
     const vn = v.vx * nx + v.vz * nz;
     if (vn > 0) {
-      v.vx -= vn * nx * 1.35; v.vz -= vn * nz * 1.35;
+      v.vx -= vn * nx * (spin ? 1.35 : 1.15); v.vz -= vn * nz * (spin ? 1.35 : 1.15);
       const f = Math.max(0.6, 1 - vn * 0.02);
       v.vx *= f; v.vz *= f;
-      // Drehimpuls je nach Aufprallwinkel
-      const fx = Math.sin(v.h), fz = Math.cos(v.h);
-      const side = fx * nz - fz * nx;
-      v.h += side * Math.min(0.15, vn * 0.006);
+      // Drehimpuls je nach Aufprallwinkel (nicht bei dünnen Masten)
+      if (spin) {
+        const fx = Math.sin(v.h), fz = Math.cos(v.h);
+        const side = fx * nz - fz * nx;
+        v.h += side * Math.min(0.15, vn * 0.006);
+      }
       this.impact(v, vn, null);
     }
   }

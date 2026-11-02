@@ -895,7 +895,7 @@ export class World {
       const heads = [[9.5, 9.5, 0], [-9.5, -9.5, Math.PI], [-9.5, 9.5, -Math.PI / 2], [9.5, -9.5, Math.PI / 2]];
       for (const [ox, oz, yaw] of heads) {
         this.signalPos.push([n.x + ox, n.z + oz, yaw]);
-        this.addCircle(n.x + ox, n.z + oz, 0.22, 6, 'signal');
+        this.addCircle(n.x + ox, n.z + oz, 0.22, 6, 'signal', { sig: this.signalPos.length - 1 });
       }
       this.signalState.push('');
     }
@@ -1060,6 +1060,8 @@ export class World {
     });
     sigIM.computeBoundingSphere(); sigIM.castShadow = true; scene.add(sigIM);
     for (const L of this.sigLamps) { L.computeBoundingSphere(); scene.add(L); }
+    this.sigIM = sigIM;
+    this.signals = this.signalPos.map(([x, z, yaw]) => ({ x, z, yaw, y: 0, fall: 0, broken: false, timer: 0 }));
 
     // Container
     const cg = new THREE.BoxGeometry(12.2, 2.6, 2.44);
@@ -1240,15 +1242,58 @@ export class World {
   }
 
   // ----------------------------------------------------------- Update
-  knockLamp(c, dx, dz) {
-    if (c.kind !== 'lamp' || !c.alive) return false;
-    const L = this.lamps[c.lamp];
+  // Laterne oder Ampel umfahren
+  knockPole(c, dx, dz) {
+    if (!c.alive) return false;
+    let L = null;
+    if (c.kind === 'lamp') L = this.lamps[c.lamp];
+    else if (c.kind === 'signal') L = this.signals[c.sig];
     if (!L || L.broken) return false;
     c.alive = false;
-    L.broken = true; L.fall = 0.001; L.timer = 0;
+    L.broken = true; L.fall = 0.001; L.timer = 0; L.circle = c;
     const len = Math.hypot(dx, dz) || 1;
     L.ax = dz / len; L.az = -dx / len;
+    if (c.kind === 'signal') {
+      const dim = new THREE.Color(0.05, 0.05, 0.05);
+      for (const S of this.sigLamps) { S.setColorAt(c.sig, dim); S.instanceColor.needsUpdate = true; }
+    }
     return true;
+  }
+  knockLamp(c, dx, dz) { return this.knockPole(c, dx, dz); }
+
+  // Fallanimation & spätere Reparatur (außer Sicht)
+  animatePoles(list, meshes, dt, onRestore) {
+    const m = this._pm || (this._pm = new THREE.Matrix4());
+    const q = this._pq || (this._pq = new THREE.Quaternion()), qy = this._pqy || (this._pqy = new THREE.Quaternion());
+    const p = this._pp || (this._pp = new THREE.Vector3()), s = this._ps || (this._ps = new THREE.Vector3(1, 1, 1));
+    const ax = this._pa || (this._pa = new THREE.Vector3()), up = THREE.Object3D.DEFAULT_UP;
+    let dirty = false;
+    for (let i = 0; i < list.length; i++) {
+      const L = list[i];
+      if (!L.broken) continue;
+      L.timer += dt;
+      if (L.fall < 1) { L.fall = Math.min(1, L.fall + dt * (0.6 + L.fall * 3)); dirty = true; }
+      p.set(L.x, L.y, L.z);
+      if (L.timer > 90) {
+        const dx = L.x - G.camera.position.x, dz = L.z - G.camera.position.z;
+        if (dx * dx + dz * dz > 150 * 150) {
+          L.broken = false; L.fall = 0; dirty = true;
+          if (L.circle) L.circle.alive = true;
+          qy.setFromAxisAngle(up, L.yaw); m.compose(p, qy, s);
+          for (const im of meshes) im.setMatrixAt(i, m);
+          if (onRestore) onRestore(i);
+          continue;
+        }
+      }
+      ax.set(L.ax || 1, 0, L.az || 0);
+      q.setFromAxisAngle(ax, L.fall * Math.PI * 0.47);
+      qy.setFromAxisAngle(up, L.yaw);
+      q.multiply(qy);
+      m.compose(p, q, s);
+      for (const im of meshes) im.setMatrixAt(i, m);
+    }
+    if (dirty) for (const im of meshes) im.instanceMatrix.needsUpdate = true;
+    return dirty;
   }
 
   update(dt) {
@@ -1276,6 +1321,7 @@ export class World {
       for (let k = 0; k < 4; k++) {
         const st = k < 2 ? ns : ew;
         const i = node.id * 4 + k;
+        if (this.signals[i].broken) continue;
         this.sigLamps[0].setColorAt(i, st === 'R' ? red : dim);
         this.sigLamps[1].setColorAt(i, st === 'Y' ? yel : dim);
         this.sigLamps[2].setColorAt(i, st === 'G' ? grn : dim);
@@ -1283,33 +1329,16 @@ export class World {
     }
     if (changed) for (const L of this.sigLamps) L.instanceColor.needsUpdate = true;
 
-    // Umgefahrene Laternen
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), qy = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), ax = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    let lampDirty = false;
-    for (let i = 0; i < this.lamps.length; i++) {
-      const L = this.lamps[i];
-      if (!L.broken) continue;
-      L.timer += dt;
-      if (L.fall < 1) { L.fall = Math.min(1, L.fall + dt * (0.6 + L.fall * 3)); lampDirty = true; }
-      if (L.timer > 120) {
-        const dx = L.x - G.camera.position.x, dz = L.z - G.camera.position.z;
-        if (dx * dx + dz * dz > 150 * 150) {
-          L.broken = false; L.fall = 0; lampDirty = true;
-          const c = this.circles.find((c) => c.lamp === i); if (c) c.alive = true;
-        }
-      }
-      ax.set(L.ax || 1, 0, L.az || 0);
-      q.setFromAxisAngle(ax, L.fall * Math.PI * 0.47);
-      qy.setFromAxisAngle(up, L.yaw);
-      q.multiply(qy);
-      p.set(L.x, L.y, L.z);
-      m.compose(p, q, s);
-      this.lampIM.setMatrixAt(i, m);
-      this.lampGlowIM.setMatrixAt(i, m);
-      if (L.fall > 0) { m.makeScale(0, 0, 0); this.poolIM.setMatrixAt(i, m); }
-      if (!L.broken) { qy.setFromAxisAngle(up, L.yaw); m.compose(p, qy, s); this.lampIM.setMatrixAt(i, m); this.lampGlowIM.setMatrixAt(i, m); this.poolIM.setMatrixAt(i, m); }
+    // Umgefahrene Laternen & Ampeln
+    const zero = this._zero || (this._zero = new THREE.Matrix4().makeScale(0, 0, 0));
+    if (this.animatePoles(this.lamps, [this.lampIM, this.lampGlowIM], dt, (i) => {
+      const L = this.lamps[i], mm = new THREE.Matrix4().compose(new THREE.Vector3(L.x, L.y, L.z), new THREE.Quaternion().setFromAxisAngle(THREE.Object3D.DEFAULT_UP, L.yaw), new THREE.Vector3(1, 1, 1));
+      this.poolIM.setMatrixAt(i, mm);
+    })) {
+      for (let i = 0; i < this.lamps.length; i++) if (this.lamps[i].broken) this.poolIM.setMatrixAt(i, zero);
+      this.poolIM.instanceMatrix.needsUpdate = true;
     }
-    if (lampDirty) { this.lampIM.instanceMatrix.needsUpdate = true; this.lampGlowIM.instanceMatrix.needsUpdate = true; this.poolIM.instanceMatrix.needsUpdate = true; }
+    this.animatePoles(this.signals, [this.sigIM, ...this.sigLamps], dt, (i) => { this.signalState[Math.floor(i / 4)] = ''; });
 
     // Riesenrad
     if (this.wheel) {
