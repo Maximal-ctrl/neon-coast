@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Neon Coast">
+<meta name="application-name" content="Neon Coast">
+<meta name="theme-color" content="#0d0618">
+<meta name="description" content="Neon Coast – ein Open-World-Actionspiel in der Küstenstadt Port Solera. Läuft im Browser und als App auf dem iPad.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<title>Neon Coast</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./lib/three.module.js", "three/addons/": "./lib/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- Ladebildschirm -->
+<div id="loading" class="screen">
+  <div class="logo"><span class="l1">NEON</span><span class="l2">COAST</span></div>
+  <div class="load-bar"><i id="load-fill"></i></div>
+  <div id="load-msg">Lade …</div>
+</div>
+
+<!-- Titel -->
+<div id="title" class="screen hidden">
+  <div class="title-inner">
+    <div class="logo big"><span class="l1">NEON</span><span class="l2">COAST</span></div>
+    <div class="tagline">PORT SOLERA · OPEN WORLD</div>
+    <div class="menu">
+      <button id="btn-continue" class="mbtn primary hidden">Weiterspielen</button>
+      <button id="btn-new" class="mbtn">Neues Spiel</button>
+      <button id="btn-controls" class="mbtn small">Steuerung</button>
+      <button id="btn-settings" class="mbtn small">Einstellungen</button>
+    </div>
+    <div id="install-hint" class="install hidden">📲 Als App spielen: In Safari auf <b>Teilen</b> tippen → <b>Zum Home-Bildschirm</b>.</div>
+  </div>
+  <div class="credits">Ein Originalspiel · alle Grafiken, Musik &amp; Sounds werden live im Browser erzeugt</div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="hud-tr">
+    <div id="clock">00:00</div>
+    <div id="money">$00000000</div>
+    <div id="money-delta"></div>
+    <div id="wanted"><i class="star"></i><i class="star"></i><i class="star"></i><i class="star"></i><i class="star"></i></div>
+    <div id="weapon-box" data-btn="weapon"><div id="weapon-icon"></div><div id="weapon-ammo"></div><div id="weapon-name"></div></div>
+  </div>
+  <div id="mm-wrap">
+    <canvas id="minimap" data-open="map"></canvas>
+    <div id="bars"><div class="bar"><i id="hb-health"></i></div><div class="bar armor"><i id="hb-armor"></i></div></div>
+  </div>
+  <div id="hint"></div>
+  <div id="objective"></div>
+  <div id="timer"></div>
+  <div id="race-pos"></div>
+  <div id="countdown"></div>
+  <div id="toasts"></div>
+  <div id="bigtoast"><div id="bt-title"></div><div id="bt-sub"></div></div>
+  <div id="banner"><div id="banner-text"></div><div id="banner-sub"></div></div>
+  <div id="area-name"></div>
+  <div id="veh-name"></div>
+  <div id="radio-box"></div>
+  <div id="speedo"><div><span id="speed-val">0</span><small>km/h</small></div><div class="sbar"><i id="speed-bar"></i></div><div class="sbar hp"><i id="car-hp"></i></div></div>
+  <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+  <div id="target-mark"></div>
+  <div id="hitmark"></div>
+  <div id="subtitle"></div>
+  <div id="fps"></div>
+  <button id="pause-btn" aria-label="Pause">❚❚</button>
+</div>
+<div id="dmg"></div>
+<div id="letterbox"><i class="top"></i><i class="bot"></i></div>
+<div id="fade"></div>
+
+<!-- Touch-Steuerung -->
+<div id="touch">
+  <div id="joy-zone"></div>
+  <div id="joy-base"><div id="joy-knob"></div></div>
+  <div id="tbtns">
+    <div class="tb foot big fire" data-btn="fire"><span>FEUER</span></div>
+    <div class="tb foot jump" data-btn="jump"><span>SPRUNG</span></div>
+    <div class="tb foot sprint" data-btn="sprint"><span>RENNEN</span></div>
+    <div class="tb car big gas" data-btn="gas"><span>GAS</span></div>
+    <div class="tb car brake" data-btn="brake"><span>BREMSE</span></div>
+    <div class="tb car hb" data-btn="handbrake"><span>HAND&shy;BREMSE</span></div>
+    <div class="tb car horn" data-btn="horn"><span>HUPE</span></div>
+    <div class="tb car shoot" data-btn="fire"><span>FEUER</span></div>
+    <div class="tb enter" data-btn="enter"><span class="foot-l">EIN</span><span class="car-l">AUS</span></div>
+    <div class="tb car radio" data-btn="radio"><span>RADIO</span></div>
+    <div class="tb car cam" data-btn="camera"><span>KAMERA</span></div>
+  </div>
+  <div class="tb skip" data-btn="skip"><span>WEITER ▸</span></div>
+</div>
+
+<!-- Pause -->
+<div id="pause" class="screen panel-screen hidden">
+  <div class="panel">
+    <h2>PAUSE</h2>
+    <button class="mbtn primary" data-act="resume">Weiterspielen</button>
+    <button class="mbtn" data-act="map">Karte</button>
+    <button class="mbtn" data-act="stats">Statistik</button>
+    <button class="mbtn" data-act="settings">Einstellungen</button>
+    <button class="mbtn" data-act="controls">Steuerung</button>
+    <button class="mbtn" data-act="save">Spiel speichern</button>
+    <button class="mbtn small" data-act="menu">Hauptmenü</button>
+  </div>
+</div>
+
+<!-- Karte -->
+<div id="mapscreen" class="screen hidden">
+  <canvas id="bigmap"></canvas>
+  <div class="map-legend">
+    <b>KARTE</b>
+    <span><i style="background:#ffd23f"></i>Auftrag</span>
+    <span><i style="background:#7cff6b"></i>Unterschlupf (Speichern)</span>
+    <span><i style="background:#ff7b39"></i>Waffenladen</span>
+    <span><i style="background:#ff4d6d"></i>Krankenhaus</span>
+    <span><i style="background:#4d8bff"></i>Polizei</span>
+    <span><i style="background:#be6eff"></i>Wegpunkt (Karte antippen)</span>
+  </div>
+  <button class="mbtn close" data-act="closemap">Schließen</button>
+</div>
+
+<!-- Generisches Panel (Einstellungen, Statistik, Laden, …) -->
+<div id="dialog" class="screen panel-screen hidden">
+  <div class="panel wide">
+    <h2 id="dlg-title"></h2>
+    <div id="dlg-body"></div>
+    <div id="dlg-btns"></div>
+  </div>
+</div>
+
+<div id="rotate-hint" class="screen"><div>↻<br>Bitte drehe dein Gerät ins Querformat</div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
