@@ -119,7 +119,8 @@ export class AudioSys {
     s.start(t, rand(0, 1)); s.stop(t + dur + 0.05);
   }
   tone(freq, dur, type = 'sine', vol = 0.2, freqEnd = null, delay = 0, dest = null) {
-    if (!this.ready) return;
+    // Exponentielle Rampen dürfen nicht auf 0 zielen -> zu leise Töne gar nicht erst spielen
+    if (!this.ready || !(vol > 0.002)) return;
     const ctx = this.ctx, t = ctx.currentTime + delay;
     const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
     if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);

@@ -370,7 +370,33 @@ function frame(now) {
   G.dt = step;
   const I = G.input;
   I.update();
+  try {
+    update(now, step, I);
+  } catch (e) {
+    // Ein einzelner Fehler darf das Spiel nicht einfrieren
+    reportError(e);
+  }
+  if (G.state !== 'loading') {
+    try {
+      G.vm.render();
+      G.peds.render();
+      if (composer) {
+        bloom.strength = 0.35 + G.world.env.night * 0.55;
+        composer.render();
+      } else G.renderer.render(G.scene, G.camera);
+    } catch (e) { reportError(e); }
+  }
+}
 
+const seenErrors = new Set();
+function reportError(e) {
+  const key = String(e && e.message);
+  if (seenErrors.has(key)) return;
+  seenErrors.add(key);
+  console.error('Spielfehler:', e);
+}
+
+function update(now, step, I) {
   if (G.state === 'title') {
     G.time += step;
     G.timeOfDay = (G.timeOfDay + step * 0.01) % 24;
@@ -413,14 +439,6 @@ function frame(now) {
   } else if (G.state === 'paused' || G.state === 'menu') {
     if (I.pressed('pause') && G.state === 'paused') setPaused(false);
     if (G.state === 'menu' && I.pressed('map') && !$('mapscreen').classList.contains('hidden')) { $('mapscreen').classList.add('hidden'); G.state = 'playing'; }
-  }
-  if (G.state !== 'loading') {
-    G.vm.render();
-    G.peds.render();
-    if (composer) {
-      bloom.strength = 0.35 + G.world.env.night * 0.55;
-      composer.render();
-    } else G.renderer.render(G.scene, G.camera);
   }
 }
 
