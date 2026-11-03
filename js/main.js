@@ -393,10 +393,28 @@ function phoneMessages() {
   phoneScreen('Nachrichten', msgs.reverse().map(([f, t]) => `<div class="ph-msg"><b>${f}</b><span>${t}</span></div>`).join(''));
 }
 function phoneRadio() {
-  phoneScreen('Radio', STATIONS.map((s, i) => `<button class="ph-row ${G.audio.station === i ? 'on' : ''}" data-st="${i}"><b>${s.name}</b><span>${s.genre || ''}</span></button>`).join('') + '<div class="ph-note">Das Radio läuft im Auto.</div>');
-  $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => { G.audio.station = +b.dataset.st; G.audio.nextBar = 0; G.hud.radio(STATIONS[G.audio.station]); phoneRadio(); });
+  const A = G.audio;
+  const n = A.tracks ? A.tracks.length : 0;
+  phoneScreen('Radio', STATIONS.map((s, i) => { const info = A.ready ? A.stationInfo(i) : s; return `<button class="ph-row ${A.station === i ? 'on' : ''}" data-st="${i}"><b>${info.name}</b><span>${info.genre || ''}</span></button>`; }).join('')
+    + `<div class="ph-note">Das Radio läuft im Auto. Bei „Mein Radio“ laufen Songs, die auf deinem Gerät gespeichert sind.</div>`
+    + `<div class="ph-actions"><button class="mbtn small" data-mus="add">🎵 Eigene Musik hinzufügen</button>${n ? `<button class="mbtn small" data-mus="clear">Eigene Musik löschen (${n})</button>` : ''}</div>`);
+  $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => { A.station = +b.dataset.st; A.nextBar = 0; if (A.ready) G.hud.radio(A.stationInfo(A.station)); phoneRadio(); });
+  $('ph-screen').querySelectorAll('[data-mus]').forEach((b) => b.onclick = async () => {
+    if (!A.ready) A.init();
+    if (b.dataset.mus === 'add') $('music-file').click();
+    else { await A.clearLibrary(); G.hud.toast('Eigene Musik gelöscht'); phoneRadio(); }
+  });
 }
 function setupPhone() {
+  $('music-file').addEventListener('change', async (e) => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if (!files.length) return;
+    if (!G.audio.ready) G.audio.init();
+    const n = await G.audio.addFiles(files);
+    G.hud.toast(n ? `${n} Song(s) zu „Mein Radio“ hinzugefügt` : 'Keine Audiodateien gefunden');
+    if (phoneOpen) phoneRadio();
+  });
   $('phone-btn').addEventListener('click', () => openPhone());
   $('phone-btn').addEventListener('touchend', (e) => { e.preventDefault(); openPhone(); });
   $('ph-home').onclick = () => (phoneOpen ? phoneHome() : null);
@@ -617,9 +635,22 @@ function autoQuality(dt) {
 }
 
 // PWA: Service Worker
+export const GAME_VERSION = '1.4';
+document.getElementById('ver').textContent = 'Version ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));
+  // Neue Version installiert -> auf dem Titelbildschirm sofort neu laden
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return;
+    if (G.state === 'title' || G.state === 'loading') { reloaded = true; location.reload(); }
+    else if (G.hud) G.hud.toast('Update geladen – beim nächsten Start aktiv.');
+  });
 }
+// Maus freigegeben (z. B. mit Esc) -> Pause-Menü
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && G.state === 'playing' && !G.isTouch) setPaused(true);
+});
 
 if (/[?&]debug/.test(location.search)) window.__G = G;
 boot().catch((e) => {

@@ -237,7 +237,7 @@ export class Interiors {
     for (const m of R.markers) m.group.visible = true;
     P.x = R.spawn.x; P.z = R.spawn.z; P.y = 0; P.yaw = R.spawn.yaw; P.vx = P.vz = P.vy = 0;
     G.cam.yaw = R.spawn.yaw; G.cam.pitch = -0.15; G.cam.snap();
-    G.interior = { kind, name: R.name, station: 2 };
+    G.interior = { kind, name: R.name, station: 3 };
     if (kind === 'club') {
       this.spawnClubPeds();
       this.light.position.set(1500, 5.5, -1);
@@ -335,7 +335,7 @@ export class Interiors {
     if (on(R.tip)) {
       G.openMenu('BÜHNE', 'Die Tänzerinnen und Tänzer geben alles.', [
         ['Trinkgeld geben – $50', () => { if (!this.pay(50)) return; this.cheer = 3; G.hud.toast('Die Show-Crew bedankt sich mit einer Pirouette!'); }],
-        ['Song wünschen – $20', () => { if (!this.pay(20)) return; G.interior.station = G.interior.station === 2 ? 0 : 2; G.audio.nextBar = 0; G.hud.toast('Der DJ legt deinen Wunsch auf!'); }],
+        ['Song wünschen – $20', () => { if (!this.pay(20)) return; G.interior.station = G.interior.station === 3 ? 2 : G.interior.station === 2 ? 0 : 3; G.audio.nextBar = 0; G.hud.toast('Der DJ legt deinen Wunsch auf!'); }],
       ]);
     }
   }

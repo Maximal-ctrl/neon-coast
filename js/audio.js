@@ -8,6 +8,8 @@ export const STATIONS = [
   { name: 'NEON 88.3', genre: 'Synthwave', bpm: 104, root: 57, scale: [0, 2, 3, 5, 7, 8, 10], prog: [[0, 3, 7], [-4, 0, 3], [-9, -5, -2], [-2, 2, 5]], style: 'synth' },
   { name: 'BAY BEATS 97.1', genre: 'Lo-Fi Hip-Hop', bpm: 84, root: 50, scale: [0, 2, 3, 5, 7, 9, 10], prog: [[0, 3, 7, 10], [5, 9, 12, 15], [-2, 2, 5, 9], [-5, -2, 2, 5]], style: 'lofi' },
   { name: 'TROPICAL 104.5', genre: 'Latin Dance', bpm: 96, root: 57, scale: [0, 2, 3, 5, 7, 8, 10], prog: [[0, 3, 7], [-2, 2, 5], [-4, 0, 3], [-2, 2, 5]], style: 'latin' },
+  { name: 'PULSE 132', genre: 'Techno', bpm: 132, root: 45, scale: [0, 3, 5, 7, 10], prog: [[0, 3, 7], [0, 3, 7], [-2, 2, 5], [-4, 0, 3]], style: 'techno' },
+  { name: 'MEIN RADIO', genre: 'Deine eigene Musik', style: 'user' },
   { name: 'RADIO AUS', style: 'off' },
 ];
 
@@ -16,6 +18,14 @@ export class AudioSys {
 
   init() {
     if (this.ctx) { this.resume(); return; }
+    // iPad/iPhone: Ton auch bei aktivem Lautlos-Schalter (Wiedergabe wie Musik-App)
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* */ }
+    try {
+      const sil = document.createElement('audio');
+      sil.src = URL.createObjectURL(silentWav()); sil.loop = true; sil.setAttribute('playsinline', ''); sil.volume = 0.01;
+      sil.play().catch(() => {});
+      this.silentEl = sil;
+    } catch (e) { /* */ }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = this.ctx = new AC();
@@ -75,11 +85,23 @@ export class AudioSys {
     this.hornO1.start(); this.hornO2.start();
     this.hornT = 0;
     this.nextBar = 0; this.bar = 0;
+    // Eigene Musik (Mein Radio)
+    this.tracks = []; this.trackIdx = 0;
+    this.userEl = document.createElement('audio');
+    this.userEl.setAttribute('playsinline', '');
+    this.userEl.addEventListener('ended', () => this.nextTrack());
+    this.userGain = ctx.createGain(); this.userGain.gain.value = 0;
+    try { ctx.createMediaElementSource(this.userEl).connect(this.userGain); this.userGain.connect(this.music); } catch (e) { /* */ }
+    this.loadLibrary();
     this.applyVolumes();
     this.ready = true;
     this.resume();
   }
-  resume() { if (this.ctx && this.ctx.state !== 'running') this.ctx.resume(); }
+  resume() {
+    if (this.ctx && this.ctx.state !== 'running') this.ctx.resume();
+    if (this.silentEl && this.silentEl.paused) this.silentEl.play().catch(() => {});
+    if (this.userEl && this.userEl.paused && this.tracks.length) this.userEl.play().catch(() => {});
+  }
   suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); }
   applyVolumes() {
     if (!this.ctx) return;
@@ -214,15 +236,18 @@ export class AudioSys {
     const st = STATIONS[this.station];
     const clubMusic = playing && !v && G.interior && G.interior.kind === 'club';
     const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic;
-    this.musicBus.gain.setTargetAtTime(wantMusic ? (G.state === 'title' ? 0.7 : 1) : 0, t, 0.4);
-    if (wantMusic) this.schedule();
+    const userOn = !!(v && playing && st.style === 'user' && !clubMusic && this.tracks.length);
+    if (this.userGain) this.userGain.gain.setTargetAtTime(userOn ? 1.6 : 0, t, 0.3);
+    this.musicBus.gain.setTargetAtTime(wantMusic && !userOn ? (G.state === 'title' ? 0.7 : 1) : 0, t, 0.4);
+    if (wantMusic && !userOn) this.schedule();
     else this.nextBar = 0;
   }
 
   nextStation() {
     this.station = (this.station + 1) % STATIONS.length;
     this.nextBar = 0;
-    G.hud.radio(STATIONS[this.station]);
+    G.hud.radio(this.stationInfo(this.station));
+    if (STATIONS[this.station].style === 'user' && !this.tracks.length) G.hud.toast('Noch keine eigene Musik – im Handy unter Radio hinzufügen.');
     this.noiseHit(0.25, 'bandpass', 2500, 0.15, 800, 1);
   }
 
@@ -230,8 +255,8 @@ export class AudioSys {
   schedule() {
     const ctx = this.ctx;
     const club = G.interior && G.interior.kind === 'club' && !(G.player && G.player.inCar);
-    const st = G.state === 'title' || club ? STATIONS[club ? 2 : 0] : STATIONS[this.station];
-    if (st.style === 'off') return;
+    const st = G.state === 'title' || club ? STATIONS[club ? (G.interior.station ?? 3) : 0] : STATIONS[this.station];
+    if (st.style === 'off' || st.style === 'user') return;
     const spb = 60 / st.bpm, bar = spb * 4;
     if (this.nextBar < ctx.currentTime) { this.nextBar = ctx.currentTime + 0.1; this.bar = 0; this.motif = null; }
     while (this.nextBar < ctx.currentTime + 0.4) {
@@ -273,6 +298,17 @@ export class AudioSys {
       this.synthBass(NOTE(root - 12 + chord[0] + 7), t0 + spb * 2.5, spb, 0.2, 'sine');
       this.motif.forEach((m, i) => { if (m !== null && i % 3 === 0) this.pluck(NOTE(root + 24 + m), t0 + i * s16, s16 * 2, 0.035, 'triangle'); });
       this.noiseHit(spb * 4, 'highpass', 4000, 0.008);
+    } else if (st.style === 'techno') {
+      for (let b = 0; b < 4; b++) {
+        this.kick(t0 + b * spb, 1.0);
+        this.hat(t0 + b * spb + spb / 2, 0.22, 0.16);
+        if (b % 2 === 1 && section > 0) this.snare(t0 + b * spb, 0.45, false, true);
+        for (let i = 1; i < 4; i++) this.synthBass(NOTE(root - 12 + chord[0] + (i === 3 ? 12 : 0)), t0 + b * spb + i * s16, s16 * 0.8, 0.18);
+      }
+      for (let i = 0; i < 16; i++) this.hat(t0 + i * s16, i % 2 ? 0.04 : 0.07);
+      const cut = 500 + 1800 * (0.5 + 0.5 * Math.sin(n * 0.4));
+      if (section !== 0) this.motif.forEach((m, i) => { if (m !== null) this.acid(NOTE(root + m + (i % 7 === 0 ? 12 : 0)), t0 + i * s16, s16 * 0.9, 0.07, cut); });
+      if (section >= 2 && n % 2 === 0) this.keys(chord.map((c) => NOTE(root + 12 + c)), t0, spb * 0.5, 0.04);
     } else if (st.style === 'latin') {
       for (let b = 0; b < 4; b++) this.kick(t0 + b * spb, 0.85);
       [3, 6, 11, 14].forEach((i) => this.snare(t0 + i * s16, 0.35, false, true));
@@ -291,7 +327,13 @@ export class AudioSys {
     s.connect(f); f.connect(g); g.connect(this.musicBus); s.start(t, Math.random()); s.stop(t + 0.35);
     if (!rim) { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 190; const og = ctx.createGain(); this.env(og, t, 0.002, 0.1, v * 0.3); o.connect(og); og.connect(this.musicBus); o.start(t); o.stop(t + 0.15); }
   }
-  hat(t, v) { const ctx = this.ctx; const s = ctx.createBufferSource(); s.buffer = this.noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000; const g = ctx.createGain(); this.env(g, t, 0.001, 0.05, v); s.connect(f); f.connect(g); g.connect(this.musicBus); s.start(t, Math.random()); s.stop(t + 0.08); }
+  acid(freq, t, dur, v, cut) {
+    const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = freq;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 13; f.frequency.setValueAtTime(cut * 1.6, t); f.frequency.exponentialRampToValueAtTime(Math.max(120, cut * 0.25), t + dur);
+    const g = ctx.createGain(); this.env(g, t, 0.003, dur, v);
+    o.connect(f); f.connect(g); g.connect(this.musicBus); o.start(t); o.stop(t + dur + 0.05);
+  }
+  hat(t, v, dec = 0.05) { const ctx = this.ctx; const s = ctx.createBufferSource(); s.buffer = this.noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000; const g = ctx.createGain(); this.env(g, t, 0.001, dec, v); s.connect(f); f.connect(g); g.connect(this.musicBus); s.start(t, Math.random()); s.stop(t + 0.08); }
   synthBass(freq, t, dur, v, type = 'sawtooth') {
     const ctx = this.ctx; const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq;
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(200, t + dur);
@@ -325,4 +367,65 @@ export class AudioSys {
     const g = ctx.createGain(); this.env(g, t, 0.02, dur, v);
     o.connect(f); f.connect(g); g.connect(this.musicBus); o.start(t); vib.start(t); o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
   }
+
+  // ------------------------------------------------- Eigene Musik
+  stationInfo(i) {
+    const st = STATIONS[i];
+    if (st.style === 'user') return { ...st, genre: this.tracks && this.tracks.length ? `${this.tracks.length} eigene Songs` : 'Keine Songs – im Handy hinzufügen' };
+    return st;
+  }
+  async addFiles(files) {
+    let n = 0;
+    for (const f of files) {
+      if (!f.type.startsWith('audio') && !/\.(mp3|m4a|aac|wav|ogg)$/i.test(f.name)) continue;
+      try { await dbPut({ id: Date.now() + '_' + Math.random().toString(36).slice(2), name: f.name.replace(/\.[^.]+$/, ''), blob: f }); n++; } catch (e) { this.tracks.push({ name: f.name, url: URL.createObjectURL(f) }); n++; }
+    }
+    await this.loadLibrary();
+    return n;
+  }
+  async loadLibrary() {
+    try {
+      const list = await dbAll();
+      for (const t of this.tracks) if (t.url && t.fromDb) URL.revokeObjectURL(t.url);
+      this.tracks = list.map((t) => ({ name: t.name, url: URL.createObjectURL(t.blob), fromDb: true }));
+    } catch (e) { /* IndexedDB nicht verfügbar */ }
+    for (let i = this.tracks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [this.tracks[i], this.tracks[j]] = [this.tracks[j], this.tracks[i]]; }
+    this.trackIdx = 0;
+    if (this.tracks.length && this.userEl) { this.userEl.src = this.tracks[0].url; this.userEl.play().catch(() => {}); }
+  }
+  async clearLibrary() {
+    try { await dbClear(); } catch (e) { /* */ }
+    if (this.userEl) { this.userEl.pause(); this.userEl.removeAttribute('src'); }
+    this.tracks = [];
+  }
+  nextTrack() {
+    if (!this.tracks.length) return;
+    this.trackIdx = (this.trackIdx + 1) % this.tracks.length;
+    this.userEl.src = this.tracks[this.trackIdx].url;
+    this.userEl.play().catch(() => {});
+    if (G.player && G.player.inCar && STATIONS[this.station].style === 'user') G.hud.radio({ name: 'MEIN RADIO', genre: '♪ ' + this.tracks[this.trackIdx].name });
+  }
+  currentTrack() { return this.tracks.length ? this.tracks[this.trackIdx].name : null; }
 }
+
+// Stille WAV-Datei (hält die iOS-Audiositzung im Wiedergabe-Modus)
+function silentWav() {
+  const sr = 8000, n = sr / 2, buf = new ArrayBuffer(44 + n * 2), d = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) d.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, 'RIFF'); d.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); d.setUint32(16, 16, true);
+  d.setUint16(20, 1, true); d.setUint16(22, 1, true); d.setUint32(24, sr, true); d.setUint32(28, sr * 2, true);
+  d.setUint16(32, 2, true); d.setUint16(34, 16, true); w(36, 'data'); d.setUint32(40, n * 2, true);
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+// IndexedDB für eigene Songs
+function db() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('neoncoast_music', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('tracks', { keyPath: 'id' });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function dbPut(rec) { const d = await db(); return new Promise((res, rej) => { const tx = d.transaction('tracks', 'readwrite'); tx.objectStore('tracks').put(rec); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function dbAll() { const d = await db(); return new Promise((res, rej) => { const r = d.transaction('tracks').objectStore('tracks').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
+async function dbClear() { const d = await db(); return new Promise((res, rej) => { const tx = d.transaction('tracks', 'readwrite'); tx.objectStore('tracks').clear(); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
