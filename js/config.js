@@ -71,6 +71,8 @@ export const DISTRICT_NAMES = {
   midtown: 'Midtown',
   pier: 'Sunset Pier',
   sea: 'Offenes Meer',
+  club: 'Club Velvet',
+  bank: 'Solera Bank',
 };
 
 export function districtAt(x, z) {

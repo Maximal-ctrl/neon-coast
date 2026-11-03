@@ -39,6 +39,7 @@ export class World {
     this.parks = [];
     this.lamps = [];
     this.lampAnim = [];
+    this.rooms = []; // Innenräume: {x0,x1,z0,z1,y}
     this.ramps = C.RAMPS.map((r) => ({ ...r, fx: Math.sin(r.dir), fz: Math.cos(r.dir) }));
     this.signalState = [];
     this.boats = [];
@@ -85,6 +86,7 @@ export class World {
   }
 
   groundHeight(x, z) {
+    for (let i = 0; i < this.rooms.length; i++) { const r = this.rooms[i]; if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return r.y; }
     const P = C.PIER, PP = C.PIER_PLAT;
     if (z > P.z0 && z < P.z1 && x > P.x0 && x < P.x1) {
       const y = x < P.rampEnd ? lerp(-0.45, P.y, (x - P.x0) / (P.rampEnd - P.x0)) : P.y;

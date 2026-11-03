@@ -221,3 +221,40 @@ body.touch #weapon-box { cursor: pointer; }
   #tbtns { transform: scale(.82); transform-origin: right bottom; }
   #mm-wrap { width: 140px; }
 }
+
+/* ---------- Handy ---------- */
+#phone-btn { position: absolute; top: calc(12px + var(--sat)); left: calc(68px + var(--sal)); width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255,255,255,.3);
+  background: rgba(0,0,0,.45); color: #fff; font-size: 22px; pointer-events: auto; cursor: pointer; }
+#hint { left: calc(124px + var(--sal)) !important; }
+#phone { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: flex-end; padding-right: max(5vw, var(--sar)); background: rgba(5,2,12,.35); }
+.ph-body { width: min(320px, 46vh); height: min(620px, 92vh); border-radius: 40px; background: linear-gradient(160deg, #1b0f2e, #0a0612 60%); border: 3px solid #2c2140;
+  box-shadow: 0 0 0 2px #000, 0 20px 60px rgba(0,0,0,.6), 0 0 30px rgba(255,46,136,.25); display: flex; flex-direction: column; overflow: hidden; animation: phin .25s ease-out; }
+@keyframes phin { from { transform: translateY(40px); opacity: 0; } }
+.ph-top { display: flex; justify-content: space-between; padding: 14px 22px 6px; font-size: 13px; opacity: .8; }
+#ph-screen { flex: 1; overflow: auto; padding: 8px 16px; display: flex; flex-direction: column; gap: 8px; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.ph-bottom { display: flex; justify-content: space-between; align-items: center; padding: 10px 22px 16px; }
+.ph-home { width: 54px; height: 54px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.06); cursor: pointer; }
+.ph-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,.08); color: #fff; font-size: 16px; cursor: pointer; display: inline-block; }
+.ph-wall { text-align: center; padding: 18px 0 10px; background: radial-gradient(ellipse at 50% 120%, rgba(255,106,61,.55), rgba(176,36,107,.35) 45%, transparent 75%); border-radius: 20px; }
+.ph-clock { font-family: 'Russo One'; font-size: 52px; text-shadow: 0 0 18px rgba(255,46,136,.6); }
+.ph-date { font-size: 15px; opacity: .8; }
+.ph-apps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 10px; }
+.ph-app { background: none; border: none; color: #fff; font: inherit; font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; }
+.ph-app span { width: 58px; height: 58px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 28px;
+  background: linear-gradient(145deg, rgba(255,46,136,.5), rgba(25,230,255,.35)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); }
+.ph-app:active span { transform: scale(.92); }
+.ph-head { display: flex; align-items: center; gap: 10px; font-size: 20px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.ph-head b { font-family: 'Russo One'; font-weight: 400; color: var(--gold); }
+.ph-back { background: none; border: none; color: #fff; font-size: 30px; line-height: 1; cursor: pointer; padding: 0 6px; }
+.ph-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 12px; color: #fff; font: inherit; font-size: 17px; cursor: pointer; }
+.ph-row span { font-size: 13px; opacity: .7; }
+.ph-row.on { border-color: var(--pink); background: rgba(255,46,136,.18); }
+.ph-call { font-size: 54px; text-align: center; margin: 6px 0; }
+.ph-bubble { background: rgba(25,230,255,.12); border: 1px solid rgba(25,230,255,.3); border-radius: 14px 14px 14px 4px; padding: 10px 12px; font-size: 16px; line-height: 1.35; }
+.ph-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.ph-actions .mbtn { text-align: center; font-size: 15px; }
+.ph-note { font-size: 14px; opacity: .7; text-align: center; }
+.ph-msg { display: flex; flex-direction: column; gap: 3px; background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px 12px; }
+.ph-msg b { color: var(--cyan); font-size: 14px; } .ph-msg span { font-size: 15px; }
+#ph-screen .kv { font-size: 14px; }
+body.photo #hud, body.photo #touch { display: none !important; }

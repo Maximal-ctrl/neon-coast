@@ -6,7 +6,7 @@ const KEYMAP = {
   KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
   ShiftLeft: 'sprint', ShiftRight: 'sprint', Space: 'jump', KeyF: 'enter', KeyE: 'enter', Enter: 'enter',
   KeyQ: 'weapon', KeyR: 'radio', KeyH: 'horn', KeyM: 'map', Escape: 'pause', KeyP: 'pause', KeyC: 'camera', KeyG: 'siren',
-  KeyX: 'handbrake',
+  KeyX: 'handbrake', KeyT: 'phone',
 };
 
 export class Input {

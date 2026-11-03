@@ -249,6 +249,7 @@ export class PedManager {
     const night = G.world.env.night;
     this.target = Math.round(dens * (1 - night * 0.45) * (G.quality === 'low' ? 0.6 : 1));
     this.spawnT -= dt;
+    if (G.interior) this.spawnT = 1;
     if (this.spawnT <= 0) {
       this.spawnT = 0.25;
       const n = this.list.filter((p) => !p.isCop && p.alive && !p.persistent).length;
@@ -269,7 +270,7 @@ export class PedManager {
   think(p, dt) {
     const P = G.player;
     p.timer -= dt;
-    p.anim.panic = false; p.anim.aim = false; p.anim.handsUp = false;
+    p.anim.panic = false; p.anim.aim = false; p.anim.handsUp = !!p.surrender;
     switch (p.state) {
       case 'walk': {
         if (!p.path) { this.attachPath(p); }

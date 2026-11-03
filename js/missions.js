@@ -25,7 +25,7 @@ function iconTexture(label, col) {
   g.fillStyle = '#111'; g.font = 'bold 70px "Russo One", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, 64, 68);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-class Marker {
+export class Marker {
   constructor(x, z, color = 0xffd23f, opts = {}) {
     this.x = x; this.z = z;
     this.r = opts.r || 1.6;

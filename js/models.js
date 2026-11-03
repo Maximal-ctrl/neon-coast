@@ -121,12 +121,13 @@ export class CrowdRenderer {
     const sw = Math.sin(ph) * amp;
     const bob = Math.abs(Math.cos(ph)) * 0.05 * amp;
     const breathe = Math.sin((A.t || 0) * 2) * 0.01;
+    const dn = A.dance ? (A.t || 0) * 6.5 + (A.dseed || 0) : 0;
     // Becken
-    child(_pelvis, _root, 0, 1.0 + bob - (A.crouch || 0), 0, 0, Math.sin(ph) * 0.12 * amp, 0);
+    child(_pelvis, _root, 0, 1.0 + bob - (A.crouch || 0) + (A.dance ? Math.abs(Math.sin(dn)) * 0.07 - 0.04 : 0), 0, 0, Math.sin(ph) * 0.12 * amp, 0);
     this._set('hips', i, _pelvis, L.pants);
     // Oberkörper
     const lean = 0.06 * run + (A.lean || 0);
-    child(_torso, _pelvis, 0, 0.08, 0, lean + breathe, -Math.sin(ph) * 0.18 * amp + (A.twist || 0), 0);
+    child(_torso, _pelvis, 0, 0.08, 0, lean + breathe, -Math.sin(ph) * 0.18 * amp + (A.twist || 0) + (A.dance ? Math.sin(dn * 0.5) * 0.35 : 0), 0);
     this._set('torso', i, _torso, L.shirt);
     child(_m, _torso, 0, 0.64, 0, (A.headPitch || 0) - lean * 0.5, A.headYaw || 0, 0);
     this._set('head', i, _m, L.skin);
@@ -150,6 +151,7 @@ export class CrowdRenderer {
     if (A.air) { lsx = -0.6; rsx = -0.6; lsz = 0.5; rsz = -0.5; }
     if (A.swim) { lsx = -Math.PI + Math.sin(ph) * 1.2; rsx = -Math.PI - Math.sin(ph) * 1.2; lsz = 0.3; rsz = -0.3; }
     if (A.handsUp) { lsx = -2.9; rsx = -2.9; lsz = 0.2; rsz = -0.2; lel = -0.3; rel = -0.3; }
+    if (A.dance && !A.handsUp) { lsx = -1.4 - Math.sin(dn) * 1.1; rsx = -1.4 + Math.sin(dn) * 1.1; lsz = 0.45; rsz = -0.45; lel = -0.9; rel = -0.9; }
     child(_sh, _torso, 0.27, 0.56, 0, lsx, 0, lsz);
     this._set('uarmL', i, _sh, L.sleeve);
     child(_el, _sh, 0, -0.29, 0, lel, 0, 0);
@@ -165,6 +167,7 @@ export class CrowdRenderer {
     if (A.air) { lth = -0.7; rth = -0.2; lkn = 1.1; rkn = 0.6; }
     if (A.swim) { lth = Math.sin(ph * 2) * 0.3; rth = -Math.sin(ph * 2) * 0.3; lkn = 0.2; rkn = 0.2; }
     if (A.sit) { lth = -1.5; rth = -1.5; lkn = 1.5; rkn = 1.5; }
+    if (A.dance) { lth = Math.sin(dn) * 0.25; rth = -Math.sin(dn) * 0.25; lkn = 0.25 + Math.max(0, Math.sin(dn)) * 0.4; rkn = 0.25 + Math.max(0, -Math.sin(dn)) * 0.4; }
     child(_hip, _pelvis, 0.1, -0.05, 0, lth, 0, 0.02);
     this._set('thighL', i, _hip, L.pants);
     child(_kn, _hip, 0, -0.43, 0, lkn, 0, 0);

@@ -212,7 +212,8 @@ export class AudioSys {
     this.heli.g.gain.setTargetAtTime(playing ? this.heliV * 0.25 : 0, t, 0.2);
     // Radio
     const st = STATIONS[this.station];
-    const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off');
+    const clubMusic = playing && !v && G.interior && G.interior.kind === 'club';
+    const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic;
     this.musicBus.gain.setTargetAtTime(wantMusic ? (G.state === 'title' ? 0.7 : 1) : 0, t, 0.4);
     if (wantMusic) this.schedule();
     else this.nextBar = 0;
@@ -228,7 +229,8 @@ export class AudioSys {
   // ------------------------------------------------- Prozedurale Musik
   schedule() {
     const ctx = this.ctx;
-    const st = G.state === 'title' ? STATIONS[0] : STATIONS[this.station];
+    const club = G.interior && G.interior.kind === 'club' && !(G.player && G.player.inCar);
+    const st = G.state === 'title' || club ? STATIONS[club ? 2 : 0] : STATIONS[this.station];
     if (st.style === 'off') return;
     const spb = 60 / st.bpm, bar = spb * 4;
     if (this.nextBar < ctx.currentTime) { this.nextBar = ctx.currentTime + 0.1; this.bar = 0; this.motif = null; }

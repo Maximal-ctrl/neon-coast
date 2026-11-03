@@ -21,6 +21,7 @@ import { AudioSys, STATIONS } from './audio.js';
 import { HUD } from './hud.js';
 import { Missions, shopItems } from './missions.js';
 import { Save } from './save.js';
+import { Interiors } from './interiors.js';
 import { fmtTime } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -147,6 +148,7 @@ function startGame(load) {
   else { Save.clear(); P.money = 250; G.timeOfDay = 16.5; }
   applyOutfit(P.outfit || 0);
   G.missions.init();
+  G.interiors = new Interiors(G.scene);
   const sh = G.world.pois.safehouse;
   P.x = sh.x - 5; P.z = sh.z - 2.5; P.y = 0; P.yaw = -Math.PI / 2; P.state = 'foot'; P.visible = true;
   G.cam.yaw = -Math.PI / 2; G.cam.pitch = -0.2;
@@ -288,6 +290,132 @@ function statsHTML() {
   <span>Polizei abgehängt</span><b>${S.copsEvaded}×</b></div>`;
 }
 
+
+// ------------------------------------------------------------ Menüs im Spiel & Handy
+G.openMenu = function (title, html, items) {
+  if (G.state !== 'playing') return;
+  G.state = 'menu';
+  if (document.pointerLockElement) document.exitPointerLock();
+  const close = () => { closePanel(); G.state = 'playing'; last = performance.now(); };
+  openPanel(title, html, items.map(([label, fn, cls]) => [label, () => { close(); fn && fn(); }, cls]).concat([['Schließen', close]]));
+};
+
+let phoneOpen = false;
+function openPhone() {
+  if (G.state !== 'playing' || G.player.state === 'dead' || G.player.state === 'busted') return;
+  G.state = 'menu'; phoneOpen = true;
+  if (document.pointerLockElement) document.exitPointerLock();
+  $('phone').classList.remove('hidden');
+  phoneHome();
+  if (G.audio.ready) G.audio.click();
+}
+function closePhone() {
+  if (!phoneOpen) return;
+  phoneOpen = false;
+  $('phone').classList.add('hidden');
+  if (G.state === 'menu') { G.state = 'playing'; last = performance.now(); }
+}
+function phoneScreen(title, html, back = true) {
+  $('ph-screen').innerHTML = (back ? `<div class="ph-head"><button class="ph-back" data-ph="home">‹</button><b>${title}</b></div>` : '') + html;
+}
+function phoneHome() {
+  const apps = [['contacts', '📞', 'Kontakte'], ['messages', '✉️', 'Nachrichten'], ['map', '🗺️', 'Karte'], ['radio', '📻', 'Radio'], ['stats', '📊', 'Statistik'], ['photo', '📷', 'Fotomodus']];
+  phoneScreen('', `<div class="ph-wall"><div class="ph-clock">${$('clock').textContent}</div><div class="ph-date">Port Solera · ${G.world.env.night > 0.5 ? 'Nacht' : 'Tag'}</div></div>
+    <div class="ph-apps">${apps.map(([id, ic, n]) => `<button class="ph-app" data-ph="${id}"><span>${ic}</span>${n}</button>`).join('')}</div>`, false);
+}
+function nextHint() {
+  const M = G.missions;
+  if (M.active && !M.active.side) return 'Erledige erst deinen aktuellen Auftrag: ' + ($('objective').innerText || M.active.title) + '.';
+  const def = M.story[M.progress];
+  if (def) return `Dein nächster Auftrag wartet bei ${G.world.pois[def.giver].name} (gelbes ${def.label} auf der Karte).`;
+  return 'Die Geschichte ist erledigt. Such Neon-Muscheln, Stuntsprünge – oder versuch dein Glück in der Solera Bank.';
+}
+const CONTACTS = [
+  { id: 'rosa', name: 'Tante Rosa', ic: '👵', lines: ['Hast du heute schon was Richtiges gegessen?', 'Pass auf dich auf, mijo.', 'Im Diner gibt\'s heute Fischtacos!'] },
+  { id: 'dex', name: 'Dex (Werkstatt)', ic: '🔧', lines: ['Na, wieder was kaputt gemacht?', 'Ich hab immer einen Wagen für dich.'] },
+  { id: 'val', name: 'Val', ic: '💜', lines: ['Ruf mich nur an, wenn es wichtig ist.', 'Die Bank in Downtown hat erstaunlich wenig Wachpersonal …'] },
+  { id: 'anwalt', name: 'Anwalt Kessler', ic: '⚖️', lines: ['Kessler & Partner. Wir lösen Probleme mit der Polizei.'] },
+  { id: 'club', name: 'Club Velvet', ic: '🪩', lines: ['Heute Nacht: DJ-Set & Show! Eingang am Club Velvet, Midtown-Ost.'] },
+];
+function phoneContact(c) {
+  const P = G.player;
+  const say = c.lines[Math.floor(Math.random() * c.lines.length)];
+  let actions = '';
+  if (c.id === 'dex') {
+    actions += `<button class="mbtn small" data-act="car">Auto liefern lassen – $250</button>`;
+    if (P.inCar) actions += `<button class="mbtn small" data-act="repair">Wagen reparieren – $150</button>`;
+  }
+  if (c.id === 'anwalt') actions += G.police.level > 0 ? `<button class="mbtn small" data-act="lawyer">Fahndung löschen – $${G.police.level * 600}</button>` : '<div class="ph-note">Du wirst gerade nicht gesucht.</div>';
+  const hint = c.id === 'rosa' || c.id === 'val' || c.id === 'dex' ? `<div class="ph-bubble">${nextHint()}</div>` : '';
+  phoneScreen(c.name, `<div class="ph-call">${c.ic}</div><div class="ph-bubble">${say}</div>${hint}<div class="ph-actions">${actions}</div>`);
+  $('ph-screen').querySelectorAll('[data-act]').forEach((b) => b.onclick = () => phoneAction(b.dataset.act));
+}
+function phoneAction(a) {
+  const P = G.player;
+  const pay = (n) => { if (P.money < n) { G.hud.toast('Nicht genug Geld.'); return false; } P.addMoney(-n); return true; };
+  if (a === 'car') {
+    if (G.interior) { G.hud.toast('Dex: Ich kann dir kein Auto in ein Gebäude stellen!'); return; }
+    if (P.inCar) { G.hud.toast('Dex: Du sitzt doch schon in einem Auto.'); return; }
+    if (!pay(250)) return;
+    const n = G.world.nearestNode(P.x, P.z);
+    const o = G.world.nodes[n.nbr[Math.floor(Math.random() * n.nbr.length)]];
+    const dx = Math.sign(o.x - n.x), dz = Math.sign(o.z - n.z);
+    const x = n.x + dx * 22 - dz * 6, z = n.z + dz * 22 + dx * 6;
+    const key = G.missions.progress >= 5 ? 'vortex' : G.missions.progress >= 2 ? 'zephyra' : 'brutus';
+    const v = G.vm.spawn(key, x, z, Math.atan2(dx, dz));
+    if (v) {
+      v.parked = true; v.ownedByPlayer = true; v.missionCar = true; P.lastVehicle = v;
+      setTimeout(() => { v.missionCar = false; }, 60000);
+      G.hud.toast(`Dex: Dein ${v.T.name} steht bereit – blauer Punkt auf der Karte.`);
+    }
+    closePhone();
+  } else if (a === 'repair') {
+    if (!P.inCar) return;
+    if (!pay(150)) return;
+    const v = P.vehicle; v.health = v.maxHealth; v.onFire = false;
+    G.hud.toast('Dex: Wie neu!'); closePhone();
+  } else if (a === 'lawyer') {
+    if (G.police.locked || G.police.minLevel > 0) { G.hud.toast('Kessler: Da kann selbst ich nichts machen.'); return; }
+    if (!pay(G.police.level * 600)) return;
+    G.police.setLevel(0, true); G.police.clear();
+    G.hud.toast('Kessler: Erledigt. Die Akte ist verschwunden.'); closePhone();
+  }
+}
+function phoneMessages() {
+  const p = G.missions.progress;
+  const msgs = [['Tante Rosa', 'Willkommen zurück, Leo! Komm im Diner vorbei.']];
+  if (p >= 1) msgs.push(['Dex', 'Hab gehört, du kannst fahren. Komm in die Werkstatt.']);
+  if (p >= 3) msgs.push(['Val', 'Dex sagt, du bist zuverlässig. Wir sollten reden. Club Velvet.']);
+  if (p >= 4) msgs.push(['Club Velvet', 'Du stehst ab sofort auf der Gästeliste. 🪩']);
+  if (p >= 6) msgs.push(['Val', 'Bereite dich vor. Das große Ding steht an.']);
+  if (p >= 7) msgs.push(['Val', 'Die Bank hat schon wieder aufgefüllt … nur so als Info. 😉']);
+  msgs.push(['Port Solera News', 'Neon-Muscheln am Strand gesichtet! Sammler zahlen gut.']);
+  phoneScreen('Nachrichten', msgs.reverse().map(([f, t]) => `<div class="ph-msg"><b>${f}</b><span>${t}</span></div>`).join(''));
+}
+function phoneRadio() {
+  phoneScreen('Radio', STATIONS.map((s, i) => `<button class="ph-row ${G.audio.station === i ? 'on' : ''}" data-st="${i}"><b>${s.name}</b><span>${s.genre || ''}</span></button>`).join('') + '<div class="ph-note">Das Radio läuft im Auto.</div>');
+  $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => { G.audio.station = +b.dataset.st; G.audio.nextBar = 0; G.hud.radio(STATIONS[G.audio.station]); phoneRadio(); });
+}
+function setupPhone() {
+  $('phone-btn').addEventListener('click', () => openPhone());
+  $('phone-btn').addEventListener('touchend', (e) => { e.preventDefault(); openPhone(); });
+  $('ph-home').onclick = () => (phoneOpen ? phoneHome() : null);
+  $('ph-close').onclick = () => closePhone();
+  $('ph-screen').addEventListener('click', (e) => {
+    const el = e.target.closest('[data-ph], [data-ct]');
+    if (!el) return;
+    if (el.dataset.ct) { phoneContact(CONTACTS.find((c) => c.id === el.dataset.ct)); return; }
+    const app = el.dataset.ph;
+    if (app === 'home') phoneHome();
+    else if (app === 'contacts') phoneScreen('Kontakte', CONTACTS.map((c) => `<button class="ph-row" data-ct="${c.id}"><b>${c.ic} ${c.name}</b></button>`).join(''));
+    else if (app === 'messages') phoneMessages();
+    else if (app === 'radio') phoneRadio();
+    else if (app === 'stats') phoneScreen('Statistik', statsHTML());
+    else if (app === 'map') { closePhone(); showMap(); }
+    else if (app === 'photo') { closePhone(); document.body.classList.add('photo'); G.hud.toast('Fotomodus – zum Beenden irgendwo tippen oder Esc'); setTimeout(() => { const off = () => { document.body.classList.remove('photo'); window.removeEventListener('pointerdown', off); window.removeEventListener('keydown', off); }; window.addEventListener('pointerdown', off); window.addEventListener('keydown', off); }, 300); }
+  });
+}
+
 G.openService = function (kind) {
   if (G.state !== 'playing') return;
   G.state = 'menu';
@@ -324,6 +452,7 @@ function setupUI() {
   $('btn-continue').onclick = () => startGame(true);
   $('btn-controls').onclick = () => openPanel('STEUERUNG', controlsHTML(), [['Schließen', closePanel]]);
   $('btn-settings').onclick = () => { openPanel('EINSTELLUNGEN', settingsHTML(), [['Schließen', closePanel]]); bindSettings(); };
+  setupPhone();
   $('pause-btn').addEventListener('click', () => setPaused(true));
   $('pause-btn').addEventListener('touchend', (e) => { e.preventDefault(); setPaused(true); });
   $('minimap').addEventListener('click', () => { if (G.state === 'playing') showMap(); });
@@ -411,6 +540,7 @@ function update(now, step, I) {
     G.audio.update(step);
   } else if (G.state === 'playing') {
     if (I.pressed('pause')) { setPaused(true); }
+    else if (I.pressed('phone')) { openPhone(); }
     else if (I.pressed('map')) { showMap(); }
     G.time += step;
     G.stats.playTime += step;
@@ -427,6 +557,7 @@ function update(now, step, I) {
     for (let k = 0; k < sub; k++) G.vm.step(step / sub);
     G.peds.update(step);
     G.missions.update(step);
+    if (G.interiors) G.interiors.update(step);
     G.world.update(step);
     G.effects.update(step);
     G.cam.update(step);
@@ -438,6 +569,7 @@ function update(now, step, I) {
     autoQuality(step);
   } else if (G.state === 'paused' || G.state === 'menu') {
     if (I.pressed('pause') && G.state === 'paused') setPaused(false);
+    if (phoneOpen && (I.pressed('phone') || I.pressed('pause'))) closePhone();
     if (G.state === 'menu' && I.pressed('map') && !$('mapscreen').classList.contains('hidden')) { $('mapscreen').classList.add('hidden'); G.state = 'playing'; }
   }
 }

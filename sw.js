@@ -1,5 +1,5 @@
 // Service Worker: Spiel offline verfügbar machen
-const VERSION = 'neoncoast-v1';
+const VERSION = 'neoncoast-v2';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './lib/three.module.js',
@@ -8,7 +8,7 @@ const FILES = [
   './lib/addons/shaders/CopyShader.js', './lib/addons/shaders/LuminosityHighPassShader.js', './lib/addons/shaders/OutputShader.js',
   './js/main.js', './js/state.js', './js/utils.js', './js/config.js', './js/textures.js', './js/geo.js', './js/env.js', './js/world.js',
   './js/models.js', './js/physics.js', './js/vehicle.js', './js/effects.js', './js/peds.js', './js/traffic.js', './js/police.js',
-  './js/combat.js', './js/player.js', './js/camera.js', './js/input.js', './js/audio.js', './js/hud.js', './js/missions.js', './js/save.js',
+  './js/combat.js', './js/player.js', './js/camera.js', './js/input.js', './js/audio.js', './js/hud.js', './js/missions.js', './js/save.js', './js/interiors.js',
   './fonts/russo-one.woff2', './fonts/rajdhani-500.woff2', './fonts/rajdhani-600.woff2', './fonts/rajdhani-700.woff2',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png',
 ];

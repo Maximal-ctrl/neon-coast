@@ -122,7 +122,7 @@ export class HUD {
     $('hb-armor').style.width = clamp(P.armor, 0, 100) + '%';
     $('bars').classList.toggle('noarmor', P.armor <= 0);
     // Gebiet
-    const area = C.districtAt(P.x, P.z);
+    const area = G.interior ? G.interior.kind : C.districtAt(P.x, P.z);
     if (area !== this.lastArea) {
       this.lastArea = area;
       const el = $('area-name'); el.textContent = C.DISTRICT_NAMES[area] || ''; el.classList.add('show'); this.areaT = 3.5;

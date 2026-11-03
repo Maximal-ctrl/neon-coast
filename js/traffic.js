@@ -358,6 +358,7 @@ export class TrafficManager {
     }
     // Neue Autos
     this.spawnT -= dt;
+    if (G.interior) this.spawnT = 1;
     if (this.spawnT <= 0) {
       this.spawnT = 0.35;
       if (this.carCount() < this.target) this.spawnCar(px, pz);
