@@ -285,51 +285,125 @@ export class HUD {
   // ------------------------------------------------------------ Karte groß
   bindMap() {
     const cv = $('bigmap');
-    const handler = (cx, cy) => {
-      const r = cv.getBoundingClientRect();
-      const s = this.bigMapView;
-      if (!s) return;
-      const mx = ((cx - r.left) / r.width) * cv.width, my = ((cy - r.top) / r.height) * cv.height;
-      const W = G.world, MB = W.mapBounds;
-      const wx = MB.x0 + ((mx - s.ox) / s.k) / W.mapScale, wz = MB.z0 + ((my - s.oy) / s.k) / W.mapScale;
-      const M = G.missions;
-      if (M.waypoint && Math.hypot(M.waypoint.x - wx, M.waypoint.z - wz) < 30) M.waypoint = null;
-      else M.waypoint = { x: wx, z: wz };
-      this.routeT = 0;
-      this.drawBigMap();
+    this.mapView = null;
+    const ptrs = new Map();
+    let drag = null, pinch = null, moved = 0;
+    const toCanvas = (e) => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * (cv.width / r.width), (e.clientY - r.top) * (cv.height / r.height)]; };
+    cv.addEventListener('pointerdown', (e) => {
+      cv.setPointerCapture(e.pointerId);
+      ptrs.set(e.pointerId, toCanvas(e));
+      moved = 0;
+      if (ptrs.size === 1) drag = { p: toCanvas(e) };
+      if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: this.mapView.zoom }; drag = null; }
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (!ptrs.has(e.pointerId) || !this.mapView) return;
+      const p = toCanvas(e); ptrs.set(e.pointerId, p);
+      const V = this.mapView;
+      if (pinch && ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        this.setZoom(pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+        moved += 10;
+      } else if (drag) {
+        const dx = p[0] - drag.p[0], dy = p[1] - drag.p[1];
+        moved += Math.abs(dx) + Math.abs(dy);
+        V.ox += dx; V.oy += dy; drag.p = p;
+        this.drawBigMap(true);
+      }
+    });
+    const up = (e) => {
+      if (!ptrs.has(e.pointerId)) return;
+      const p = ptrs.get(e.pointerId);
+      ptrs.delete(e.pointerId);
+      if (ptrs.size < 2) pinch = null;
+      if (ptrs.size === 0) {
+        if (moved < 12 && drag) this.tapMap(p[0], p[1]);
+        drag = null;
+      }
     };
-    cv.addEventListener('click', (e) => handler(e.clientX, e.clientY));
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); const p = toCanvas(e); this.setZoom(this.mapView.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), p[0], p[1]); }, { passive: false });
+    $('map-zin').onclick = () => this.setZoom(this.mapView.zoom * 1.4, cv.width / 2, cv.height / 2);
+    $('map-zout').onclick = () => this.setZoom(this.mapView.zoom / 1.4, cv.width / 2, cv.height / 2);
+    $('map-center').onclick = () => { this.mapView = null; this.drawBigMap(); };
   }
-  drawBigMap() {
+  setZoom(z, cx, cy) {
+    const V = this.mapView;
+    z = Math.max(V.min, Math.min(V.min * 8, z));
+    // Punkt unter (cx,cy) bleibt fest
+    V.ox = cx - (cx - V.ox) * (z / V.zoom); V.oy = cy - (cy - V.oy) * (z / V.zoom);
+    V.zoom = z;
+    this.drawBigMap(true);
+  }
+  tapMap(mx, my) {
+    const V = this.mapView, W = G.world, MB = W.mapBounds;
+    const wx = MB.x0 + ((mx - V.ox) / V.zoom) / W.mapScale, wz = MB.z0 + ((my - V.oy) / V.zoom) / W.mapScale;
+    const M = G.missions;
+    if (M.waypoint && Math.hypot(M.waypoint.x - wx, M.waypoint.z - wz) < 30) { M.waypoint = null; this.toast('Wegpunkt entfernt'); }
+    else { M.waypoint = { x: wx, z: wz }; this.toast('Wegpunkt gesetzt – folge der lila Route'); }
+    this.routeT = 0;
+    this.drawBigMap(true);
+  }
+  drawBigMap(keep = false) {
     const cv = $('bigmap'), g = cv.getContext('2d');
     const r = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
     const W = G.world, img = W.mapCanvas;
-    const k = Math.min(cv.width / img.width, cv.height / img.height);
-    const ox = (cv.width - img.width * k) / 2, oy = (cv.height - img.height * k) / 2;
-    this.bigMapView = { k, ox, oy };
-    g.fillStyle = '#0b2a40'; g.fillRect(0, 0, cv.width, cv.height);
-    g.drawImage(img, ox, oy, img.width * k, img.height * k);
-    const toS = (x, z) => { const [mx, mz] = W.mapToPx(x, z); return [ox + mx * k, oy + mz * k]; };
-    // Bezirksnamen
-    g.font = `${Math.round(14 * dpr)}px "Russo One", sans-serif`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,0.55)';
-    const labels = [['Coral Heights', 0, -300], ['Downtown', 0, 0], ['Midtown', 200, -60], ['Westside', -280, 0], ['Hafen', -200, 330], ['Seaside', 330, -150], ['Solera Beach', 420, 200], ['Sunset Pier', 600, 95]];
-    for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.fillText(t, sx, sy); }
-    for (const b of G.missions.mapBlips(true)) {
-      const [sx, sy] = toS(b.x, b.z);
-      const rad = 9 * dpr;
-      g.fillStyle = b.col; g.strokeStyle = '#000'; g.lineWidth = 2 * dpr;
-      g.beginPath(); g.arc(sx, sy, rad, 0, 7); g.fill(); g.stroke();
-      if (b.label) { g.fillStyle = '#000'; g.font = `bold ${Math.round(12 * dpr)}px Rajdhani, sans-serif`; g.textBaseline = 'middle'; g.fillText(b.label, sx, sy + 1); }
+    if (!keep || !this.mapView) {
+      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+      const fit = Math.min(cv.width / img.width, cv.height / img.height);
+      if (!this.mapView || !keep) {
+        // auf den Spieler zentriert, leicht vergrößert
+        const P = G.player, px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
+        const [mx, mz] = W.mapToPx(px, pz);
+        const zoom = fit * 1.6;
+        this.mapView = { min: fit * 0.9, zoom, ox: cv.width / 2 - mx * zoom, oy: cv.height / 2 - mz * zoom };
+      }
     }
-    if (G.missions.waypoint) { const [sx, sy] = toS(G.missions.waypoint.x, G.missions.waypoint.z); g.fillStyle = '#be6eff'; g.beginPath(); g.arc(sx, sy, 8 * dpr, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.stroke(); }
+    const V = this.mapView, k = V.zoom;
+    g.fillStyle = '#070f1c'; g.fillRect(0, 0, cv.width, cv.height);
+    g.imageSmoothingEnabled = true;
+    g.drawImage(img, V.ox, V.oy, img.width * k, img.height * k);
+    const toS = (x, z) => { const [mx, mz] = W.mapToPx(x, z); return [V.ox + mx * k, V.oy + mz * k]; };
+    const u = dpr * Math.min(1.6, Math.max(0.9, k / (Math.min(cv.width, cv.height) / img.width)));
+    // Bezirksnamen
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `${Math.round(13 * u)}px "Russo One", sans-serif`;
+    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95]];
+    for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillText(t, sx + 1.5, sy + 1.5); g.fillStyle = 'rgba(200,220,255,0.62)'; g.fillText(t, sx, sy); }
+    // Route
+    const tgt = this.getRouteTarget();
+    if (tgt && this.route) {
+      g.save(); g.lineWidth = 5 * u; g.lineJoin = 'round'; g.lineCap = 'round';
+      g.strokeStyle = G.missions.gpsTarget ? '#ffd60a' : '#be6eff'; g.shadowColor = g.strokeStyle; g.shadowBlur = 10 * u;
+      g.beginPath(); this.route.forEach(([x, z], i) => { const [sx, sy] = toS(x, z); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy); }); g.stroke(); g.restore();
+    }
+    // Symbole
+    const icon = (x, z, col, label, size = 13) => {
+      const [sx, sy] = toS(x, z), rad = size * u;
+      g.save();
+      g.shadowColor = col; g.shadowBlur = 14 * u;
+      g.fillStyle = '#0d1220'; g.beginPath(); g.arc(sx, sy, rad, 0, 7); g.fill();
+      g.shadowBlur = 0; g.lineWidth = 3 * u; g.strokeStyle = col; g.stroke();
+      g.fillStyle = col; g.font = `${Math.round(rad * 1.15)}px "Russo One", sans-serif`; g.fillText(label, sx, sy + 1 * u);
+      g.restore();
+      return [sx, sy, rad];
+    };
+    for (const b of G.missions.mapBlips(true)) {
+      const [sx, sy, rad] = icon(b.x, b.z, b.col, b.label || '•', b.label ? 13 : 9);
+      if (b.name && k > V.min * 1.5) { g.font = `${Math.round(11 * u)}px Rajdhani, sans-serif`; g.fillStyle = '#fff'; g.fillText(b.name, sx, sy + rad + 9 * u); }
+    }
+    if (G.missions.waypoint) icon(G.missions.waypoint.x, G.missions.waypoint.z, '#be6eff', '⚑', 12);
+    // Spieler
     const P = G.player, px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z, ph = P.inCar ? P.vehicle.h : P.yaw;
     const [sx, sy] = toS(px, pz);
-    g.save(); g.translate(sx, sy); g.rotate(Math.atan2(Math.cos(ph), Math.sin(ph)));
-    const a = 11 * dpr;
-    g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2 * dpr;
-    g.beginPath(); g.moveTo(a, 0); g.lineTo(-a * 0.7, a * 0.65); g.lineTo(-a * 0.35, 0); g.lineTo(-a * 0.7, -a * 0.65); g.closePath(); g.fill(); g.stroke();
+    g.save(); g.translate(sx, sy);
+    g.fillStyle = 'rgba(25,230,255,0.18)'; g.beginPath(); g.arc(0, 0, 22 * u, 0, 7); g.fill();
+    g.rotate(Math.atan2(Math.cos(ph), Math.sin(ph)));
+    const a = 12 * u;
+    g.shadowColor = '#19e6ff'; g.shadowBlur = 12 * u;
+    g.fillStyle = '#fff'; g.strokeStyle = '#0d1220'; g.lineWidth = 2.5 * u;
+    g.beginPath(); g.moveTo(a, 0); g.lineTo(-a * 0.7, a * 0.68); g.lineTo(-a * 0.3, 0); g.lineTo(-a * 0.7, -a * 0.68); g.closePath(); g.fill(); g.stroke();
     g.restore();
   }
 }

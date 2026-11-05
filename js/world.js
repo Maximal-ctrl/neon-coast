@@ -1187,7 +1187,7 @@ export class World {
 
   // ------------------------------------------------------------- Karte
   drawMap() {
-    const S = 1024;
+    const S = 2048;
     const MB = { x0: -480, x1: 760, z0: -620, z1: 620 };
     this.mapBounds = MB;
     const c = document.createElement('canvas');
@@ -1195,49 +1195,77 @@ export class World {
     const g = c.getContext('2d');
     const sx = (x) => ((x - MB.x0) / (MB.x1 - MB.x0)) * S, sz = (z) => ((z - MB.z0) / (MB.z1 - MB.z0)) * S;
     const sc = S / (MB.x1 - MB.x0);
-    const gr = g.createLinearGradient(0, 0, S, S);
-    gr.addColorStop(0, '#0f3550'); gr.addColorStop(1, '#0b2a40');
+    const rect = (x0, z0, x1, z1, col, r = 0) => {
+      g.fillStyle = col; g.beginPath();
+      if (r && g.roundRect) g.roundRect(sx(x0), sz(z0), (x1 - x0) * sc, (z1 - z0) * sc, r * sc); else g.rect(sx(x0), sz(z0), (x1 - x0) * sc, (z1 - z0) * sc);
+      g.fill();
+    };
+    // Meer mit dezentem Verlauf
+    const gr = g.createRadialGradient(S * 0.45, S * 0.5, S * 0.1, S * 0.5, S * 0.5, S * 0.75);
+    gr.addColorStop(0, '#10233a'); gr.addColorStop(1, '#070f1c');
     g.fillStyle = gr; g.fillRect(0, 0, S, S);
-    // Strand
-    g.fillStyle = '#d8c08a';
-    g.beginPath();
-    g.moveTo(sx(C.BEACH_X0), sz(-460));
-    for (let z = -460; z <= 460; z += 10) {
+    // feines Raster
+    g.strokeStyle = 'rgba(120,170,255,0.05)'; g.lineWidth = 1;
+    for (let k = 0; k <= S; k += 64) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k, S); g.moveTo(0, k); g.lineTo(S, k); g.stroke(); }
+    // Küste (Strand) mit Glühkante
+    const shore = [];
+    for (let z = -460; z <= 460; z += 6) {
       let x = C.BEACH_X0;
-      while (x < C.BEACH_X0 + 200 && C.sandHeight(x, z) > C.WATER_Y) x += 2;
-      g.lineTo(sx(x), sz(z));
+      while (x < C.BEACH_X0 + 200 && C.sandHeight(x, z) > C.WATER_Y) x += 1;
+      shore.push([x, z]);
     }
-    g.lineTo(sx(C.BEACH_X0), sz(460));
-    g.fill();
-    // Land
+    g.beginPath(); g.moveTo(sx(C.BEACH_X0), sz(-460));
+    for (const [x, z] of shore) g.lineTo(sx(x), sz(z));
+    g.lineTo(sx(C.BEACH_X0), sz(460)); g.closePath();
+    g.fillStyle = '#4a3f2c'; g.fill();
+    g.save(); g.shadowColor = 'rgba(25,230,255,0.6)'; g.shadowBlur = 18; g.strokeStyle = 'rgba(25,230,255,0.55)'; g.lineWidth = 3;
+    g.beginPath(); shore.forEach(([x, z], i) => (i ? g.lineTo(sx(x), sz(z)) : g.moveTo(sx(x), sz(z)))); g.stroke(); g.restore();
+    // Landmasse mit Uferlinie
     const L = C.LAND;
-    g.fillStyle = '#3c414a';
-    g.fillRect(sx(L.minX), sz(L.minZ), (L.maxX - L.minX) * sc, (L.maxZ - L.minZ) * sc);
+    g.save(); g.shadowColor = 'rgba(25,230,255,0.45)'; g.shadowBlur = 22;
+    rect(L.minX, L.minZ, L.maxX, L.maxZ, '#151b28', 6); g.restore();
+    g.strokeStyle = 'rgba(25,230,255,0.35)'; g.lineWidth = 2;
+    g.strokeRect(sx(L.minX), sz(L.minZ), (L.maxX - L.minX) * sc, (L.maxZ - L.minZ) * sc);
     // Blöcke
-    const dcol = { downtown: '#4e5361', midtown: '#4a4e58', westside: '#4d4a52', heights: '#45524a', seaside: '#5a4d5c', harbor: '#4a4f55' };
+    const dcol = { downtown: '#202a3e', midtown: '#1d2638', westside: '#1f2335', heights: '#1b2731', seaside: '#252036', harbor: '#1b222e' };
     for (let bj = 0; bj < NB; bj++) for (let bi = 0; bi < NB; bi++) {
-      const x0 = roadPos(bi) + 8, z0 = roadPos(bj) + 8;
-      g.fillStyle = C.isPark(bi, bj) ? '#3f7a3a' : (dcol[C.districtOf(bi, bj)] || '#4a4e58');
-      g.fillRect(sx(x0), sz(z0), (CELL - 16) * sc, (CELL - 16) * sc);
+      const x0 = roadPos(bi) + 9, z0 = roadPos(bj) + 9;
+      rect(x0, z0, x0 + CELL - 18, z0 + CELL - 18, C.isPark(bi, bj) ? '#15392b' : (dcol[C.districtOf(bi, bj)] || '#1d2638'), 4);
+      if (C.isPark(bi, bj)) { // Parkwege
+        g.strokeStyle = 'rgba(124,255,107,0.18)'; g.lineWidth = 3 * sc;
+        g.beginPath(); g.moveTo(sx(x0 + 31), sz(z0)); g.lineTo(sx(x0 + 31), sz(z0 + 62)); g.moveTo(sx(x0), sz(z0 + 31)); g.lineTo(sx(x0 + 62), sz(z0 + 31)); g.stroke();
+      }
     }
-    // Gebäude
-    g.fillStyle = 'rgba(20,22,28,0.55)';
-    for (const [x0, z0, x1, z1] of this.footprints) g.fillRect(sx(x0), sz(z0), (x1 - x0) * sc, (z1 - z0) * sc);
-    // Straßen
-    g.strokeStyle = '#8d929c'; g.lineWidth = 16 * sc;
-    for (let i = 0; i <= NB; i++) {
-      const r = roadPos(i);
-      g.beginPath(); g.moveTo(sx(r), sz(-HALF - 8)); g.lineTo(sx(r), sz(HALF + 8)); g.stroke();
-      g.beginPath(); g.moveTo(sx(-HALF - 8), sz(r)); g.lineTo(sx(HALF + 8), sz(r)); g.stroke();
+    // Gebäude (leicht erhaben)
+    for (const [x0, z0, x1, z1] of this.footprints) {
+      rect(x0 + 0.5, z0 + 0.5, x1 - 0.5, z1 - 0.5, '#2a3449');
+      g.fillStyle = 'rgba(160,190,255,0.08)'; g.fillRect(sx(x0 + 0.5), sz(z0 + 0.5), (x1 - x0 - 1) * sc, 2.2 * sc);
     }
-    // Pier
-    g.fillStyle = '#9a7650';
-    g.fillRect(sx(C.PIER.x0), sz(C.PIER.z0), (C.PIER.x1 - C.PIER.x0) * sc, (C.PIER.z1 - C.PIER.z0) * sc);
-    g.fillRect(sx(C.PIER_PLAT.x0), sz(C.PIER_PLAT.z0), (C.PIER_PLAT.x1 - C.PIER_PLAT.x0) * sc, (C.PIER_PLAT.z1 - C.PIER_PLAT.z0) * sc);
-    g.strokeStyle = '#ffffff'; g.lineWidth = 2;
-    g.beginPath(); g.arc(sx(632), sz(40), 24 * sc, 0, 7); g.stroke();
-    // Schiff
-    g.fillStyle = '#26324a'; g.fillRect(sx(-330), sz(398), 238 * sc, 28 * sc);
+    // Straßen: Kontur, Belag, Mittellinie
+    const major = (i) => i === 0 || i === NB || i === 4 || i === 5;
+    const lines = (w, colFn) => {
+      for (let i = 0; i <= NB; i++) {
+        const r = roadPos(i);
+        g.strokeStyle = colFn(i); g.lineWidth = w(i) * sc; g.lineCap = 'round';
+        g.beginPath(); g.moveTo(sx(r), sz(-HALF - 6)); g.lineTo(sx(r), sz(HALF + 6)); g.stroke();
+        g.beginPath(); g.moveTo(sx(-HALF - 6), sz(r)); g.lineTo(sx(HALF + 6), sz(r)); g.stroke();
+      }
+    };
+    lines((i) => (major(i) ? 20 : 18), () => '#0b0f17');
+    lines((i) => (major(i) ? 15 : 13), (i) => (major(i) ? '#56627f' : '#3d4760'));
+    g.setLineDash([3 * sc, 4 * sc]);
+    lines(() => 0.7, (i) => (major(i) ? 'rgba(255,210,63,0.55)' : 'rgba(255,255,255,0.18)'));
+    g.setLineDash([]);
+    // Kreuzungen
+    for (const n of this.nodes) { g.fillStyle = '#4a5570'; g.beginPath(); g.arc(sx(n.x), sz(n.z), 6.5 * sc, 0, 7); g.fill(); }
+    // Pier & Riesenrad
+    rect(C.PIER.x0, C.PIER.z0, C.PIER.x1, C.PIER.z1, '#6b5038', 2);
+    rect(C.PIER_PLAT.x0, C.PIER_PLAT.z0, C.PIER_PLAT.x1, C.PIER_PLAT.z1, '#6b5038', 4);
+    g.save(); g.shadowColor = '#ff2e88'; g.shadowBlur = 16; g.strokeStyle = '#ff6fb0'; g.lineWidth = 3;
+    g.beginPath(); g.arc(sx(632), sz(40), 24 * sc, 0, 7); g.stroke(); g.restore();
+    // Hafen: Schiff & Kräne
+    rect(-330, 398, -92, 426, '#232f48', 6);
+    for (const cx of [-330, -250, -170, -90]) rect(cx - 6, 372, cx + 6, 384, '#5a4a1a');
     this.mapCanvas = c;
     this.mapScale = sc;
     this.mapToPx = (x, z) => [sx(x), sz(z)];

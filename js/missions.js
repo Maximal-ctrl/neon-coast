@@ -213,6 +213,8 @@ export class Missions {
     if (!this.active && this.giverMarker) out.push({ x: this.giverMarker.x, z: this.giverMarker.z, col: '#ffd23f', label: this.giverDef.label, edge: true, r: 0.05 });
     out.push({ x: poi.safehouse.x, z: poi.safehouse.z, col: '#7cff6b', label: 'H', r: 0.04 });
     out.push({ x: poi.gunshop.x, z: poi.gunshop.z, col: '#ff7b39', label: 'W', r: 0.04 });
+    out.push({ x: 234, z: 106.5, col: '#ff2e88', label: 'C', r: 0.04, name: 'Club Velvet' });
+    out.push({ x: 10, z: 26.8, col: '#19e6ff', label: 'B', r: 0.04, name: 'Solera Bank' });
     if (full) {
       out.push({ x: poi.hospital.x, z: poi.hospital.z, col: '#ff4d6d', label: '+' });
       out.push({ x: poi.police.x, z: poi.police.z, col: '#4d8bff', label: 'P' });
