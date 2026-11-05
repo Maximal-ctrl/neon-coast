@@ -22,6 +22,7 @@ import { HUD } from './hud.js';
 import { Missions, shopItems } from './missions.js';
 import { Save } from './save.js';
 import { Interiors } from './interiors.js';
+import { Multiplayer } from './multiplayer.js';
 import { fmtTime } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -174,6 +175,8 @@ function beginPlay(isNew) {
   G.hud.weapon();
   G.hud.fadeIn();
   G.audio.station = 0;
+  if (G.pendingMP) { G.pendingMP = false; setTimeout(openMultiplayer, 1200); }
+  if (G.mp && G.mp.online) G.mp.sendLook();
   if (isNew) {
     Save.write();
     setTimeout(() => G.hud.bigToast('PORT SOLERA', `Willkommen zu Hause, ${P.name}.`), 600);
@@ -408,10 +411,11 @@ const ICON = {
   stats: '<svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>',
   photo: '<svg viewBox="0 0 24 24"><path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="4" fill="#0b0716"/></svg>',
   settings: '<svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-2.1-.7-.4-1 1-2-1.8-1.8-2 1-1-.4L14 3h-4l-.7 2.1-1 .4-2-1-1.8 1.8 1 2-.4 1L3 10v4l2.1.7.4 1-1 2 1.8 1.8 2-1 1 .4L10 21h4l.7-2.1 1-.4 2 1 1.8-1.8-1-2 .4-1L21 14z"/></svg>',
+  mp: '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.7"/><path d="M2 20c0-3.6 2.7-6 6-6s6 2.4 6 6zm12.2 0c.1-2.2-.6-4.1-1.9-5.4 3.4-.9 7.7.9 7.7 5.4z"/></svg>',
   save: '<svg viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 2v5h9V5zm5 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
 };
 const APPS = [['contacts', 'Kontakte', '#34c759,#0a8f3c'], ['messages', 'Nachrichten', '#19e6ff,#1567d3'], ['map', 'Karte', '#ff9f1c,#e8590c'], ['radio', 'Radio', '#ff2e88,#a01458'],
-  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00']];
+  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3']];
 
 function openPhone() {
   if (G.state !== 'playing' || G.player.state === 'dead' || G.player.state === 'busted') return;
@@ -574,6 +578,7 @@ function setupPhone() {
     else if (app === 'stats') phoneScreen('Statistik', statsHTML());
     else if (app === 'map') { closePhone(); showMap(); }
     else if (app === 'settings') { closePhone(); setPaused(true); openPanel('EINSTELLUNGEN', settingsHTML(), [['Zurück', closePanel]]); bindSettings(); }
+    else if (app === 'mp') { closePhone(); openMultiplayer(); }
     else if (app === 'save') {
       if (G.missions.active && !G.missions.active.side) G.hud.toast('Während eines Auftrags kann nicht gespeichert werden.');
       else { Save.write(); G.hud.toast(`Gespeichert in Speicherplatz ${Save.slot}`); }
@@ -581,6 +586,44 @@ function setupPhone() {
     }
     else if (app === 'photo') { closePhone(); document.body.classList.add('photo'); G.hud.toast('Fotomodus – zum Beenden irgendwo tippen oder Esc'); setTimeout(() => { const off = () => { document.body.classList.remove('photo'); window.removeEventListener('pointerdown', off); window.removeEventListener('keydown', off); }; window.addEventListener('pointerdown', off); window.addEventListener('keydown', off); }, 300); }
   });
+}
+
+
+// ------------------------------------------------------------ Multiplayer-Menü
+function openMultiplayer() {
+  if (G.state === 'playing') { G.state = 'menu'; if (document.pointerLockElement) document.exitPointerLock(); }
+  else if (G.state !== 'paused' && G.state !== 'menu') return;
+  const fromPause = G.state === 'paused';
+  const close = () => { G.mp.onChange = null; closePanel(); if (G.state === 'menu') { G.state = 'playing'; last = performance.now(); } };
+  const render = () => {
+    const M = G.mp, P = G.player;
+    let html;
+    if (M.status === 'offline') {
+      html = `<p class="mp-p">Spielt zusammen in Port Solera! Einer <b>hostet</b> ein Spiel und bekommt einen Code, die anderen <b>treten bei</b>, indem sie den Code eingeben. Bis zu 4 Spieler.</p>
+        <button class="mbtn primary mp-big" id="mp-host">🌐 Spiel hosten</button>
+        <div class="mp-join"><input id="mp-code" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="mbtn" id="mp-joinbtn">Beitreten</button></div>
+        ${M.lastError ? `<div class="mp-err">${M.lastError}</div>` : ''}
+        <small class="mp-small">Beide Geräte brauchen Internet. Ihr seht euch gegenseitig, fahrt zusammen, könnt chatten und euch duellieren. Verkehr und Passanten laufen auf jedem Gerät eigenständig.</small>`;
+    } else if (M.status === 'connecting') {
+      html = `<div class="mp-wait"><i class="mp-spin"></i>Verbinde …</div>`;
+    } else {
+      const list = [`<div class="mp-pl me"><i style="background:${'#' + P.look.shirt.getHexString()}"></i><b>${P.name}</b><span>${M.host ? 'Host · Du' : 'Du'}</span></div>`]
+        .concat([...M.remotes()].map((r) => `<div class="mp-pl"><i style="background:#${new THREE.Color(r.look ? r.look.shirt : 0x4dd2ff).getHexString()}"></i><b>${r.name.replace(/[<>&]/g, '')}</b><span>${r.visible ? 'im Spiel' : 'verbindet …'}</span></div>`));
+      html = `<div class="mp-code"><small>RAUM-CODE</small><b>${M.code}</b><span>${M.host ? 'Gib diesen Code deinen Freunden.' : 'Du bist verbunden.'}</span></div>
+        <div class="mp-list">${list.join('')}</div>
+        ${M.host && !M.conns.size ? '<div class="mp-wait small"><i class="mp-spin"></i>Warte auf Mitspieler …</div>' : ''}
+        <div class="mp-join"><input id="mp-msg" maxlength="80" placeholder="Nachricht an alle …" autocomplete="off"><button class="mbtn" id="mp-send">Senden</button></div>`;
+    }
+    const btns = M.status === 'online' ? [['Multiplayer verlassen', () => { M.leave(); }], ['Schließen', close, 'primary']] : [['Schließen', close]];
+    openPanel('MULTIPLAYER', html, btns);
+    const host = $('mp-host'), join = $('mp-joinbtn'), send = $('mp-send');
+    if (host) host.onclick = async () => { M.lastError = null; try { await M.hostGame(); } catch (e) { /* Meldung kommt per Toast */ } };
+    if (join) join.onclick = async () => { M.lastError = null; try { await M.joinGame($('mp-code').value); } catch (e) { M.lastError = e.message || M.lastError; render(); } };
+    if (send) { const go = () => { M.chat($('mp-msg').value); $('mp-msg').value = ''; }; send.onclick = go; $('mp-msg').onkeydown = (e) => { if (e.key === 'Enter') go(); }; }
+    const code = $('mp-code'); if (code) code.oninput = () => { code.value = code.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+  };
+  G.mp.onChange = () => { if (!$('dialog').classList.contains('hidden') && $('dlg-title').textContent === 'MULTIPLAYER') render(); };
+  render();
 }
 
 // Kiosk
@@ -629,6 +672,13 @@ function setupUI() {
   $('btn-load').onclick = () => showSlots('load');
   $('btn-continue').onclick = () => { Save.setSlot(Save.latest()); startGame(true); };
   refreshTitle();
+  G.mp = new Multiplayer();
+  $('btn-mp').onclick = () => {
+    if (!G.audio.ready) G.audio.init();
+    const n = Save.latest();
+    if (n) { Save.setSlot(n); startGame(true); setTimeout(openMultiplayer, 700); }
+    else { G.pendingMP = true; showSlots('new'); }
+  };
   $('btn-controls').onclick = () => openPanel('STEUERUNG', controlsHTML(), [['Schließen', closePanel]]);
   $('btn-settings').onclick = () => { openPanel('EINSTELLUNGEN', settingsHTML(), [['Schließen', closePanel]]); bindSettings(); };
   setupPhone();
@@ -645,6 +695,7 @@ function setupUI() {
     else if (a === 'map') showMap();
     else if (a === 'stats') openPanel('STATISTIK', statsHTML(), [['Zurück', closePanel]]);
     else if (a === 'settings') { openPanel('EINSTELLUNGEN', settingsHTML(), [['Zurück', closePanel]]); bindSettings(); }
+    else if (a === 'mp') { $('pause').classList.add('hidden'); G.state = 'menu'; openMultiplayer(); }
     else if (a === 'controls') openPanel('STEUERUNG', controlsHTML(), [['Zurück', closePanel]]);
     else if (a === 'save') {
       if (G.missions.active && !G.missions.active.side) G.hud.toast('Während eines Auftrags kann nicht gespeichert werden.');
@@ -737,6 +788,7 @@ function update(now, step, I) {
     G.peds.update(step);
     G.missions.update(step);
     if (G.interiors) G.interiors.update(step);
+    if (G.mp) G.mp.update(step);
     G.world.update(step);
     G.effects.update(step);
     G.cam.update(step);
@@ -805,7 +857,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '1.03';
+export const GAME_VERSION = '1.04';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));

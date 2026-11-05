@@ -162,7 +162,7 @@ export class Player {
   nearestVehicle(r) {
     let best = null, bd = r * r;
     for (const v of G.vehicles) {
-      if (!v.alive || v.sinking || v.driver === 'player') continue;
+      if (!v.alive || v.sinking || v.driver === 'player' || v.remote) continue;
       if (Math.abs(v.y - this.y) > 2) continue;
       const d = dist2(v.x, v.z, this.x, this.z);
       if (d < bd) { bd = d; best = v; }

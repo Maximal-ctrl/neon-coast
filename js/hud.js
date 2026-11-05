@@ -261,6 +261,7 @@ export class HUD {
       else if (p.hostile && p.alive) blip(p.x, p.z, '#ff3b5c', 0.02);
     }
     if (G.police.heliActive) blip(G.police.heliPos.x, G.police.heliPos.z, flash ? '#ff2b2b' : '#2b6bff', 0.03);
+    if (G.mp) for (const r of G.mp.remotes()) if (r.visible) blip(r.car ? r.car.x : r.x, r.car ? r.car.z : r.z, '#4dd2ff', 0.04, 'dot', null, true);
     if (G.missions.waypoint) blip(G.missions.waypoint.x, G.missions.waypoint.z, '#be6eff', 0.035, 'dot', null, true);
     // Spielerpfeil
     const ph = P.inCar ? P.vehicle.h : P.yaw;

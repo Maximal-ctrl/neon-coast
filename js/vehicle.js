@@ -258,7 +258,7 @@ export class VehicleManager {
 
   step(dt) {
     const vs = G.vehicles;
-    for (const v of vs) v.update(dt);
+    for (const v of vs) if (!v.remote) v.update(dt);
     // Kollisionen
     const W = G.world;
     for (const v of vs) {

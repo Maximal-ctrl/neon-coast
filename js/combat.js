@@ -76,6 +76,16 @@ export class Combat {
       let sx = dx + rand(-w.spread, w.spread), sy = dy + rand(-w.spread, w.spread) * 0.6, sz = dz + rand(-w.spread, w.spread);
       const L = Math.hypot(sx, sy, sz); sx /= L; sy /= L; sz /= L;
       const h = this.raycast(ox, oy, oz, sx, sy, sz, w.range, ignoreVeh);
+      const mh = G.mp && G.mp.online ? G.mp.rayHit(ox, oy, oz, sx, sy, sz, h.t) : null;
+      if (mh) {
+        // Mitspieler getroffen
+        const hx = ox + sx * mh.t, hy = oy + sy * mh.t, hz = oz + sz * mh.t;
+        G.effects.tracer(ox, oy, oz, hx, hy, hz);
+        G.effects.impact(hx, hy, hz, 'dust');
+        G.mp.sendHit(mh.r, w.dmg * (hy > mh.r.y + 1.55 ? 2 : 1));
+        G.hud.hitMarker(false);
+        continue;
+      }
       G.effects.tracer(ox, oy, oz, h.x, h.y, h.z);
       this.applyHit(h, w.dmg, 'player', sx, sz);
     }

@@ -503,6 +503,7 @@ export class PedManager {
       R.add(p);
       if (p.lie < 0.5 && this.blobs.length < 60) this.blobs.push({ x: p.x, z: p.z, gy: p.gy });
     }
+    if (G.mp) G.mp.renderInto(R);
     R.end();
   }
 }
