@@ -62,11 +62,8 @@ export class Vehicle {
     let vl = this.vx * lx + this.vz * lz;
     const drive = this.alive && this.grounded;
     const sand = W.surfaceAt(this.x, this.z) === 'sand';
-    // Geschwindigkeitsabhängige Lenkung: schnell = ruhiger, präziser
-    const spAbs = Math.abs(vf);
-    const maxSteer = T.steer / (1 + spAbs / 17);
-    const steerRate = 10 / (1 + spAbs / 35);
-    this.steer = damp(this.steer, (this.alive ? inp.steer : 0) * maxSteer, steerRate, dt);
+    const maxSteer = T.steer / (1 + Math.abs(vf) / 24);
+    this.steer = damp(this.steer, (this.alive ? inp.steer : 0) * maxSteer, 9, dt);
     this.braking = false;
     if (drive) {
       const thr = inp.throttle, brk = inp.brake;
@@ -91,13 +88,7 @@ export class Vehicle {
       vl *= Math.max(0, 1 - grip * dt);
       const wb = this.geo.wheelbase;
       let yaw = -(vf / wb) * Math.tan(this.steer);
-      // Kurvenrate durch Reifenhaftung begrenzen (verhindert Übersteuern bei hohem Tempo)
-      const latMax = T.grip * 1.65 * (sand ? 0.7 : 1);
-      const yawCap = latMax / Math.max(4, spAbs);
-      if (!inp.handbrake) yaw = Math.max(-yawCap, Math.min(yawCap, yaw));
-      else yaw *= 1.45;
-      // Stabilisierung: Seitenrutschen wird bei hohem Tempo schneller abgefangen
-      if (!inp.handbrake && spAbs > 25) vl *= Math.max(0, 1 - (spAbs - 25) * 0.004);
+      if (inp.handbrake) yaw *= 1.45;
       this.yawRate = yaw;
       this.h += yaw * dt;
       this.slip = Math.abs(vl);
