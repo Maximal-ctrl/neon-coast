@@ -418,3 +418,139 @@ input, textarea { -webkit-user-select: text; user-select: text; touch-action: ma
 .mp-wait.small { padding: 6px; font-size: 15px; opacity: .8; }
 .mp-spin { width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(255,255,255,.2); border-top-color: #4dd2ff; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ================= Version 1.05: Läden, Inventar, Casino, Autohaus ================= */
+#inv-btn { position: absolute; top: calc(120px + var(--sat)); left: calc(var(--mmw) + 26px + var(--sal)); width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.45); color: #fff; font-size: 22px; pointer-events: auto; cursor: pointer; }
+.ui-layer { position: fixed; inset: 0; z-index: 65; display: flex; align-items: center; justify-content: center; animation: uiIn .22s ease-out; }
+.ui-layer.hidden { display: none; }
+@keyframes uiIn { from { opacity: 0; } }
+.ui-store, .ui-slots, .ui-scratch { background: radial-gradient(ellipse at 30% 20%, rgba(40,20,70,.55), rgba(5,3,12,.82)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.bump { animation: bump .45s ease-out; } @keyframes bump { 40% { transform: scale(1.15); } }
+.shake { animation: shake .4s; } @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+/* ---- Laden ---- */
+.st { width: min(1080px, 96vw); height: min(680px, 92vh); display: flex; flex-direction: column; border-radius: 28px; overflow: hidden; background: linear-gradient(160deg, rgba(26,18,44,.96), rgba(10,8,18,.97));
+  border: 1px solid rgba(255,255,255,.1); box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px color-mix(in srgb, var(--a) 30%, transparent); }
+.st.anim { animation: stIn .3s cubic-bezier(.2,.9,.3,1.15); }
+@keyframes stIn { from { transform: translateY(24px) scale(.97); opacity: 0; } }
+.st-h { display: flex; align-items: center; gap: 16px; padding: 18px 22px; background: linear-gradient(90deg, color-mix(in srgb, var(--a) 22%, transparent), transparent 70%); border-bottom: 1px solid rgba(255,255,255,.07); }
+.st-logo { width: 54px; height: 54px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 30px; background: linear-gradient(145deg, var(--a), color-mix(in srgb, var(--a) 40%, #000)); box-shadow: 0 6px 18px color-mix(in srgb, var(--a) 45%, transparent); }
+.st-t { flex: 1; display: flex; flex-direction: column; }
+.st-t b { font-family: 'Russo One'; font-weight: 400; font-size: 26px; letter-spacing: .06em; }
+.st-t span { opacity: .6; font-size: 15px; }
+.st-money { font-family: 'Russo One'; font-size: 20px; color: #7dffa0; background: rgba(125,255,160,.08); border: 1px solid rgba(125,255,160,.25); padding: 8px 14px; border-radius: 12px; }
+.st-x { width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(255,255,255,.08); color: #fff; font-size: 18px; cursor: pointer; }
+.st-x:hover { background: rgba(255,255,255,.18); }
+.st-tabs { display: flex; gap: 8px; padding: 12px 22px; overflow-x: auto; }
+.st-tabs button { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: rgba(255,255,255,.75); font: inherit; font-size: 16px; font-weight: 700; padding: 9px 18px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.st-tabs button.on { background: var(--a); border-color: var(--a); color: #0d0618; }
+.st-body { flex: 1; display: grid; grid-template-columns: 1fr 340px; min-height: 0; }
+.st-grid { padding: 6px 22px 22px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; overflow: auto; align-content: start; touch-action: pan-y; }
+.st-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px; border-radius: 18px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.04); color: #fff; font: inherit; text-align: left; cursor: pointer; transition: transform .12s, border-color .12s, background .12s; }
+.st-card:hover { transform: translateY(-2px); }
+.st-card.on { border-color: var(--a); background: color-mix(in srgb, var(--a) 14%, transparent); box-shadow: 0 0 0 1px var(--a), 0 8px 24px color-mix(in srgb, var(--a) 22%, transparent); }
+.st-card.dis { opacity: .5; }
+.st-ic { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 38px; background: rgba(255,255,255,.06); margin-bottom: 6px; }
+.st-card b { font-size: 16px; line-height: 1.15; } .st-card em { font-style: normal; color: #7dffa0; font-family: 'Russo One'; font-size: 15px; }
+.st-own { position: absolute; top: 10px; right: 10px; font-style: normal; font-size: 11px; background: rgba(255,255,255,.12); padding: 2px 8px; border-radius: 999px; }
+.st-empty { grid-column: 1 / -1; text-align: center; opacity: .7; font-size: 18px; padding: 40px 10px; line-height: 1.5; }
+.st-detail { border-left: 1px solid rgba(255,255,255,.07); padding: 22px; display: flex; flex-direction: column; gap: 10px; background: rgba(0,0,0,.18); overflow: auto; }
+.st-big { width: 120px; height: 120px; border-radius: 28px; display: flex; align-items: center; justify-content: center; font-size: 70px; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--a) 45%, transparent), rgba(255,255,255,.04)); align-self: center; }
+.st-detail h3 { margin: 4px 0 0; font-size: 24px; text-align: center; } .st-detail p { margin: 0; opacity: .75; font-size: 16px; line-height: 1.35; text-align: center; }
+.st-tag { align-self: center; font-size: 13px; padding: 4px 12px; border-radius: 999px; background: rgba(255,255,255,.08); }
+.st-qty { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 4px; }
+.st-qty button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: #fff; font-size: 24px; cursor: pointer; }
+.st-qty b { font-family: 'Russo One'; font-size: 26px; min-width: 40px; text-align: center; }
+.st-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); }
+.st-total span { opacity: .6; } .st-total b { font-family: 'Russo One'; font-size: 26px; color: #7dffa0; }
+.st-buy { border: none; border-radius: 16px; padding: 16px; font: inherit; font-size: 20px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; color: #0d0618;
+  background: linear-gradient(135deg, var(--a, #ff2e88), color-mix(in srgb, var(--a, #ff2e88) 60%, #fff)); box-shadow: 0 8px 22px color-mix(in srgb, var(--a, #ff2e88) 40%, transparent); transition: transform .1s; }
+.st-buy:active { transform: scale(.97); } .st-buy:disabled { opacity: .45; filter: grayscale(1); }
+.st-buy.done { background: linear-gradient(135deg, #34c759, #7dffa0); }
+.st-sec { border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 12px; font: inherit; font-size: 17px; font-weight: 700; color: #fff; background: rgba(255,255,255,.06); cursor: pointer; }
+@media (max-width: 820px) { .st-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } .st-detail { border-left: none; border-top: 1px solid rgba(255,255,255,.07); flex-direction: row; flex-wrap: wrap; align-items: center; } .st-big { width: 64px; height: 64px; font-size: 38px; } .st-detail p { display: none; } .st-total { margin: 0; flex: 1; border: none; } }
+/* ---- Spielautomat ---- */
+.sl { position: relative; display: flex; align-items: center; gap: 22px; }
+.sl-cab { width: min(420px, 60vw); padding: 18px; border-radius: 30px; background: linear-gradient(180deg, #2a0f3d, #12081d); border: 3px solid #ffd23f; box-shadow: 0 0 40px rgba(255,46,136,.5), inset 0 0 30px rgba(0,0,0,.6); display: flex; flex-direction: column; gap: 12px; }
+.sl-top { text-align: center; padding: 10px; border-radius: 18px; background: linear-gradient(180deg, #ff2e88, #8a1050); position: relative; overflow: hidden; }
+.sl-top b { display: block; font-family: 'Russo One'; font-weight: 400; font-size: 32px; letter-spacing: .08em; text-shadow: 0 0 14px #fff, 0 3px 0 #5a0a35; }
+.sl-top span { font-size: 13px; letter-spacing: .3em; color: #ffd23f; }
+.sl-bulbs { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.sl-bulbs i { width: 10px; height: 10px; border-radius: 50%; background: #ffd23f; box-shadow: 0 0 8px #ffd23f; animation: bulb .8s infinite alternate; }
+.sl-bulbs i:nth-child(2n) { animation-delay: .4s; }
+@keyframes bulb { to { opacity: .25; box-shadow: none; } }
+.sl-window { position: relative; display: flex; gap: 8px; padding: 10px; border-radius: 16px; background: #0a0610; box-shadow: inset 0 0 22px #000; }
+.sl-reel { flex: 1; height: 288px; overflow: hidden; border-radius: 12px; background: linear-gradient(180deg, #ddd 0%, #fff 30%, #fff 70%, #ddd 100%); position: relative; }
+.sl-reel::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.45), transparent 30%, transparent 70%, rgba(0,0,0,.45)); pointer-events: none; }
+.sl-strip div { height: 96px; display: flex; align-items: center; justify-content: center; font-size: 62px; }
+.sl-strip.blur { filter: blur(2.5px); }
+.sl-line { position: absolute; left: 4px; right: 4px; top: 50%; height: 3px; margin-top: -1.5px; background: rgba(255,46,136,.85); box-shadow: 0 0 10px #ff2e88; pointer-events: none; }
+.sl-msg { text-align: center; font-family: 'Russo One'; font-size: 22px; min-height: 30px; color: #fff; }
+.sl-msg.win { color: #7dffa0; text-shadow: 0 0 16px #7dffa0; animation: bump .6s; } .sl-msg.big { color: #ffd23f; font-size: 30px; text-shadow: 0 0 22px #ffd23f; }
+.sl-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sl-bets { display: flex; gap: 6px; width: 100%; }
+.sl-bets button { flex: 1; padding: 10px 0; border-radius: 12px; border: 1px solid rgba(255,210,63,.4); background: rgba(255,210,63,.08); color: #ffd23f; font-family: 'Russo One'; font-size: 15px; cursor: pointer; }
+.sl-bets button.on { background: #ffd23f; color: #12081d; }
+.sl-money { font-family: 'Russo One'; color: #7dffa0; font-size: 20px; }
+.sl-spin { flex: 1; max-width: 220px; padding: 16px; border-radius: 18px; border: none; font-family: 'Russo One'; font-size: 24px; letter-spacing: .1em; color: #12081d; cursor: pointer; background: linear-gradient(180deg, #7dffa0, #20b25a); box-shadow: 0 6px 0 #0c6b33, 0 10px 24px rgba(125,255,160,.4); }
+.sl-spin:active { transform: translateY(4px); box-shadow: 0 2px 0 #0c6b33; }
+.sl-lever { width: 26px; height: 220px; position: relative; cursor: pointer; }
+.sl-lever::before { content: ''; position: absolute; left: 9px; top: 40px; width: 8px; height: 170px; border-radius: 4px; background: linear-gradient(90deg, #888, #eee, #888); transform-origin: bottom; }
+.sl-lever i { position: absolute; left: 0; top: 18px; width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff8a8a, #c00); box-shadow: 0 0 12px rgba(255,0,0,.6); }
+.sl-lever.pull i { animation: lever .5s ease-in-out; } @keyframes lever { 50% { transform: translateY(150px); } }
+.sl-pay { width: 200px; padding: 16px; border-radius: 22px; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column; gap: 6px; }
+.sl-pay b { font-family: 'Russo One'; font-weight: 400; color: #ffd23f; letter-spacing: .15em; margin-bottom: 4px; }
+.sl-pay div { display: flex; justify-content: space-between; font-size: 16px; } .sl-pay em { font-style: normal; color: #7dffa0; font-family: 'Russo One'; }
+.sl-close { margin-top: 10px; padding: 12px; border-radius: 14px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); color: #fff; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; }
+.sl-coins { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.sl-coins i { position: absolute; top: -40px; font-style: normal; animation: coin 2.2s ease-in forwards; } @keyframes coin { to { transform: translateY(110vh) rotate(540deg); } }
+@media (max-width: 820px) { .sl-pay { display: none; } .sl-reel { height: 216px; } .sl-strip div { height: 72px; font-size: 46px; } }
+/* ---- Rubbellos ---- */
+.sc { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.sc-card { width: min(380px, 88vw); padding: 18px; border-radius: 24px; background: linear-gradient(160deg, #19e6ff, #6a2bd3 60%, #ff2e88); box-shadow: 0 30px 70px rgba(0,0,0,.6); animation: stIn .35s; }
+.sc-card.gold { background: linear-gradient(160deg, #ffe08a, #e0a100 50%, #8a5a00); }
+.sc-head { text-align: center; color: #fff; margin-bottom: 12px; } .sc-head b { display: block; font-family: 'Russo One'; font-weight: 400; font-size: 30px; letter-spacing: .06em; text-shadow: 0 3px 0 rgba(0,0,0,.25); } .sc-head span { font-size: 14px; font-weight: 700; opacity: .9; }
+.sc-grid { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px; border-radius: 16px; background: rgba(255,255,255,.92); }
+.sc-cell { height: 92px; border-radius: 12px; background: #fff8e8; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #2a0f3d; transition: transform .3s; }
+.sc-cell span { font-size: 22px; } .sc-cell b { font-family: 'Russo One'; font-size: 20px; }
+.sc-cell.hit { background: #7dffa0; transform: scale(1.06); box-shadow: 0 0 0 3px #20b25a; }
+#sc-cv { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 16px; touch-action: none; cursor: grab; }
+.sc-foot { text-align: center; margin-top: 12px; color: #fff; font-weight: 700; font-size: 17px; min-height: 26px; }
+.sc-win { font-family: 'Russo One'; font-size: 24px; color: #fff; text-shadow: 0 0 16px #7dffa0; }
+.sc-btns { display: flex; gap: 12px; } .sc-btns .st-buy { --a: #7dffa0; padding: 12px 28px; }
+/* ---- Autohaus ---- */
+.ui-dealer { justify-content: flex-end; background: linear-gradient(90deg, transparent 40%, rgba(5,3,12,.55)); }
+.dl-hint { position: absolute; left: calc(30px + var(--sal)); bottom: calc(30px + var(--sab)); display: flex; flex-direction: column; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+.dl-hint b { font-family: 'Russo One'; font-weight: 400; font-size: clamp(34px, 5vw, 60px); line-height: 1; } .dl-hint span { font-size: 18px; letter-spacing: .3em; text-transform: uppercase; color: var(--pink); }
+.dl-panel { width: min(440px, 46vw); height: 100%; display: flex; flex-direction: column; background: rgba(10,8,18,.88); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-left: 1px solid rgba(255,255,255,.1); padding-top: var(--sat); --a: #ff2e88; }
+.dl.anim .dl-panel { animation: dlIn .35s cubic-bezier(.2,.9,.3,1); }
+@keyframes dlIn { from { transform: translateX(60px); opacity: 0; } }
+.dl-h { display: flex; align-items: center; gap: 12px; padding: 18px 20px 6px; }
+.dl-h > div:first-child { flex: 1; font-family: 'Russo One'; font-size: 22px; letter-spacing: .08em; } .dl-h > div b { color: var(--pink); font-weight: 400; } .dl-h span { display: block; font-family: 'Rajdhani'; font-size: 13px; letter-spacing: .1em; opacity: .55; }
+.dl-list { padding: 0 20px; display: flex; flex-direction: column; gap: 6px; overflow: auto; max-height: 30vh; touch-action: pan-y; }
+.dl-car { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.04); color: #fff; font: inherit; text-align: left; cursor: pointer; }
+.dl-car div { display: flex; flex-direction: column; } .dl-car b { font-size: 18px; } .dl-car span { font-size: 13px; opacity: .6; } .dl-car em { font-style: normal; font-family: 'Russo One'; color: #7dffa0; }
+.dl-car i { position: absolute; top: -6px; left: -6px; width: 20px; height: 20px; border-radius: 50%; background: #34c759; font-style: normal; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+.dl-car.on { border-color: var(--pink); background: rgba(255,46,136,.14); }
+.dl-detail { padding: 14px 20px 20px; display: flex; flex-direction: column; gap: 10px; margin-top: auto; border-top: 1px solid rgba(255,255,255,.08); overflow: auto; }
+.dl-detail h2 { margin: 0; font-family: 'Russo One'; font-weight: 400; font-size: 28px; } .dl-detail p { margin: 0; opacity: .7; font-size: 15px; }
+.dl-stats { display: flex; flex-direction: column; gap: 7px; }
+.dl-stats div { display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 10px; font-size: 14px; }
+.dl-stats span { opacity: .7; } .dl-stats b { text-align: right; font-size: 13px; }
+.dl-stats i { height: 7px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; } .dl-stats s { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #19e6ff, #ff2e88); animation: grow .6s ease-out; transform-origin: left; }
+@keyframes grow { from { transform: scaleX(0); } }
+.dl-paint { display: flex; gap: 8px; flex-wrap: wrap; }
+.dl-paint button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); background: var(--c); cursor: pointer; }
+.dl-paint button.on { border-color: #fff; box-shadow: 0 0 0 3px var(--pink); }
+.dl-buyrow { display: flex; align-items: center; gap: 14px; }
+.dl-buyrow > div { flex: 1; display: flex; flex-direction: column; } .dl-buyrow span { opacity: .6; font-size: 13px; } .dl-buyrow b { font-family: 'Russo One'; font-size: 26px; color: #7dffa0; } .dl-buyrow em { font-style: normal; font-size: 12px; color: #34c759; }
+.dl-buyrow .st-buy { padding: 14px 26px; }
+.dl-bought { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px 40px; border-radius: 24px; background: rgba(10,8,18,.9); border: 1px solid #34c759; box-shadow: 0 0 40px rgba(52,199,89,.5); animation: stIn .35s; text-align: center; }
+.dl-bought b { font-family: 'Russo One'; font-weight: 400; font-size: 42px; color: #7dffa0; } .dl-bought span { font-size: 24px; font-weight: 700; } .dl-bought small { opacity: .7; font-size: 14px; }
+@media (max-width: 820px) { .dl-panel { width: 62vw; } .dl-list { max-height: 22vh; } .dl-hint b { font-size: 30px; } }
+/* ---- Handy: Garage ---- */
+.ph-car { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.ph-car i { width: 34px; height: 34px; border-radius: 10px; flex: none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); }
+.ph-car div { flex: 1; display: flex; flex-direction: column; } .ph-car b { font-size: 17px; } .ph-car span { font-size: 12px; opacity: .6; }
+.ph-btn2.small { width: auto; padding: 8px 14px; font-size: 14px; }
+.ph-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 40px 10px; font-size: 40px; }
+.ph-empty b { font-size: 20px; } .ph-empty span { font-size: 15px; opacity: .7; }

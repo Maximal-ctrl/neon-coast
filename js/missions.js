@@ -213,6 +213,8 @@ export class Missions {
     out.push({ x: poi.safehouse.x, z: poi.safehouse.z, col: '#7cff6b', label: 'H', r: 0.04 });
     out.push({ x: poi.gunshop.x, z: poi.gunshop.z, col: '#ff7b39', label: 'W', r: 0.04 });
     out.push({ x: 234, z: 106.5, col: '#ff2e88', label: 'C', r: 0.04, name: 'Club Velvet' });
+    if (poi.dealer) out.push({ x: poi.dealer.x, z: poi.dealer.z, col: '#ff4fd8', label: 'A', r: 0.04, name: 'Solera Motors' });
+    if (poi.shop) out.push({ x: poi.shop.x, z: poi.shop.z, col: '#ffd23f', label: '24', r: 0.04, name: 'Samis 24/7' });
     out.push({ x: 10, z: 26.8, col: '#19e6ff', label: 'B', r: 0.04, name: 'Solera Bank' });
     if (full) {
       out.push({ x: poi.hospital.x, z: poi.hospital.z, col: '#ff4d6d', label: '+' });

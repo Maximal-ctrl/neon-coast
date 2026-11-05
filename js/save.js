@@ -31,6 +31,7 @@ export const Save = {
       v: 2, t: Date.now(),
       name: P.name, look: { skin: hex(L.skin), hair: hex(L.hair), hairStyle: P.hairStyle || 'short', shirt: hex(L.shirt), pants: hex(L.pants), shorts: !!P.shorts, shoes: hex(L.shoes), scale: L.scale },
       contacts: [...(P.contacts || [])],
+      inventory: P.inventory || {}, garage: P.garage || [],
       money: P.money, health: P.health, armor: P.armor, ammo: { ...P.ammo, fists: 0 }, weapon: P.weapon,
       outfit: P.outfit || 0,
       progress: M.progress, shells: [...M.shells], stunts: [...P.stuntsDone], taxi: M.taxiFares,
@@ -56,6 +57,8 @@ export const Save = {
     P.outfit = d.outfit || 0;
     P.name = d.name || 'Leo';
     P.contacts = new Set(d.contacts || []);
+    P.inventory = { ...(d.inventory || {}) };
+    P.garage = [...(d.garage || [])];
     if (d.look) G.applyLook(d.look);
   },
 };

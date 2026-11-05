@@ -651,16 +651,37 @@ export class World {
     const backHalf = (style, tint, hmin, hmax) => this.grid2(X0, Z0, X1, zm - 4, 2, 1, 4, (a, b, c, e) => this.tower(a, b, c, e, hmin + rnd() * (hmax - hmin), style, rnd, { tint }));
     switch (kind) {
       case 'safehouse': {
+        // Wohnhochhaus "Solera Heights" mit Lobby
         this.B.grass.box(x0, 0.02, z0, x1, 0.06, z1, { sides: false, topScale: 6 });
-        this.facadeBox('house', 222, -172, 250, -152, 0, 7, { rnd, tint: 0xffffff });
-        this.facadeBox('glass', 228, -170, 258, -154, 7, 12, { rnd });
-        A.box(228, 11.6, -154.2, 258, 11.9, -153.9, { col: rgb(0x19e6ff, 1.5) });
-        this.collider(222, -172, 258, -152, 12);
-        this.B.concrete.box(221, 0.0, -148, 247, 0.15, -138, { col: rgb(0xece6da), topScale: 2 });
-        this.B.poolw.box(223, 0.15, -146.5, 245, 0.17, -139.5, { sides: false });
-        for (const [px, pz] of [[217, -175], [217, -140], [264, -175], [264, -150]]) this.addPalm(px, pz, rnd);
-        this.B.concrete.box(250, 0.0, -150, 262, 0.05, -132, { sides: false, col: rgb(0x55575c), topScale: 4 });
-        this.pois.safehouseCar = { x: 231, z: -136, h: 0 };
+        this.B.concrete.box(x0, 0.0, -150, x1, 0.04, z1, { sides: false, col: rgb(0xb9b2a6), topScale: 4 });
+        this.tower(216, -186, 246, -152, 112, 'glass', rnd, { crown: true, crownColor: 0x19e6ff });
+        // Lobby-Vordach
+        this.B.props.box(221, 4.6, -152, 241, 5.0, -145.5, { col: rgb(0x22262e) });
+        A.box(221, 4.55, -145.6, 241, 4.65, -145.4, { col: rgb(0x19e6ff, 1.2) });
+        for (const px of [222, 240]) this.B.props.box(px - 0.15, 0, -146.2, px + 0.15, 4.6, -145.8, { col: rgb(0xc9ced6) });
+        this.sign(SIGN.SOLERA, 231, 6.1, -151.9, 7, 0, 1);
+        // Samis 24/7-Markt
+        this.tower(249, -160, 266, -142, 6.5, 'apt', rnd, { tint: 0xf2e8d5, store: true });
+        this.sign(SIGN.H24, 257.5, 5.6, -141.9, 5.5, 0, 1);
+        A.box(249, 4.5, -141.95, 266, 4.75, -141.7, { col: rgb(0xffd23f, 1.2) });
+        for (const [px, pz] of [[217, -140], [246, -138], [264, -170], [213, -170]]) this.addPalm(px, pz, rnd);
+        this.pois.safehouse = { x: 231, z: -143.5, name: 'Solera Heights' };
+        this.pois.shop = { x: 257.5, z: -139.6, name: 'Samis 24/7' };
+        this.pois.safehouseCar = { x: 244, z: -136, h: 0 };
+        break;
+      }
+      case 'dealer': {
+        // Autohaus mit Glasfront und Vorplatz
+        this.B.concrete.box(x0, 0.0, z0, x1, 0.04, z1, { sides: false, col: rgb(0xd6d2ca), topScale: 3 });
+        this.tower(138, -24, 186, 2, 13, 'glass', rnd, { store: false, crown: true, crownColor: 0xff2e88 });
+        this.B.props.box(136.5, 12.6, -25.5, 187.5, 13.6, 3.5, { col: rgb(0x111318) });
+        A.box(136.5, 12.2, 3.45, 187.5, 12.5, 3.6, { col: rgb(0xff2e88, 1.2) });
+        for (const px of [140, 184]) for (const pz of [6, 24]) {
+          this.B.props.box(px - 0.12, 0, pz - 0.12, px + 0.12, 9, pz + 0.12, { col: rgb(0xc9ced6) });
+          A.box(px - 0.05, 6, pz + 0.12, px + 0.9, 9, pz + 0.16, { col: rgb([0xff2e88, 0x19e6ff][(px + pz) % 2], 1.1) });
+          this.addCircle(px, pz, 0.25, 9, 'pole');
+        }
+        this.pois.dealer = { x: 162, z: 4.8, name: 'Solera Motors' };
         break;
       }
       case 'diner': {

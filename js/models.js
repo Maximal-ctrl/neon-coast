@@ -47,6 +47,7 @@ function partGeos() {
     shin: box(0.13, 0.43, 0.14, 0, -0.21, 0),
     shoe: box(0.13, 0.09, 0.27, 0, -0.04, 0.05),
     gun: gun.build(),
+    item: box(0.06, 0.06, 0.16, 0, 0, 0.05),
   };
 }
 
@@ -67,10 +68,10 @@ export class CrowdRenderer {
     const g = partGeos();
     const mat = new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0.02 });
     const gunMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.7 });
-    const geoFor = { hips: g.hips, torso: g.torso, head: g.head, eyes: g.eyes, hair: g.hair, hat: g.hat, uarmL: g.uarm, uarmR: g.uarm, farmL: g.farm, farmR: g.farm, thighL: g.thigh, thighR: g.thigh, shinL: g.shin, shinR: g.shin, shoeL: g.shoe, shoeR: g.shoe, gun: g.gun };
+    const geoFor = { hips: g.hips, torso: g.torso, head: g.head, eyes: g.eyes, hair: g.hair, hat: g.hat, uarmL: g.uarm, uarmR: g.uarm, farmL: g.farm, farmR: g.farm, thighL: g.thigh, thighR: g.thigh, shinL: g.shin, shinR: g.shin, shoeL: g.shoe, shoeR: g.shoe, gun: g.gun, item: g.item };
     this.im = {};
     // L/R teilen sich ein InstancedMesh (doppelte Kapazität)
-    const groups = { hips: ['hips'], torso: ['torso'], head: ['head'], eyes: ['eyes'], hair: ['hair'], hat: ['hat'], uarm: ['uarmL', 'uarmR'], farm: ['farmL', 'farmR'], thigh: ['thighL', 'thighR'], shin: ['shinL', 'shinR'], shoe: ['shoeL', 'shoeR'], gun: ['gun'] };
+    const groups = { hips: ['hips'], torso: ['torso'], head: ['head'], eyes: ['eyes'], hair: ['hair'], hat: ['hat'], uarm: ['uarmL', 'uarmR'], farm: ['farmL', 'farmR'], thigh: ['thighL', 'thighR'], shin: ['shinL', 'shinR'], shoe: ['shoeL', 'shoeR'], gun: ['gun'], item: ['item'] };
     this.slot = {};
     for (const [gname, list] of Object.entries(groups)) {
       const m = new THREE.InstancedMesh(geoFor[list[0]], gname === 'gun' ? gunMat : mat, max * list.length);
@@ -80,6 +81,7 @@ export class CrowdRenderer {
       m.count = 0;
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       if (gname !== 'gun') m.setColorAt(0, new THREE.Color(1, 1, 1));
+      if (gname === 'item') m.castShadow = false;
       scene.add(m);
       this.im[gname] = m;
       list.forEach((p, i) => (this.slot[p] = { m, mul: list.length, off: i }));
@@ -151,6 +153,8 @@ export class CrowdRenderer {
     if (A.air) { lsx = -0.6; rsx = -0.6; lsz = 0.5; rsz = -0.5; }
     if (A.swim) { lsx = -Math.PI + Math.sin(ph) * 1.2; rsx = -Math.PI - Math.sin(ph) * 1.2; lsz = 0.3; rsz = -0.3; }
     if (A.handsUp) { lsx = -2.9; rsx = -2.9; lsz = 0.2; rsz = -0.2; lel = -0.3; rel = -0.3; }
+    if (A.reach > 0) { rsx = -1.35 * A.reach + rsx * (1 - A.reach); rel = -0.25; rsz = -0.1; }
+    if (A.handMouth > 0) { const k = A.handMouth; rsx = rsx + (-2.05 - rsx) * k; rsz = rsz + (-0.62 - rsz) * k; rel = rel + (-2.25 - rel) * k; }
     if (A.dance && !A.handsUp) { lsx = -1.4 - Math.sin(dn) * 1.1; rsx = -1.4 + Math.sin(dn) * 1.1; lsz = 0.45; rsz = -0.45; lel = -0.9; rel = -0.9; }
     child(_sh, _torso, 0.27, 0.56, 0, lsx, 0, lsz);
     this._set('uarmL', i, _sh, L.sleeve);
@@ -160,7 +164,8 @@ export class CrowdRenderer {
     this._set('uarmR', i, _sh, L.sleeve);
     child(_el, _sh, 0, -0.29, 0, rel, 0, 0);
     this._set('farmR', i, _el, L.skin);
-    if (A.gun) { child(_tmp, _el, 0, -0.3, 0.02); this._set('gun', i, _tmp, null); } else this._set('gun', i, ZERO, null);
+    if (A.gun && !A.prop) { child(_tmp, _el, 0, -0.3, 0.02); this._set('gun', i, _tmp, null); } else this._set('gun', i, ZERO, null);
+    if (A.prop) { child(_tmp, _el, 0, -0.33, 0.04); this._set('item', i, _tmp, A.prop); } else this._set('item', i, ZERO, this.eyeCol);
     // Beine
     let lth = -sw, rth = sw;
     let lkn = Math.max(0, Math.cos(ph)) * (0.3 + run * 0.9) * amp + 0.05, rkn = Math.max(0, -Math.cos(ph)) * (0.3 + run * 0.9) * amp + 0.05;
@@ -242,6 +247,16 @@ export const CAR_TYPES = {
   police: { name: 'Streifenwagen', profile: 'sedan', L: 4.8, W: 1.9, wheelR: 0.35, maxSpeed: 58, accel: 14, brake: 28, grip: 10.5, steer: 0.56, mass: 1600, hp: 1300, colors: [0xf2f2f2], police: true },
 };
 // Häufigkeit im Verkehr
+export const CAR_SHOP = {
+  kiwi: { price: 4500, cls: 'Kompakt', desc: 'Wendig, sparsam, passt in jede Parklücke.' },
+  marina: { price: 9000, cls: 'Limousine', desc: 'Bequemer Alltagswagen mit viel Platz.' },
+  hauler: { price: 12000, cls: 'Nutzfahrzeug', desc: 'Robuster Transporter für jede Ladung.' },
+  coyote: { price: 15000, cls: 'Pick-up', desc: 'Kräftig, hoch und unverwüstlich.' },
+  atlas: { price: 22000, cls: 'SUV', desc: 'Großer SUV mit Präsenz auf jeder Straße.' },
+  brutus: { price: 38000, cls: 'Muscle-Car', desc: 'Lauter V8, lange Motorhaube, pure Kraft.' },
+  zephyra: { price: 72000, cls: 'Sportwagen', desc: 'Präzise Lenkung, starke Beschleunigung.' },
+  vortex: { price: 160000, cls: 'Supersportwagen', desc: 'Das Schnellste, was Port Solera zu bieten hat.' },
+};
 export const TRAFFIC_MIX = ['kiwi', 'kiwi', 'kiwi', 'marina', 'marina', 'marina', 'marina', 'taxi', 'taxi', 'atlas', 'atlas', 'coyote', 'hauler', 'brutus', 'zephyra', 'vortex'];
 
 // Profile: Oberkontur (z, y) von hinten unten nach vorne unten; Kabine (Glas); Dach [z0, z1, y0, y1]
@@ -361,10 +376,46 @@ function carGeos(key) {
   const ry = Math.min(P.body[0][1] - 0.14, yb + 0.62);
   R.box(-W / 2 + 0.12, ry - 0.07, -L / 2 - 0.04, -W / 2 + 0.55, ry + 0.07, -L / 2 + 0.02, {});
   R.box(W / 2 - 0.55, ry - 0.07, -L / 2 - 0.04, W / 2 - 0.12, ry + 0.07, -L / 2 + 0.02, {});
+  // Innenraum: Sitze, Armaturenbrett, Lenkrad
+  const belt = cab[0][1], fzA = cab[cab.length - 1][0];
+  const seatF = fzA - 0.95, seatR = seatF - 0.95, inW = W * P.cabinW / 2 - 0.12;
+  const seatCol = rgb(0x2b2b30), seatHi = rgb(0x8a6a4a);
+  for (const sx of [W * 0.22, -W * 0.22]) {
+    D.box(sx - 0.24, belt - 0.5, seatF - 0.25, sx + 0.24, belt - 0.28, seatF + 0.25, { col: seatCol });
+    D.box(sx - 0.23, belt - 0.28, seatF - 0.32, sx + 0.23, belt + 0.32, seatF - 0.2, { col: seatHi });
+    D.box(sx - 0.12, belt + 0.32, seatF - 0.3, sx + 0.12, belt + 0.45, seatF - 0.22, { col: seatCol });
+  }
+  if (seatR - 0.35 > cab[1][0] - 0.2) D.box(-inW, belt - 0.5, seatR - 0.3, inW, belt + 0.2, seatR + 0.2, { col: seatCol });
+  D.box(-inW, belt - 0.2, fzA - 0.45, inW, belt + 0.05, fzA - 0.15, { col: rgb(0x1a1a1d) });
+  D.addGeometry(new THREE.TorusGeometry(0.17, 0.025, 6, 16).rotateX(-0.35), new THREE.Matrix4().makeTranslation(W * 0.22, belt + 0.16, fzA - 0.55), rgb(0x111111));
+  // Zierleisten, Türfugen, Türgriffe, Scheinwerfer-Fassung
+  const hingeZ = fzA + 0.12, doorLen = Math.max(0.9, Math.min(1.25, hingeZ - (rz + ar) - 0.15));
+  for (const sxs of [1, -1]) {
+    const x0 = sxs * (W / 2 + 0.004);
+    D.box(Math.min(x0, x0 + sxs * 0.012), belt - 0.02, cab[0][0] + 0.05, Math.max(x0, x0 + sxs * 0.012), belt + 0.02, fzA, { col: ch });
+    for (const zz of [hingeZ, hingeZ - doorLen]) D.box(Math.min(x0, x0 + sxs * 0.01), yb + 0.08, zz - 0.012, Math.max(x0, x0 + sxs * 0.01), belt - 0.04, zz + 0.012, { col: dk });
+    D.box(Math.min(x0, x0 + sxs * 0.03), belt - 0.18, hingeZ - doorLen + 0.12, Math.max(x0, x0 + sxs * 0.03), belt - 0.13, hingeZ - doorLen + 0.32, { col: ch });
+  }
+  for (const sx of [-1, 1]) D.box(sx * hx - 0.23, hy - 0.1, L / 2 - 0.03, sx * hx + 0.23, hy + 0.1, L / 2 + 0.035, { col: ch });
+  // Tagfahrlicht & Rückleuchtenband
+  for (const sx of [-1, 1]) H.box(sx * hx - 0.2, hy + 0.1, L / 2 - 0.01, sx * hx + 0.2, hy + 0.13, L / 2 + 0.05, {});
+  if (['sports', 'super', 'muscle'].includes(T.profile)) R.box(-W / 2 + 0.55, ry - 0.025, -L / 2 - 0.035, W / 2 - 0.55, ry + 0.025, -L / 2 + 0.01, {});
+  // Fahrertür (Scharnier vorne, linke Seite = lokal +x)
+  const doorH0 = yb + 0.07, doorH1 = belt - 0.03;
+  const doorG = new GeoBuilder(false);
+  doorG.box(0, doorH0, -doorLen, 0.05, doorH1, 0, {});
+  const holeG = new GeoBuilder(true);
+  holeG.box(W / 2 - 0.02, doorH0, hingeZ - doorLen, W / 2 + 0.004, doorH1, hingeZ, { col: rgb(0x0c0c0f) });
+  holeG.box(W * 0.22 - 0.24, belt - 0.5, seatF - 0.25, W / 2 - 0.03, belt - 0.28, seatF + 0.25, { col: seatHi });
+  // Fahrer-Dummy
+  const dT = new THREE.BoxGeometry(0.42, 0.55, 0.26).translate(W * 0.22, belt + 0.02, seatF - 0.05);
+  const dH = new THREE.BoxGeometry(0.22, 0.26, 0.24).translate(W * 0.22, belt + 0.45, seatF - 0.02);
   const out = {
     paint: paint.build(), glass, details: D.build(), head: H.build(), tail: R.build(),
     wheels: [[W / 2 - 0.16, r, fz, 1], [-W / 2 + 0.16, r, fz, 1], [W / 2 - 0.16, r, rz, 0], [-W / 2 + 0.16, r, rz, 0]],
     height: P.roof ? P.roof[3] : 2.25, headY: hy, wheelbase: fz - rz,
+    door: doorG.build(), hole: holeG.build(), hinge: [W / 2 + 0.006, hingeZ], doorLen, seat: [W * 0.22, seatF], belt,
+    dTorso: dT, dHead: dH, plateY: [yb + 0.04, yb + 0.08], L,
   };
   if (T.police) {
     const lb = new GeoBuilder(false), lr = new GeoBuilder(false), lbl = new GeoBuilder(false);
@@ -395,7 +446,7 @@ function carGeos(key) {
 // Gemeinsame Materialien
 export const CAR_MATS = {
   paint: new Map(),
-  glass: new THREE.MeshStandardMaterial({ color: 0x0b1622, metalness: 0.9, roughness: 0.06, envMapIntensity: 1.6 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x0a1622, metalness: 0.7, roughness: 0.04, envMapIntensity: 1.8, transparent: true, opacity: 0.72 }),
   details: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 }),
   head: new THREE.MeshBasicMaterial({ color: 0xfff6e0 }),
   tailOff: new THREE.MeshBasicMaterial({ color: 0x7a0a0a }),
@@ -413,7 +464,7 @@ export const CAR_MATS = {
 export function paintMat(hex) {
   let m = CAR_MATS.paint.get(hex);
   if (!m) {
-    m = new THREE.MeshStandardMaterial({ color: hex, metalness: 0.55, roughness: 0.28, envMapIntensity: 1.3 });
+    m = new THREE.MeshPhysicalMaterial({ color: hex, metalness: 0.5, roughness: 0.34, clearcoat: 1, clearcoatRoughness: 0.07, envMapIntensity: 1.45 });
     CAR_MATS.paint.set(hex, m);
   }
   return m;
@@ -426,11 +477,29 @@ export function buildCar(key, color) {
   grp.rotation.order = 'YXZ';
   const mk = (geo, mat, cast = false) => { const m = new THREE.Mesh(geo, mat); m.castShadow = cast; grp.add(m); return m; };
   const body = mk(g.paint, paintMat(color ?? pick(T.colors)), true);
-  mk(g.glass, CAR_MATS.glass);
+  // Fahrer (hinter der Scheibe sichtbar)
+  const driver = new THREE.Group();
+  const dTm = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 }), dHm = new THREE.MeshStandardMaterial({ color: 0xd9a066, roughness: 0.8 });
+  driver.add(new THREE.Mesh(g.dTorso, dTm), new THREE.Mesh(g.dHead, dHm));
+  driver.visible = false; grp.add(driver);
   mk(g.details, CAR_MATS.details);
+  const glassM = mk(g.glass, CAR_MATS.glass); glassM.renderOrder = 3;
+  // Tür
+  const doorPivot = new THREE.Group();
+  doorPivot.position.set(g.hinge[0], 0, g.hinge[1]);
+  const doorMesh = new THREE.Mesh(g.door, body.material); doorMesh.castShadow = true; doorPivot.add(doorMesh); grp.add(doorPivot);
+  const hole = mk(g.hole, CAR_MATS.details); hole.visible = false;
+  // Kennzeichen
+  const plate = plateMat();
+  for (const sg of [1, -1]) {
+    const pm = new THREE.Mesh(PLATE_GEO, plate);
+    pm.position.set(0, sg > 0 ? g.plateY[0] : g.plateY[1], sg * (g.L / 2 + 0.085));
+    if (sg < 0) pm.rotation.y = Math.PI;
+    grp.add(pm);
+  }
   mk(g.head, CAR_MATS.head);
   const tail = mk(g.tail, CAR_MATS.tailOff);
-  const parts = { body, tail };
+  const parts = { body, tail, doorPivot, doorMesh, hole, driver, dTm, dHm };
   if (g.barBase) {
     mk(g.barBase, CAR_MATS.barBase);
     parts.red = mk(g.barRed, CAR_MATS.off);
@@ -439,6 +508,44 @@ export function buildCar(key, color) {
   if (g.stripe) mk(g.stripe, T.police ? CAR_MATS.stripePol : CAR_MATS.stripeTaxi);
   if (g.taxiSign) mk(g.taxiSign, CAR_MATS.taxiSign);
   return { group: grp, parts, geo: g };
+}
+
+// Kennzeichen-Texturen (fiktiv, Port Solera)
+const PLATE_GEO = new THREE.PlaneGeometry(0.52, 0.12);
+const plateMats = [];
+function plateMat() {
+  if (plateMats.length < 8) {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 60;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f4f4ef'; g.fillRect(0, 0, 256, 60);
+    g.fillStyle = '#1d4ed8'; g.fillRect(0, 0, 26, 60);
+    g.strokeStyle = '#222'; g.lineWidth = 4; g.strokeRect(2, 2, 252, 56);
+    g.fillStyle = '#fff'; g.font = 'bold 14px sans-serif'; g.textAlign = 'center'; g.fillText('PS', 13, 36);
+    const L = 'ABCDEFGHJKLMNPRSTUVWXYZ';
+    const txt = L[Math.floor(Math.random() * L.length)] + L[Math.floor(Math.random() * L.length)] + ' ' + (100 + Math.floor(Math.random() * 8900));
+    g.fillStyle = '#111'; g.font = 'bold 40px "Russo One", sans-serif'; g.fillText(txt, 140, 46);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.MeshBasicMaterial({ map: t });
+    m.color.setScalar(0.85);
+    plateMats.push(m);
+    return m;
+  }
+  return plateMats[Math.floor(Math.random() * plateMats.length)];
+}
+
+// Räder für statische Modelle (Autohaus)
+let _wheelGeo = null, _wheelMat = null;
+export function addWheels(group, key) {
+  const T = CAR_TYPES[key], g = carGeos(key);
+  _wheelGeo = _wheelGeo || wheelGeometry();
+  _wheelMat = _wheelMat || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.35 });
+  for (const [x, y, z, front] of g.wheels) {
+    const m = new THREE.Mesh(_wheelGeo, _wheelMat);
+    m.position.set(x, y, z); m.scale.set(0.26, T.wheelR, T.wheelR);
+    if (front) m.rotation.y = -0.25;
+    m.castShadow = true;
+    group.add(m);
+  }
 }
 
 // Radgeometrie (Einheitsgröße: Radius 1, Breite 1)
@@ -457,6 +564,16 @@ export function wheelGeometry() {
       const m = new THREE.Matrix4().makeTranslation(sx * 0.52, 0, 0).multiply(new THREE.Matrix4().makeRotationX(a));
       b.addGeometry(sp, m, rgb(0xc9ced6));
     }
+    const lip = new THREE.RingGeometry(0.6, 0.68, 24).rotateY(sx * Math.PI / 2);
+    b.addGeometry(lip, new THREE.Matrix4().makeTranslation(sx * 0.515, 0, 0), rgb(0xe6e9ee));
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2 + Math.PI / 5;
+      const sp = new THREE.BoxGeometry(0.04, 0.5, 0.07).translate(0, 0.32, 0);
+      const m = new THREE.Matrix4().makeTranslation(sx * 0.51, 0, 0).multiply(new THREE.Matrix4().makeRotationX(a));
+      b.addGeometry(sp, m, rgb(0x9aa1ab));
+    }
+    const caliper = new THREE.BoxGeometry(0.08, 0.22, 0.12).translate(0, 0.38, 0.12);
+    b.addGeometry(caliper, new THREE.Matrix4().makeTranslation(sx * 0.4, 0, 0), rgb(0xd62828));
     const hub = new THREE.CircleGeometry(0.16, 10).rotateY(sx * Math.PI / 2);
     b.addGeometry(hub, new THREE.Matrix4().makeTranslation(sx * 0.53, 0, 0), rgb(0xdfe3e8));
   }

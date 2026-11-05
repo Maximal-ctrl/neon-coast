@@ -62,8 +62,11 @@ export class Vehicle {
     let vl = this.vx * lx + this.vz * lz;
     const drive = this.alive && this.grounded;
     const sand = W.surfaceAt(this.x, this.z) === 'sand';
-    const maxSteer = T.steer / (1 + Math.abs(vf) / 24);
-    this.steer = damp(this.steer, (this.alive ? inp.steer : 0) * maxSteer, 9, dt);
+    // Geschwindigkeitsabhängige Lenkung: schnell = ruhiger, präziser
+    const spAbs = Math.abs(vf);
+    const maxSteer = T.steer / (1 + spAbs / 17);
+    const steerRate = 10 / (1 + spAbs / 35);
+    this.steer = damp(this.steer, (this.alive ? inp.steer : 0) * maxSteer, steerRate, dt);
     this.braking = false;
     if (drive) {
       const thr = inp.throttle, brk = inp.brake;
@@ -88,7 +91,13 @@ export class Vehicle {
       vl *= Math.max(0, 1 - grip * dt);
       const wb = this.geo.wheelbase;
       let yaw = -(vf / wb) * Math.tan(this.steer);
-      if (inp.handbrake) yaw *= 1.45;
+      // Kurvenrate durch Reifenhaftung begrenzen (verhindert Übersteuern bei hohem Tempo)
+      const latMax = T.grip * 1.65 * (sand ? 0.7 : 1);
+      const yawCap = latMax / Math.max(4, spAbs);
+      if (!inp.handbrake) yaw = Math.max(-yawCap, Math.min(yawCap, yaw));
+      else yaw *= 1.45;
+      // Stabilisierung: Seitenrutschen wird bei hohem Tempo schneller abgefangen
+      if (!inp.handbrake && spAbs > 25) vl *= Math.max(0, 1 - (spAbs - 25) * 0.004);
       this.yawRate = yaw;
       this.h += yaw * dt;
       this.slip = Math.abs(vl);
@@ -203,6 +212,26 @@ export class Vehicle {
   }
 
   updateVisual(dt) {
+    // Tür öffnen/schließen
+    const want = this.doorHold > 0 ? 1 : (this.doorTarget || 0);
+    if (this.doorHold > 0) this.doorHold -= dt;
+    this.doorOpen = damp(this.doorOpen || 0, want, want > (this.doorOpen || 0) ? 9 : 7, dt);
+    if (this.parts.doorPivot) {
+      this.parts.doorPivot.rotation.y = -1.15 * this.doorOpen;
+      this.parts.hole.visible = this.doorOpen > 0.03;
+    }
+    // Fahrer hinter der Scheibe
+    const d = this.driver;
+    const show = this.alive && !this.sinking && d && !(d === 'player' && G.player.visible);
+    this.parts.driver.visible = !!show;
+    if (show && this._dlook !== d) {
+      this._dlook = d;
+      let L = null;
+      if (d === 'player') L = G.player.look;
+      else if (d === 'remote' && G.mp) { const r = G.mp.players.get(this.mpOwner); L = r && r.lk; }
+      else if (d.look) L = d.look;
+      if (L) { this.parts.dTm.color.copy(L.shirt); this.parts.dHm.color.copy(L.skin); }
+    }
     const g = this.group;
     g.position.set(this.x, this.y, this.z);
     g.rotation.set(-this.pitch, this.h, this.roll, 'YXZ');

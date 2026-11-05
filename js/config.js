@@ -35,6 +35,7 @@ export const SPECIAL = {
   hospital: { bi: 1, bj: 2, name: 'Krankenhaus' },
   police: { bi: 5, bj: 2, name: 'Polizeirevier' },
   gunshop: { bi: 2, bj: 6, name: 'Waffenladen' },
+  dealer: { bi: 6, bj: 4, name: 'Solera Motors' },
 };
 export const PARKS = [[4, 1], [1, 4], [6, 6]];
 export const OPEN_LOTS = [[1, 8], [7, 7], [3, 6]]; // Containerhof, Parkplatz, Plaza

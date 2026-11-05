@@ -23,6 +23,8 @@ import { Missions, shopItems } from './missions.js';
 import { Save } from './save.js';
 import { Interiors } from './interiors.js';
 import { Multiplayer } from './multiplayer.js';
+import { UI, Inventory, ITEMS } from './ui.js';
+import { CAR_TYPES, CAR_SHOP } from './models.js';
 import { fmtTime } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -144,7 +146,7 @@ function prepareWorld(d) {
   const P = G.player;
   for (const v of [...G.vehicles]) v.remove();
   for (const p of [...G.peds.list]) G.peds.remove(p);
-  P.contacts = new Set(); P.name = 'Leo';
+  P.contacts = new Set(); P.name = 'Leo'; P.inventory = {}; P.garage = [];
   if (d) Save.apply(d);
   else { P.money = 250; G.timeOfDay = 16.5; G.applyLook(DEFAULT_LOOK); }
   if (!d || !d.look) applyOutfit(P.outfit || 0, !d);
@@ -183,7 +185,7 @@ function beginPlay(isNew) {
     setTimeout(() => G.hud.hint(G.isTouch
       ? 'Linker Daumen: <b>laufen</b> · rechts wischen: <b>umsehen</b>.<br>Am Bett (<b>S</b>) speichern · Tür (<b>X</b>) nach draußen.'
       : '<b>WASD</b> laufen · <b>Maus</b> umsehen · <b>F</b> einsteigen.<br>Am Bett (<b>S</b>) speichern · Tür (<b>X</b>) nach draußen.', 9), 3500);
-    setTimeout(() => G.hud.hint('Schau mal bei <b>Samis Kiosk</b> (gelbes <b>24</b>) direkt neben deinem Haus vorbei.', 7), 14000);
+    setTimeout(() => G.hud.hint('Schau mal bei <b>Samis 24/7</b> (gelbes <b>24</b>) direkt neben deinem Hochhaus vorbei.', 7), 14000);
   } else G.hud.toast(`Spielstand ${Save.slot} geladen`);
 }
 
@@ -412,10 +414,12 @@ const ICON = {
   photo: '<svg viewBox="0 0 24 24"><path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="4" fill="#0b0716"/></svg>',
   settings: '<svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-2.1-.7-.4-1 1-2-1.8-1.8-2 1-1-.4L14 3h-4l-.7 2.1-1 .4-2-1-1.8 1.8 1 2-.4 1L3 10v4l2.1.7.4 1-1 2 1.8 1.8 2-1 1 .4L10 21h4l.7-2.1 1-.4 2 1 1.8-1.8-1-2 .4-1L21 14z"/></svg>',
   mp: '<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.7"/><path d="M2 20c0-3.6 2.7-6 6-6s6 2.4 6 6zm12.2 0c.1-2.2-.6-4.1-1.9-5.4 3.4-.9 7.7.9 7.7 5.4z"/></svg>',
+  garage: '<svg viewBox="0 0 24 24"><path d="M5 11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11h1a1 1 0 0 1 1 1v5h-2v2h-3v-2H8v2H5v-2H3v-5a1 1 0 0 1 1-1zm2.2 0h9.6l-1-2.9H8.2zM7 13.2a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm10 0a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z"/></svg>',
+  inv: '<svg viewBox="0 0 24 24"><path d="M9 4h6a2 2 0 0 1 2 2v1h1a3 3 0 0 1 3 3v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a3 3 0 0 1 3-3h1V6a2 2 0 0 1 2-2zm0 3h6V6H9zm-1 6v2h8v-2z"/></svg>',
   save: '<svg viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 2v5h9V5zm5 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
 };
 const APPS = [['contacts', 'Kontakte', '#34c759,#0a8f3c'], ['messages', 'Nachrichten', '#19e6ff,#1567d3'], ['map', 'Karte', '#ff9f1c,#e8590c'], ['radio', 'Radio', '#ff2e88,#a01458'],
-  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3']];
+  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3'], ['garage', 'Garage', '#ff7b00,#b5179e'], ['inv', 'Inventar', '#06d6a0,#118ab2']];
 
 function openPhone() {
   if (G.state !== 'playing' || G.player.state === 'dead' || G.player.state === 'busted') return;
@@ -551,7 +555,33 @@ function phoneRadio() {
     else { await A.clearLibrary(); G.hud.toast('Eigene Musik gelöscht'); phoneRadio(); }
   });
 }
+let lastDelivered = null;
+function phoneGarage() {
+  const P = G.player;
+  const list = P.garage;
+  phoneScreen('Garage', list.length ? list.map((c, i) => { const T = CAR_TYPES[c.key]; return `<div class="ph-car"><i style="background:#${c.color.toString(16).padStart(6, '0')}"></i><div><b>${T.name}</b><span>${CAR_SHOP[c.key] ? CAR_SHOP[c.key].cls : ''} · ${Math.round(T.maxSpeed * 3.6)} km/h</span></div><button class="ph-btn2 small" data-deliver="${i}">Liefern</button></div>`; }).join('')
+    + '<div class="ph-note">Deine Autos werden kostenlos in deine Nähe geliefert.</div>'
+    : '<div class="ph-empty">🚗<b>Noch keine Autos</b><span>Kauf dein erstes Auto bei <b>Solera Motors</b> in Midtown (pinkes A auf der Karte).</span></div>');
+  $('ph-screen').querySelectorAll('[data-deliver]').forEach((b) => b.onclick = () => {
+    if (G.interior) { G.hud.toast('Geh erst nach draußen.'); return; }
+    if (P.inCar) { G.hud.toast('Steig erst aus.'); return; }
+    const c = list[+b.dataset.deliver];
+    if (lastDelivered && !lastDelivered.removed && lastDelivered.driver !== 'player' && lastDelivered.alive) lastDelivered.remove();
+    const n = G.world.nearestNode(P.x, P.z);
+    const o = G.world.nodes[n.nbr[Math.floor(Math.random() * n.nbr.length)]];
+    const dx = Math.sign(o.x - n.x), dz = Math.sign(o.z - n.z);
+    const v = G.vm.spawn(c.key, n.x + dx * 22 - dz * 6, n.z + dz * 22 + dx * 6, Math.atan2(dx, dz), c.color);
+    if (v) {
+      v.parked = true; v.ownedByPlayer = true; v.persistent = true; v.missionCar = true; P.lastVehicle = v; lastDelivered = v;
+      setTimeout(() => { v.missionCar = false; }, 60000);
+      G.hud.toast(`🚗 Dein ${v.T.name} wurde geliefert – blauer Punkt auf der Karte.`);
+    }
+    closePhone();
+  });
+}
 function setupPhone() {
+  $('inv-btn').addEventListener('click', () => { if (G.state === 'playing') G.ui.inventory(); });
+  $('inv-btn').addEventListener('touchend', (e) => { e.preventDefault(); if (G.state === 'playing') G.ui.inventory(); });
   $('music-file').addEventListener('change', async (e) => {
     const files = [...e.target.files];
     e.target.value = '';
@@ -579,6 +609,8 @@ function setupPhone() {
     else if (app === 'map') { closePhone(); showMap(); }
     else if (app === 'settings') { closePhone(); setPaused(true); openPanel('EINSTELLUNGEN', settingsHTML(), [['Zurück', closePanel]]); bindSettings(); }
     else if (app === 'mp') { closePhone(); openMultiplayer(); }
+    else if (app === 'inv') { closePhone(); G.ui.inventory(); }
+    else if (app === 'garage') phoneGarage();
     else if (app === 'save') {
       if (G.missions.active && !G.missions.active.side) G.hud.toast('Während eines Auftrags kann nicht gespeichert werden.');
       else { Save.write(); G.hud.toast(`Gespeichert in Speicherplatz ${Save.slot}`); }
@@ -645,7 +677,8 @@ G.openService = function (kind) {
   G.missions.uiOpen = true;
   if (document.pointerLockElement) document.exitPointerLock();
   const close = () => { closePanel(); G.missions.uiOpen = false; G.state = 'playing'; last = performance.now(); };
-  if (kind === 'gunshop') {
+  if (kind === 'gunshop') { G.state = 'playing'; G.missions.uiOpen = false; G.ui.gunshop(); return; }
+  if (kind === 'gunshop_old') {
     const render = () => {
       const items = shopItems();
       const html = `<div style="opacity:.85">Dein Geld: <b style="color:#7dffa0">$${G.player.money}</b></div>` + items.map((it, i) =>
@@ -673,6 +706,8 @@ function setupUI() {
   $('btn-continue').onclick = () => { Save.setSlot(Save.latest()); startGame(true); };
   refreshTitle();
   G.mp = new Multiplayer();
+  G.ui = UI; G.inv = Inventory;
+  G.resetClock = () => { last = performance.now(); };
   $('btn-mp').onclick = () => {
     if (!G.audio.ready) G.audio.init();
     const n = Save.latest();
@@ -771,6 +806,7 @@ function update(now, step, I) {
   } else if (G.state === 'playing') {
     if (I.pressed('pause')) { setPaused(true); }
     else if (I.pressed('phone')) { openPhone(); }
+    else if (I.pressed('inv')) { G.ui.inventory(); }
     else if (I.pressed('map')) { showMap(); }
     G.time += step;
     G.stats.playTime += step;
@@ -807,8 +843,10 @@ function update(now, step, I) {
     G.world.env.update(step, G.timeOfDay, P);
     G.audio.update(step);
   } else if (G.state === 'paused' || G.state === 'menu') {
+    if (G.menuCam && G.state === 'menu') { G.menuCam(step); G.world.update(step); G.world.env.update(step, G.timeOfDay, G.camera.position); }
     if (I.pressed('pause') && G.state === 'paused') setPaused(false);
     if (phoneOpen && (I.pressed('phone') || I.pressed('pause'))) closePhone();
+    if (G.ui.isOpen && (I.pressed('pause') || I.pressed('inv'))) G.ui.close();
     if (G.state === 'menu' && I.pressed('map') && !$('mapscreen').classList.contains('hidden')) { $('mapscreen').classList.add('hidden'); G.state = 'playing'; }
   }
 }
@@ -857,7 +895,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '1.04';
+export const GAME_VERSION = '1.05';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));
