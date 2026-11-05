@@ -129,8 +129,8 @@ void main(){
 
 // Farbtabellen nach Sonnenhöhe (Grad)
 const KEYS = [
-  { e: -20, zen: 0x03050f, hor: 0x0b1230, sun: 0x6f88ff, gnd: 0x05060a, hs: 0x1b2850, hg: 0x07080c },
-  { e: -8, zen: 0x0a1233, hor: 0x2b2450, sun: 0x8c7cff, gnd: 0x0a0a12, hs: 0x2a2f5a, hg: 0x101015 },
+  { e: -20, zen: 0x03050f, hor: 0x0b1230, sun: 0x6f88ff, gnd: 0x05060a, hs: 0x4a5a98, hg: 0x22222e },
+  { e: -8, zen: 0x0a1233, hor: 0x2b2450, sun: 0x8c7cff, gnd: 0x0a0a12, hs: 0x515a90, hg: 0x24222c },
   { e: -2, zen: 0x162a62, hor: 0xc0566e, sun: 0xff6b4a, gnd: 0x16121a, hs: 0x5a5080, hg: 0x2a1e22 },
   { e: 3, zen: 0x24489a, hor: 0xff8a50, sun: 0xff8a3c, gnd: 0x2a2228, hs: 0x8a7aa8, hg: 0x4a3a30 },
   { e: 12, zen: 0x2e64c0, hor: 0xf6c49a, sun: 0xffc48a, gnd: 0x3a3a3a, hs: 0x9ab8e0, hg: 0x5a5040 },
@@ -253,9 +253,9 @@ export class Environment {
     const lightDir = sunUp ? this.sunDir : new THREE.Vector3(-this.sunDir.x, Math.max(0.35, -this.sunDir.y), -this.sunDir.z + 0.3).normalize();
     this.sun.color.copy(u.sunColor.value);
     if (!sunUp) this.sun.color.setHex(0x8fa6ff);
-    const sunI = sunUp ? lerp(0.6, 3.2, smoothstep(-3, 25, e)) : 0.35;
+    const sunI = sunUp ? lerp(0.6, 3.2, smoothstep(-3, 25, e)) : 0.7;
     this.sun.intensity = sunI;
-    this.hemi.intensity = lerp(1.3, 0.55, this.night) ;
+    this.hemi.intensity = lerp(1.3, 1.25, this.night);
     // Schattenkamera folgt dem Fokus (mit Texel-Snapping)
     const fx = focus.x, fz = focus.z;
     const snap = this.shadowSize ? (this.sun.shadow.camera.right * 2) / this.shadowSize : 1;
