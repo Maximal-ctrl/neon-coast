@@ -119,7 +119,6 @@ export class Missions {
     const W = G.world, poi = W.pois;
     // Dienste
     this.serviceMarkers = [
-      { kind: 'safehouse', m: new Marker(poi.safehouse.x, poi.safehouse.z, 0x7cff6b, { label: 'H', r: 1.3 }) },
       { kind: 'gunshop', m: new Marker(poi.gunshop.x, poi.gunshop.z, 0xff7b39, { label: 'W', r: 1.3 }) },
     ];
     for (const s of this.serviceMarkers) s.inside = true; // erst nach Verlassen erneut auslösen
@@ -390,9 +389,11 @@ export class Missions {
     const prevState = P.state;
     if (P.state === 'foot') { P.state = 'cutscene'; P.vx = P.vz = 0; if (other) P.yaw = Math.atan2(other.x - P.x, other.z - P.z); }
     if (other) other.yaw = Math.atan2(P.x - other.x, P.z - other.z);
-    for (const [who, text] of lines) {
-      const col = { Leo: '#7cff6b', Rosa: '#ff8fab', Dex: '#ffd23f', Val: '#b26bff', Marco: '#ff9f1c' }[who] || '#19e6ff';
-      G.hud.subtitle(who, text, col);
+    for (let [who, text] of lines) {
+      const col = { Leo: '#7cff6b', Rosa: '#ff8fab', Dex: '#ffd23f', Val: '#b26bff', Marco: '#ff9f1c', Sami: '#ffd23f' }[who] || '#19e6ff';
+      const nm = G.player.name || 'Leo';
+      text = text.replace(/\bLeo\b/g, nm);
+      G.hud.subtitle(who === 'Leo' ? nm : who, text, col);
       const dur = 1.6 + text.length * 0.05;
       let t = 0;
       yield;

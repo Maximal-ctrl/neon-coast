@@ -31,18 +31,30 @@
 
 <!-- Titel -->
 <div id="title" class="screen hidden">
-  <div class="title-inner">
-    <div class="logo big"><span class="l1">NEON</span><span class="l2">COAST</span></div>
-    <div class="tagline">PORT SOLERA · OPEN WORLD <span id="ver" class="ver"></span></div>
-    <div class="menu">
-      <button id="btn-continue" class="mbtn primary hidden">Weiterspielen</button>
-      <button id="btn-new" class="mbtn">Neues Spiel</button>
-      <button id="btn-controls" class="mbtn small">Steuerung</button>
-      <button id="btn-settings" class="mbtn small">Einstellungen</button>
-    </div>
-    <div id="install-hint" class="install hidden">📲 Als App spielen: In Safari auf <b>Teilen</b> tippen → <b>Zum Home-Bildschirm</b>.</div>
+  <div class="title-card">
+    <div class="logo"><span class="l1">NEON</span><span class="l2">COAST</span></div>
+    <div class="tagline">PORT SOLERA <span id="ver" class="ver"></span></div>
+    <nav class="tmenu">
+      <button id="btn-continue" class="tbtn primary hidden"><b>Weiterspielen</b><small id="continue-info"></small></button>
+      <button id="btn-new" class="tbtn">Neues Spiel</button>
+      <button id="btn-load" class="tbtn hidden">Spiel laden</button>
+      <button id="btn-settings" class="tbtn">Einstellungen</button>
+      <button id="btn-controls" class="tbtn">Steuerung</button>
+    </nav>
+    <div id="install-hint" class="install hidden">📲 Als App spielen: In Safari auf <b>Teilen</b> → <b>Zum Home-Bildschirm</b>.</div>
   </div>
-  <div class="credits">Ein Originalspiel · alle Grafiken, Musik &amp; Sounds werden live im Browser erzeugt</div>
+  <div class="credits">Ein Originalspiel · Grafik, Musik &amp; Sound entstehen live im Browser</div>
+</div>
+
+<!-- Charakter-Editor -->
+<div id="creator" class="screen hidden">
+  <div class="cr-panel">
+    <h2>DEIN CHARAKTER</h2>
+    <label class="cr-l" for="cr-name">Name</label>
+    <input id="cr-name" maxlength="14" value="Leo" autocomplete="off" spellcheck="false">
+    <div id="cr-opts"></div>
+    <div class="cr-btns"><button id="cr-rand" class="tbtn">🎲 Zufällig</button><button id="cr-go" class="mbtn primary">Los geht's</button></div>
+  </div>
 </div>
 
 <!-- HUD -->
@@ -147,10 +159,12 @@
 <input type="file" id="music-file" accept="audio/*,.mp3,.m4a,.aac,.wav" multiple hidden>
 <!-- Handy -->
 <div id="phone" class="hidden">
+  <div id="ph-backdrop"></div>
   <div class="ph-body">
-    <div class="ph-top"><span>NeonTel</span><span>▂▄▆ 100%</span></div>
+    <div class="ph-island"></div>
+    <div class="ph-status"><span id="ph-time">12:00</span><span class="ph-icons">5G <i class="bat"></i></span></div>
     <div id="ph-screen"></div>
-    <div class="ph-bottom"><button id="ph-close" class="ph-btn">✕</button><button id="ph-home" class="ph-home" aria-label="Home"></button><span class="ph-btn"></span></div>
+    <div class="ph-bottom"><button id="ph-close" aria-label="Schließen">✕</button><button id="ph-home" aria-label="Home"></button><span></span></div>
   </div>
 </div>
 

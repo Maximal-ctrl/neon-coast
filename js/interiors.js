@@ -36,9 +36,13 @@ export class Interiors {
     scene.add(this.light);
     this.buildClub();
     this.buildBank();
+    this.buildHome();
+    this.buildKiosk();
+    const sh = G.world.pois.safehouse;
     this.doors = [
       { kind: 'club', m: new Marker(234, 106.5, 0xff2e88, { label: 'C', r: 1.2 }), out: { x: 234, z: 109.8, yaw: 0 } },
       { kind: 'bank', m: new Marker(10, 26.8, 0x19e6ff, { label: 'B', r: 1.2 }), out: { x: 10, z: 30.5, yaw: 0 } },
+      { kind: 'home', m: new Marker(sh.x, sh.z, 0x7cff6b, { label: 'H', r: 1.2 }), out: { x: sh.x - 3.5, z: sh.z - 0.5, yaw: 0 } },
     ];
     for (const d of this.doors) d.latch = false;
   }
@@ -73,6 +77,87 @@ export class Interiors {
     m.position.set(x, y, z); R.g.add(m);
     if (collide) G.world.addBox(x - sx / 2, z - sz / 2, x + sx / 2, z + sz / 2, -1, y + sy / 2, 'bld');
     return m;
+  }
+
+
+  // ------------------------------------------------------------ Wohnung (Startort & Speicherpunkt)
+  buildHome() {
+    const wood = canvasTex(256, 256, (g, w) => {
+      for (let i = 0; i < 8; i++) { const b = 0.8 + Math.random() * 0.25; g.fillStyle = `rgb(${150 * b},${108 * b},${72 * b})`; g.fillRect(0, i * 32, w, 31); g.fillStyle = 'rgba(40,25,15,.6)'; g.fillRect(0, i * 32 + 31, w, 1); }
+    }, true);
+    wood.repeat.set(4, 4);
+    const mats = {
+      floor: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.55 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xf3efe8, emissive: 0x4a463e, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xe9e1d6, emissive: 0x2a2620, roughness: 0.9 }),
+    };
+    const R = this.room('home', 1500, 300, 16, 14, 3.4, mats);
+    R.name = 'Deine Wohnung';
+    R.spawn = { x: 1500, z: 304.5, yaw: Math.PI };
+    const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o });
+    // Bett (Speichern)
+    this.box(R, 1504.5, 0.25, 295.2, 3.2, 0.5, 4.2, M(0x3b2a1e), true);
+    this.box(R, 1504.5, 0.58, 295.4, 3.0, 0.18, 3.8, M(0xf2f2f2));
+    this.box(R, 1504.5, 0.7, 296.4, 3.05, 0.1, 2.2, M(0x2a6bb8));
+    this.box(R, 1504.5, 0.75, 293.8, 2.4, 0.18, 0.7, M(0xffffff));
+    this.box(R, 1504.5, 1.0, 293.1, 3.2, 1.2, 0.15, M(0x3b2a1e));
+    // Sofa, Tisch, Teppich, TV
+    this.box(R, 1495, 0.25, 297, 4, 0.5, 1.6, M(0x4a5568), true);
+    this.box(R, 1495, 0.75, 296.35, 4, 0.6, 0.3, M(0x4a5568));
+    this.box(R, 1495, 0.22, 299.6, 2.2, 0.44, 1.0, M(0x1f1f1f, { metalness: 0.3 }), true);
+    const rug = new THREE.Mesh(new THREE.PlaneGeometry(5, 4).rotateX(-Math.PI / 2), M(0xb5485f, { roughness: 1 }));
+    rug.position.set(1495, 0.02, 299.3); R.g.add(rug);
+    this.box(R, 1495, 0.35, 306.6, 3.4, 0.7, 0.6, M(0x222222), true);
+    this.tv = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.7), new THREE.MeshBasicMaterial({ color: 0x19e6ff }));
+    this.tv.position.set(1495, 1.75, 306.78); this.tv.rotation.y = Math.PI; R.g.add(this.tv);
+    this.box(R, 1495, 1.75, 306.85, 3.15, 1.85, 0.08, M(0x111111));
+    // Küche
+    this.box(R, 1493.2, 0.5, 293.6, 1.2, 1.0, 1.4, M(0xdedede), true);
+    this.box(R, 1495.6, 0.5, 293.6, 3.6, 1.0, 1.4, M(0xdedede), true);
+    this.box(R, 1495, 1.02, 293.6, 4.9, 0.05, 1.45, M(0x2b2b2b, { metalness: 0.4, roughness: 0.3 }));
+    this.box(R, 1492.6, 1.0, 293.3, 0.9, 2.0, 0.9, M(0xc9ced6, { metalness: 0.6, roughness: 0.3 }), true);
+    // Fenster mit Stadtblick
+    const view = canvasTex(512, 256, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#1a1145'); gr.addColorStop(0.6, '#b0246b'); gr.addColorStop(1, '#ff8a50');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 26; i++) { const bw = 14 + Math.random() * 30, bh = 40 + Math.random() * 150, x = Math.random() * w; g.fillStyle = '#0d0618'; g.fillRect(x, h - bh, bw, bh);
+        for (let k = 0; k < 20; k++) if (Math.random() < 0.4) { g.fillStyle = Math.random() < 0.5 ? '#ffd9a0' : '#19e6ff'; g.fillRect(x + 2 + Math.random() * (bw - 6), h - bh + 4 + Math.random() * (bh - 8), 3, 4); } }
+    });
+    for (const x of [1494, 1500]) {
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.8), new THREE.MeshBasicMaterial({ map: view }));
+      win.position.set(x + 3, 1.9, 293.02); R.g.add(win);
+      this.box(R, x + 3, 1.9, 293.0, 3.8, 2.0, 0.05, M(0xffffff));
+      win.position.z = 293.05;
+    }
+    // Pflanze & Lampe
+    this.box(R, 1507.2, 0.3, 306.2, 0.6, 0.6, 0.6, M(0x333333));
+    const pl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 0), M(0x2f7d32, { flatShading: true })); pl.position.set(1507.2, 1.1, 306.2); R.g.add(pl);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.8, 1.2) }));
+    lamp.position.set(1500, 3.0, 300); R.g.add(lamp);
+    R.exit = new Marker(1500, 306.4, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.bed = new Marker(1501.9, 295.6, 0x7cff6b, { label: 'S', r: 0.9 });
+    R.markers = [R.exit, R.bed];
+    for (const m of R.markers) m.group.visible = false;
+  }
+
+  // Samis Kiosk neben der Wohnung (außen)
+  buildKiosk() {
+    const g = new THREE.Group();
+    const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o });
+    const add = (x, y, z, sx, sy, sz, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+    const kx = 260, kz = -140;
+    add(kx, 1.6, kz - 1.5, 7, 3.2, 4, M(0x2b6f77));
+    add(kx, 3.3, kz - 1.4, 7.4, 0.25, 4.6, M(0x1f1f1f));
+    add(kx, 0.55, kz + 0.9, 6, 1.1, 0.8, M(0xf4efe6));
+    for (let i = 0; i < 8; i++) add(kx - 3.15 + i * 0.9 + 0.45, 2.85, kz + 1.0, 0.9, 0.12, 1.4, M(i % 2 ? 0xffffff : 0xe63946));
+    // Regale mit Waren
+    const goods = [0xffd166, 0x06d6a0, 0xef476f, 0x118ab2, 0xf78c6b, 0xffffff];
+    for (let r = 0; r < 3; r++) for (let i = 0; i < 12; i++) add(kx - 2.7 + i * 0.48, 1.4 + r * 0.45, kz - 0.4, 0.3, 0.3, 0.25, new THREE.MeshBasicMaterial({ color: new THREE.Color(goods[(i + r) % goods.length]).multiplyScalar(0.8) }));
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.1), new THREE.MeshBasicMaterial({ map: textTex('SAMIS KIOSK', '#ffd23f', 768, 160, 80), transparent: true, depthWrite: false }));
+    sign.position.set(kx, 3.75, kz + 0.75); g.add(sign);
+    this.scene.add(g);
+    G.world.addBox(kx - 3.5, kz - 3.5, kx + 3.5, kz + 1.3, -1, 3.4, 'bld');
+    this.kiosk = { x: kx, z: kz + 2.6, m: new Marker(kx, kz + 2.6, 0xffd23f, { label: '24', r: 1.1 }) };
   }
 
   // ------------------------------------------------------------ Club Velvet
@@ -243,6 +328,10 @@ export class Interiors {
       this.light.position.set(1500, 5.5, -1);
       this.light.intensity = 160;
       if (!this.clubHint) { this.clubHint = true; G.hud.hint('Willkommen im <b>Club Velvet</b>!<br>Bleib auf der Tanzfläche stehen zum <b>Tanzen</b>. Bar: <b>B</b> · Bühne: <b>$</b>', 8); }
+    } else if (kind === 'home') {
+      this.light.position.set(1500, 3, 300);
+      this.light.color.setHex(0xffe2c0);
+      this.light.intensity = 45;
     } else {
       this.spawnBankPeds();
       this.light.position.set(1500, 5, 150);
@@ -279,6 +368,7 @@ export class Interiors {
       d.m.update(dt);
       d.m.group.visible = !G.interior && !storyBusy;
     }
+    this.updateKiosk(dt);
     if (this.drunk > 0) {
       this.drunk -= dt;
       const k = Math.min(1, this.drunk / 5);
@@ -306,7 +396,31 @@ export class Interiors {
     };
     if (on(R.exit)) { this.exit(); return; }
     if (G.interior.kind === 'club') this.updateClub(dt, R, on);
+    else if (G.interior.kind === 'home') this.updateHome(dt, R, on);
     else this.updateBank(dt, R, on);
+  }
+
+  updateHome(dt, R, on) {
+    this.tv.material.color.setHSL((this.t * 0.05) % 1, 0.7, 0.45 + Math.sin(this.t * 3) * 0.05);
+    if (on(R.bed, 1.4)) G.openService('safehouse');
+  }
+
+  updateKiosk(dt) {
+    const K = this.kiosk, P = G.player;
+    K.m.update(dt);
+    K.m.group.visible = !G.interior;
+    if (!this.sami || this.sami.removed) {
+      this.sami = G.peds.spawnAt(K.x, K.z - 1.5, { ...randomLook(), skin: C(0xc68642), shirt: C(0x2b6f77), sleeve: C(0x2b6f77), pants: C(0x3a3a3a), legs: C(0x3a3a3a), hair: C(0x9e9e9e), hat: null, bald: false, scale: 0.95 }, 'mission');
+      this.sami.persistent = true; this.sami.yaw = 0; this.sami.r = 0.2;
+    }
+    if (G.interior || P.state !== 'foot' || G.missions.active) { K.latch = dist2(P.x, P.z, K.x, K.z) < 2; return; }
+    const inside = dist2(P.x, P.z, K.x, K.z) < 1.3 * 1.3;
+    if (inside && !K.latch) {
+      K.latch = true;
+      if (!P.contacts.has('sami')) G.missions.start(samiIntro(this));
+      else G.openShop('kiosk');
+    }
+    if (!inside) K.latch = false;
   }
 
   updateClub(dt, R, on) {
@@ -394,3 +508,24 @@ function heistDef(I) {
     },
   };
 }
+
+// Erstes Gespräch mit Sami – danach ist er im Handy
+function samiIntro(I) {
+  return {
+    id: 'sami', title: 'Samis Kiosk', side: true, reward: 0,
+    *run(m) {
+      const P = G.player, s = I.sami;
+      yield* m.talk([
+        ['Sami', 'Na sieh mal an – ein neues Gesicht in der Nachbarschaft! Ich bin Sami, mir gehört der Kiosk hier.'],
+        ['Leo', 'Ich wohne gleich nebenan. Ich bin Leo.'],
+        ['Sami', 'Dann sehen wir uns ja öfter. Zigaretten, Snacks, Zeitung – und manchmal höre ich Dinge, die für dich interessant sein könnten.'],
+        ['Sami', 'Hier, meine Nummer. Wenn ich was höre, melde ich mich.'],
+      ], s, s);
+      P.contacts.add('sami');
+      G.hud.bigToast('NEUER KONTAKT', 'Sami (Kiosk) wurde in deinem Handy gespeichert');
+      G.audio.pickup();
+      G.save.write();
+    },
+  };
+}
+

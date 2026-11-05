@@ -1330,17 +1330,17 @@ export class World {
     const night = G.world.env ? G.world.env.night : 0;
     // Nachtbeleuchtung
     const n = night;
-    for (const k of ['glass', 'office', 'apt', 'deco', 'warehouse', 'house', 'store']) this.M[k].emissiveIntensity = n * (k === 'store' ? 1.6 : 1.25);
-    this.M.bill.emissiveIntensity = n * 0.9;
-    this.M.accent.color.setScalar(lerp(0.35, 1.0, n));
-    this.M.signs.color.setScalar(lerp(0.55, 1.5, n) * (0.94 + 0.06 * Math.sin(G.time * 40) * (Math.sin(G.time * 1.3) > 0.97 ? 1 : 0)));
-    this.lampGlowMat.color.setRGB(lerp(0.5, 3.0, n), lerp(0.45, 2.4, n), lerp(0.4, 1.6, n));
-    this.poolMat.opacity = n * 0.9;
+    for (const k of ['glass', 'office', 'apt', 'deco', 'warehouse', 'house', 'store']) this.M[k].emissiveIntensity = n * (k === 'store' ? 0.85 : 0.7);
+    this.M.bill.emissiveIntensity = n * 0.5;
+    this.M.accent.color.setScalar(lerp(0.35, 0.75, n));
+    this.M.signs.color.setScalar(lerp(0.55, 0.95, n) * (0.94 + 0.06 * Math.sin(G.time * 40) * (Math.sin(G.time * 1.3) > 0.97 ? 1 : 0)));
+    this.lampGlowMat.color.setRGB(lerp(0.5, 1.5, n), lerp(0.45, 1.25, n), lerp(0.4, 0.85, n));
+    this.poolMat.opacity = n * 0.45;
     this.poolIM.visible = n > 0.02;
-    this.M.poolw.emissiveIntensity = 0.3 + n * 1.5;
+    this.M.poolw.emissiveIntensity = 0.3 + n * 0.7;
 
     // Ampeln
-    const red = new THREE.Color(3.2, 0.25, 0.15), yel = new THREE.Color(3, 1.9, 0.1), grn = new THREE.Color(0.2, 3, 0.8), dim = new THREE.Color(0.07, 0.07, 0.07);
+    const red = new THREE.Color(1.6, 0.12, 0.08), yel = new THREE.Color(1.5, 0.95, 0.05), grn = new THREE.Color(0.1, 1.5, 0.4), dim = new THREE.Color(0.07, 0.07, 0.07);
     let changed = false;
     for (const node of this.nodes) {
       const ns = this.signal(node.id, true), ew = this.signal(node.id, false);
@@ -1382,7 +1382,7 @@ export class World {
       this.gondolas.instanceMatrix.needsUpdate = true;
       // Lichter (Farbverlauf)
       const lc = this.wheelLightCols, t = G.time;
-      const bright = lerp(0.25, 1.4, n);
+      const bright = lerp(0.25, 0.85, n);
       for (let k = 0; k < lc.length / 3; k++) {
         const h = (k * 0.013 + t * 0.12) % 1;
         const r = 0.5 + 0.5 * Math.sin((h) * 6.283), gg = 0.5 + 0.5 * Math.sin((h + 0.33) * 6.283), b = 0.5 + 0.5 * Math.sin((h + 0.66) * 6.283);

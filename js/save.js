@@ -1,30 +1,45 @@
-// Speichern & Laden (localStorage)
+// Speichern & Laden (localStorage) – 3 Speicherplätze
 import { G } from './state.js';
 
-const KEY = 'neoncoast_save_v1';
+const OLD_KEY = 'neoncoast_save_v1';
 const SKEY = 'neoncoast_settings_v1';
+const SLOTS = 3;
+const key = (n) => `neoncoast_slot_${n}`;
 
 function store() { try { return window.localStorage; } catch (e) { return null; } }
+function get(k) { const s = store(); try { return s ? JSON.parse(s.getItem(k)) : null; } catch (e) { return null; } }
+
+// Alten Einzelspielstand in Platz 1 übernehmen
+(function migrate() {
+  const s = store(); if (!s) return;
+  try { const old = s.getItem(OLD_KEY); if (old && !s.getItem(key(1))) s.setItem(key(1), old); if (old) s.removeItem(OLD_KEY); } catch (e) { /* */ }
+})();
+
+const hex = (c) => (c && c.getHex ? c.getHex() : c);
 
 export const Save = {
-  exists() { const s = store(); try { return !!(s && s.getItem(KEY)); } catch (e) { return false; } },
+  SLOTS,
+  slot: 1,
+  setSlot(n) { this.slot = n; },
+  list() { const out = []; for (let n = 1; n <= SLOTS; n++) out.push({ n, data: get(key(n)) }); return out; },
+  exists() { return this.list().some((s) => s.data); },
+  latest() { let best = null; for (const s of this.list()) if (s.data && (!best || (s.data.t || 0) > (best.data.t || 0))) best = s; return best ? best.n : null; },
   write() {
     const s = store(); if (!s || !G.player) return false;
-    const P = G.player, M = G.missions;
+    const P = G.player, M = G.missions, L = P.look;
     const data = {
-      v: 1, t: Date.now(),
+      v: 2, t: Date.now(),
+      name: P.name, look: { skin: hex(L.skin), hair: hex(L.hair), hairStyle: P.hairStyle || 'short', shirt: hex(L.shirt), pants: hex(L.pants), shorts: !!P.shorts, shoes: hex(L.shoes), scale: L.scale },
+      contacts: [...(P.contacts || [])],
       money: P.money, health: P.health, armor: P.armor, ammo: { ...P.ammo, fists: 0 }, weapon: P.weapon,
       outfit: P.outfit || 0,
       progress: M.progress, shells: [...M.shells], stunts: [...P.stuntsDone], taxi: M.taxiFares,
       stats: G.stats, time: G.timeOfDay,
     };
-    try { s.setItem(KEY, JSON.stringify(data)); return true; } catch (e) { return false; }
+    try { s.setItem(key(this.slot), JSON.stringify(data)); return true; } catch (e) { return false; }
   },
-  read() {
-    const s = store(); if (!s) return null;
-    try { return JSON.parse(s.getItem(KEY)); } catch (e) { return null; }
-  },
-  clear() { const s = store(); try { s && s.removeItem(KEY); } catch (e) { /* */ } },
+  read(n = this.slot) { return get(key(n)); },
+  clear(n = this.slot) { const s = store(); try { s && s.removeItem(key(n)); } catch (e) { /* */ } },
   writeSettings() { const s = store(); try { s && s.setItem(SKEY, JSON.stringify(G.settings)); } catch (e) { /* */ } },
   readSettings() { const s = store(); try { const d = s && JSON.parse(s.getItem(SKEY)); if (d) Object.assign(G.settings, d); } catch (e) { /* */ } },
   apply(d) {
@@ -39,5 +54,8 @@ export const Save = {
     Object.assign(G.stats, d.stats || {});
     if (d.time != null) G.timeOfDay = d.time;
     P.outfit = d.outfit || 0;
+    P.name = d.name || 'Leo';
+    P.contacts = new Set(d.contacts || []);
+    if (d.look) G.applyLook(d.look);
   },
 };

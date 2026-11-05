@@ -399,9 +399,9 @@ export class VehicleManager {
     }
     this.blobIM.count = bi; this.blobIM.instanceMatrix.needsUpdate = true;
     this.headIM.count = hi; this.headIM.instanceMatrix.needsUpdate = true;
-    this.headMat.opacity = night * 0.8;
-    CAR_MATS.head.color.setScalar(lerp(0.9, 3.2, night));
-    CAR_MATS.tailOff.color.setRGB(lerp(0.35, 1.4, night), 0.03, 0.03);
+    this.headMat.opacity = night * 0.4;
+    CAR_MATS.head.color.setScalar(lerp(0.9, 1.6, night));
+    CAR_MATS.tailOff.color.setRGB(lerp(0.35, 0.9, night), 0.03, 0.03);
     CAR_MATS.taxiSign.color.setRGB(lerp(0.9, 2.4, night), lerp(0.8, 2.0, night), lerp(0.5, 1.0, night));
   }
 }

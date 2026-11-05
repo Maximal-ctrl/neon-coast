@@ -73,7 +73,7 @@ async function boot() {
   env.setFogRange(q === 'low' ? 140 : 180, q === 'low' ? 520 : q === 'medium' ? 820 : 1050);
   await world.build(setLoad);
 
-  G.crowd = new CrowdRenderer(scene, 110);
+  G.crowd = new CrowdRenderer(scene, 180);
   G.crowd.setShadows(q === 'high');
   G.effects = new Effects(scene);
   G.vm = new VehicleManager(scene);
@@ -84,6 +84,7 @@ async function boot() {
   const sh = world.pois.safehouse;
   G.player = new Player(sh.x, sh.z);
   G.player.visible = false;
+  G.player.name = 'Leo'; G.player.contacts = new Set();
   G.cam = new CameraRig(camera);
   G.input = new Input(canvas);
   G.audio = new AudioSys();
@@ -96,7 +97,7 @@ async function boot() {
     composer.setPixelRatio(pixelRatio(q));
     composer.addPass(new RenderPass(scene, camera));
     const res = new THREE.Vector2(window.innerWidth, window.innerHeight);
-    bloom = new UnrealBloomPass(res, 0.55, 0.45, 0.82);
+    bloom = new UnrealBloomPass(res, 0.4, 0.35, 0.9);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
   }
@@ -114,7 +115,6 @@ async function boot() {
   onResize();
   $('loading').classList.add('hidden');
   $('title').classList.remove('hidden');
-  if (Save.exists()) $('btn-continue').classList.remove('hidden');
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const standalone = window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || navigator.standalone;
   if (ios && !standalone) $('install-hint').classList.remove('hidden');
@@ -137,49 +137,148 @@ function onResize() {
 }
 
 // ------------------------------------------------------------ Spielstart
-function startGame(load) {
+// Welt für einen Spielstand vorbereiten (Spieler startet in seiner Wohnung)
+function prepareWorld(d) {
   G.audio.init();
   const P = G.player;
-  const d = load ? Save.read() : null;
-  // Titel-Simulation aufräumen
   for (const v of [...G.vehicles]) v.remove();
   for (const p of [...G.peds.list]) G.peds.remove(p);
+  P.contacts = new Set(); P.name = 'Leo';
   if (d) Save.apply(d);
-  else { Save.clear(); P.money = 250; G.timeOfDay = 16.5; }
-  applyOutfit(P.outfit || 0);
-  G.missions.init();
-  G.interiors = new Interiors(G.scene);
-  const sh = G.world.pois.safehouse;
-  P.x = sh.x - 5; P.z = sh.z - 2.5; P.y = 0; P.yaw = -Math.PI / 2; P.state = 'foot'; P.visible = true;
-  G.cam.yaw = -Math.PI / 2; G.cam.pitch = -0.2;
+  else { P.money = 250; G.timeOfDay = 16.5; G.applyLook(DEFAULT_LOOK); }
+  if (!d || !d.look) applyOutfit(P.outfit || 0, !d);
+  if (!G.missionsReady) { G.missions.init(); G.missionsReady = true; }
+  if (!G.interiors) G.interiors = new Interiors(G.scene);
+  P.state = 'foot'; P.visible = true;
   G.traffic.initParked();
   const sc = G.world.pois.safehouseCar;
-  const car = G.vm.spawn(load && G.missions.progress >= 2 ? 'zephyra' : 'kiwi', sc.x, sc.z, sc.h, load && G.missions.progress >= 2 ? 0xe63946 : 0x4ecdc4);
-  if (car) { car.parked = true; car.ownedByPlayer = true; }
-  for (let i = 0; i < 10; i++) G.traffic.spawnCar(P.x, P.z, 60, 200);
-  G.cam.snap();
+  const car = G.vm.spawn(d && G.missions.progress >= 2 ? 'zephyra' : 'kiwi', sc.x, sc.z, sc.h, d && G.missions.progress >= 2 ? 0xe63946 : 0x4ecdc4);
+  if (car) { car.parked = true; car.ownedByPlayer = true; P.lastVehicle = car; }
+  for (let i = 0; i < 10; i++) G.traffic.spawnCar(sc.x, sc.z, 60, 200);
+  G.interiors.enter('home');
+}
+
+function startGame(load) {
+  const d = load ? Save.read() : null;
+  prepareWorld(d);
+  beginPlay(!d);
+}
+
+function beginPlay(isNew) {
+  const P = G.player;
+  G.cam.clearCine();
   G.state = 'playing';
   $('title').classList.add('hidden');
+  $('creator').classList.add('hidden');
   G.hud.show(true);
   G.hud.weapon();
   G.hud.fadeIn();
   G.audio.station = 0;
-  if (!d) {
-    setTimeout(() => G.hud.bigToast('PORT SOLERA', 'Willkommen zurück, Leo.'), 600);
+  if (isNew) {
+    Save.write();
+    setTimeout(() => G.hud.bigToast('PORT SOLERA', `Willkommen zu Hause, ${P.name}.`), 600);
     setTimeout(() => G.hud.hint(G.isTouch
-      ? 'Linker Daumen: <b>laufen</b> · rechts wischen: <b>umsehen</b>.<br>Folge der <b>gelben Route</b> zu Tante Rosa (R).'
-      : '<b>WASD</b> laufen · <b>Maus</b> umsehen · <b>F</b> einsteigen.<br>Folge der <b>gelben Route</b> zu Tante Rosa (R).', 9), 3500);
-  } else {
-    G.hud.toast('Spielstand geladen');
-  }
+      ? 'Linker Daumen: <b>laufen</b> · rechts wischen: <b>umsehen</b>.<br>Am Bett (<b>S</b>) speichern · Tür (<b>X</b>) nach draußen.'
+      : '<b>WASD</b> laufen · <b>Maus</b> umsehen · <b>F</b> einsteigen.<br>Am Bett (<b>S</b>) speichern · Tür (<b>X</b>) nach draußen.', 9), 3500);
+    setTimeout(() => G.hud.hint('Schau mal bei <b>Samis Kiosk</b> (gelbes <b>24</b>) direkt neben deinem Haus vorbei.', 7), 14000);
+  } else G.hud.toast(`Spielstand ${Save.slot} geladen`);
 }
 
-function applyOutfit(i) {
+// ------------------------------------------------------------ Aussehen
+const DEFAULT_LOOK = { skin: 0xd9a066, hair: 0x1b1b1b, hairStyle: 'short', shirt: 0xf6f1e9, pants: 0x2b3a55, shorts: false, shoes: 0xffffff, scale: 0.96 };
+G.applyLook = function (L) {
+  const P = G.player, K = P.look;
+  K.skin.setHex(L.skin); K.hair.setHex(L.hair);
+  K.shirt.setHex(L.shirt); K.sleeve.setHex(L.shirt);
+  K.pants.setHex(L.pants); K.legs.setHex(L.shorts ? L.skin : L.pants);
+  K.shoes.setHex(L.shoes); K.scale = L.scale || 0.96;
+  K.bald = L.hairStyle === 'bald';
+  K.hat = L.hairStyle === 'cap' ? new THREE.Color(L.hair === 0x111111 || L.hair === 0x1b1b1b ? 0x222a44 : L.hair) : null;
+  P.hairStyle = L.hairStyle; P.shorts = !!L.shorts;
+  P.lookData = { ...L };
+};
+
+const CR = {
+  skin: [0xffdbac, 0xf1c27d, 0xe0ac69, 0xd9a066, 0xc68642, 0x8d5524, 0x5c3a21],
+  hair: [0x111111, 0x3b2716, 0x6b4423, 0xb98b4e, 0xe6c27a, 0x8a3324, 0x9e9e9e, 0xff2e88, 0x19e6ff],
+  shirt: [0xf6f1e9, 0x222222, 0xff4d6d, 0x3ec1d3, 0xffd166, 0x06d6a0, 0x9b5de5, 0x1d3557, 0xff8fab, 0xe76f51],
+  pants: [0x2b3a55, 0x111111, 0x4a4e69, 0xd4c4a8, 0x6c584c, 0x264653, 0x7b8fa1, 0xe9d8a6],
+  shoes: [0xffffff, 0x222222, 0xd62828, 0x3a86ff, 0x8b5a2b, 0xffd166],
+};
+const hx = (n) => '#' + n.toString(16).padStart(6, '0');
+function openCreator() {
+  prepareWorld(null);
+  const P = G.player;
+  G.state = 'creator';
+  $('title').classList.add('hidden');
+  $('creator').classList.remove('hidden');
+  P.x = 1500; P.z = 304.5; P.yaw = Math.PI;
+  G.cam.setCine(new THREE.Vector3(1500.9, 1.55, 301.2), new THREE.Vector3(1500, 1.15, 304.5));
+  const L = { ...DEFAULT_LOOK };
+  const row = (k, label) => `<div class="cr-row"><span>${label}</span><div class="cr-sw">${CR[k].map((c) => `<button data-k="${k}" data-v="${c}" style="--c:${hx(c)}" class="${L[k] === c ? 'on' : ''}"></button>`).join('')}</div></div>`;
+  const render = () => {
+    $('cr-opts').innerHTML = row('skin', 'Hautton') +
+      `<div class="cr-row"><span>Frisur</span><div class="cr-seg">${[['short', 'Kurz'], ['bald', 'Glatze'], ['cap', 'Cap']].map(([v, n]) => `<button data-k="hairStyle" data-v="${v}" class="${L.hairStyle === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>` +
+      row('hair', L.hairStyle === 'cap' ? 'Cap-Farbe' : 'Haarfarbe') + row('shirt', 'Oberteil') + row('pants', 'Hose') +
+      `<div class="cr-row"><span>Schnitt</span><div class="cr-seg">${[[false, 'Lang'], [true, 'Shorts']].map(([v, n]) => `<button data-k="shorts" data-v="${v}" class="${L.shorts === v ? 'on' : ''}">${n}</button>`).join('')}</div></div>` +
+      row('shoes', 'Schuhe') +
+      `<div class="cr-row"><span>Größe</span><input id="cr-size" type="range" min="0.88" max="1.04" step="0.01" value="${L.scale}"></div>`;
+    $('cr-size').oninput = (e) => { L.scale = +e.target.value; G.applyLook(L); };
+  };
+  render();
+  G.applyLook(L);
+  $('cr-opts').onclick = (e) => {
+    const b = e.target.closest('[data-k]'); if (!b) return;
+    const k = b.dataset.k, v = b.dataset.v;
+    L[k] = k === 'hairStyle' ? v : k === 'shorts' ? v === 'true' : +v;
+    G.applyLook(L); render();
+  };
+  $('cr-rand').onclick = () => {
+    const pk = (a) => a[Math.floor(Math.random() * a.length)];
+    Object.assign(L, { skin: pk(CR.skin), hair: pk(CR.hair), shirt: pk(CR.shirt), pants: pk(CR.pants), shoes: pk(CR.shoes), hairStyle: pk(['short', 'short', 'bald', 'cap']), shorts: Math.random() < 0.3 });
+    G.applyLook(L); render();
+  };
+  $('cr-go').onclick = () => {
+    const name = ($('cr-name').value || '').replace(/[^\p{L}\p{N} \-]/gu, '').trim().slice(0, 14) || 'Leo';
+    P.name = name;
+    G.applyLook(L);
+    G.interiors.enter('home');
+    beginPlay(true);
+  };
+}
+
+// ------------------------------------------------------------ Speicherplätze
+function slotInfo(d) {
+  if (!d) return '<span class="slot-empty">Leer</span>';
+  const when = d.t ? new Date(d.t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  const prog = Math.min(d.progress || 0, 7);
+  return `<b>${(d.name || 'Leo').replace(/[<>&]/g, '')}</b><span>${prog}/7 Aufträge · $${(d.money || 0).toLocaleString('de-DE')} · ${when}</span>`;
+}
+function showSlots(mode) {
+  const list = Save.list();
+  const html = `<div class="slots">${list.map((s) => `<button class="slot" data-n="${s.n}"><i>${s.n}</i><div>${slotInfo(s.data)}</div></button>`).join('')}</div>`;
+  openPanel(mode === 'new' ? 'NEUES SPIEL – SPEICHERPLATZ' : 'SPIEL LADEN', html, [['Zurück', closePanel]]);
+  $('dlg-body').querySelectorAll('.slot').forEach((b) => b.onclick = () => {
+    const n = +b.dataset.n, d = Save.read(n);
+    if (mode === 'load') { if (!d) return; Save.setSlot(n); closePanel(); startGame(true); return; }
+    const go = () => { Save.setSlot(n); Save.clear(n); closePanel(); openCreator(); };
+    if (d) openPanel('Überschreiben?', `Speicherplatz ${n} (${(d.name || 'Leo').replace(/[<>&]/g, '')}) wird überschrieben.`, [['Ja, überschreiben', go, 'primary'], ['Abbrechen', () => showSlots('new')]]);
+    else go();
+  });
+}
+function refreshTitle() {
+  const n = Save.latest();
+  $('btn-continue').classList.toggle('hidden', !n);
+  $('btn-load').classList.toggle('hidden', !Save.exists());
+  if (n) $('continue-info').innerHTML = slotInfo(Save.read(n));
+}
+
+function applyOutfit(i, keep = false) {
   const P = G.player, o = OUTFITS[i % OUTFITS.length];
   P.outfit = i % OUTFITS.length;
-  P.look.shirt.setHex(o.shirt); P.look.sleeve.setHex(o.shirt);
-  P.look.pants.setHex(o.pants);
-  P.look.legs.setHex(o.shorts ? 0xd9a066 : o.pants);
+  if (keep) return;
+  const L = { ...(P.lookData || DEFAULT_LOOK), shirt: o.shirt, pants: o.pants, shorts: o.shorts };
+  G.applyLook(L);
 }
 
 // ------------------------------------------------------------ Menüs
@@ -301,53 +400,90 @@ G.openMenu = function (title, html, items) {
 };
 
 let phoneOpen = false;
+const ICON = {
+  contacts: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/></svg>',
+  messages: '<svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>',
+  map: '<svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>',
+  radio: '<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13" fill="none" stroke="#fff" stroke-width="2.2"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  stats: '<svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="7" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="18" rx="1"/></svg>',
+  photo: '<svg viewBox="0 0 24 24"><path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="4" fill="#0b0716"/></svg>',
+  settings: '<svg viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm9 4-2.1-.7-.4-1 1-2-1.8-1.8-2 1-1-.4L14 3h-4l-.7 2.1-1 .4-2-1-1.8 1.8 1 2-.4 1L3 10v4l2.1.7.4 1-1 2 1.8 1.8 2-1 1 .4L10 21h4l.7-2.1 1-.4 2 1 1.8-1.8-1-2 .4-1L21 14z"/></svg>',
+  save: '<svg viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 2v5h9V5zm5 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
+};
+const APPS = [['contacts', 'Kontakte', '#34c759,#0a8f3c'], ['messages', 'Nachrichten', '#19e6ff,#1567d3'], ['map', 'Karte', '#ff9f1c,#e8590c'], ['radio', 'Radio', '#ff2e88,#a01458'],
+  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00']];
+
 function openPhone() {
   if (G.state !== 'playing' || G.player.state === 'dead' || G.player.state === 'busted') return;
   G.state = 'menu'; phoneOpen = true;
   if (document.pointerLockElement) document.exitPointerLock();
-  $('phone').classList.remove('hidden');
+  $('phone').classList.remove('hidden', 'closing');
   phoneHome();
   if (G.audio.ready) G.audio.click();
 }
 function closePhone() {
   if (!phoneOpen) return;
   phoneOpen = false;
-  $('phone').classList.add('hidden');
+  $('phone').classList.add('closing');
+  setTimeout(() => { if (!phoneOpen) $('phone').classList.add('hidden'); }, 220);
   if (G.state === 'menu') { G.state = 'playing'; last = performance.now(); }
 }
 function phoneScreen(title, html, back = true) {
-  $('ph-screen').innerHTML = (back ? `<div class="ph-head"><button class="ph-back" data-ph="home">‹</button><b>${title}</b></div>` : '') + html;
+  $('ph-time').textContent = $('clock').textContent;
+  const el = $('ph-screen');
+  el.innerHTML = (back ? `<div class="ph-head"><button class="ph-back" data-ph="home" aria-label="Zurück">‹</button><b>${title}</b></div>` : '') + `<div class="ph-content">${html}</div>`;
+  el.classList.remove('ph-anim'); void el.offsetWidth; el.classList.add('ph-anim');
 }
 function phoneHome() {
-  const apps = [['contacts', '📞', 'Kontakte'], ['messages', '✉️', 'Nachrichten'], ['map', '🗺️', 'Karte'], ['radio', '📻', 'Radio'], ['stats', '📊', 'Statistik'], ['photo', '📷', 'Fotomodus']];
-  phoneScreen('', `<div class="ph-wall"><div class="ph-clock">${$('clock').textContent}</div><div class="ph-date">Port Solera · ${G.world.env.night > 0.5 ? 'Nacht' : 'Tag'}</div></div>
-    <div class="ph-apps">${apps.map(([id, ic, n]) => `<button class="ph-app" data-ph="${id}"><span>${ic}</span>${n}</button>`).join('')}</div>`, false);
+  const P = G.player, lvl = G.police.level;
+  const night = G.world.env.night > 0.5;
+  const goal = nextHint();
+  phoneScreen('', `<div class="ph-wall ${night ? 'night' : ''}"><div class="ph-clock">${$('clock').textContent}</div><div class="ph-date">Port Solera · ${night ? 'Nacht' : 'Tag'} · ${night ? '21°' : '29°'}</div></div>
+    <div class="ph-widgets">
+      <div class="ph-w wide"><small>NÄCHSTES ZIEL</small><span>${goal}</span></div>
+      <div class="ph-w"><small>KONTO</small><b class="money">$${P.money.toLocaleString('de-DE')}</b></div>
+      <div class="ph-w"><small>FAHNDUNG</small><b class="stars">${'★'.repeat(lvl)}<i>${'★'.repeat(5 - lvl)}</i></b></div>
+    </div>
+    <div class="ph-apps">${APPS.map(([id, n, g]) => `<button class="ph-app" data-ph="${id}"><span style="background:linear-gradient(145deg,${g})">${ICON[id]}</span>${n}</button>`).join('')}</div>`, false);
 }
 function nextHint() {
   const M = G.missions;
-  if (M.active && !M.active.side) return 'Erledige erst deinen aktuellen Auftrag: ' + ($('objective').innerText || M.active.title) + '.';
+  if (M.active && !M.active.side) return 'Aktueller Auftrag: ' + ($('objective').innerText || M.active.title);
   const def = M.story[M.progress];
-  if (def) return `Dein nächster Auftrag wartet bei ${G.world.pois[def.giver].name} (gelbes ${def.label} auf der Karte).`;
-  return 'Die Geschichte ist erledigt. Such Neon-Muscheln, Stuntsprünge – oder versuch dein Glück in der Solera Bank.';
+  if (def) return `Auftrag bei ${G.world.pois[def.giver].name} (gelbes ${def.label} auf der Karte)`;
+  return 'Geschichte erledigt – such Neon-Muscheln, Stuntsprünge oder probier die Bank.';
 }
 const CONTACTS = [
-  { id: 'rosa', name: 'Tante Rosa', ic: '👵', lines: ['Hast du heute schon was Richtiges gegessen?', 'Pass auf dich auf, mijo.', 'Im Diner gibt\'s heute Fischtacos!'] },
-  { id: 'dex', name: 'Dex (Werkstatt)', ic: '🔧', lines: ['Na, wieder was kaputt gemacht?', 'Ich hab immer einen Wagen für dich.'] },
-  { id: 'val', name: 'Val', ic: '💜', lines: ['Ruf mich nur an, wenn es wichtig ist.', 'Die Bank in Downtown hat erstaunlich wenig Wachpersonal …'] },
-  { id: 'anwalt', name: 'Anwalt Kessler', ic: '⚖️', lines: ['Kessler & Partner. Wir lösen Probleme mit der Polizei.'] },
-  { id: 'club', name: 'Club Velvet', ic: '🪩', lines: ['Heute Nacht: DJ-Set & Show! Eingang am Club Velvet, Midtown-Ost.'] },
+  { id: 'rosa', name: 'Tante Rosa', role: "Rosa's Diner", col: '#ff8fab', lines: ['Hast du heute schon was Richtiges gegessen?', 'Pass auf dich auf, mijo.', 'Im Diner gibt\'s heute Fischtacos!'] },
+  { id: 'sami', need: 'sami', name: 'Sami', role: 'Kiosk nebenan', col: '#ffd23f', lines: ['Na, Nachbar? Der Kiosk hat immer offen.', 'Ich hab da was läuten hören … ich melde mich, wenn es konkret wird.', 'Frische Zeitung ist da, komm vorbei!'] },
+  { id: 'dex', name: 'Dex', role: 'Werkstatt', col: '#ffb703', lines: ['Na, wieder was kaputt gemacht?', 'Ich hab immer einen Wagen für dich.'] },
+  { id: 'val', name: 'Val', role: 'Club Velvet', col: '#b26bff', lines: ['Ruf mich nur an, wenn es wichtig ist.', 'Die Bank in Downtown hat erstaunlich wenig Wachpersonal …'] },
+  { id: 'anwalt', name: 'Kessler', role: 'Anwalt', col: '#8e9aaf', lines: ['Kessler & Partner. Wir lösen Probleme mit der Polizei.'] },
+  { id: 'club', name: 'Club Velvet', role: 'Nachtclub', col: '#ff2e88', lines: ['Heute Nacht: DJ-Set & Show! Eingang am Club Velvet, Midtown-Ost.'] },
 ];
+const avatar = (c, big = false) => `<i class="ph-av ${big ? 'big' : ''}" style="--c:${c.col}">${c.name[0]}</i>`;
+function contactList() {
+  const P = G.player;
+  return CONTACTS.filter((c) => !c.need || (P.contacts && P.contacts.has(c.need)));
+}
 function phoneContact(c) {
   const P = G.player;
-  const say = c.lines[Math.floor(Math.random() * c.lines.length)];
   let actions = '';
   if (c.id === 'dex') {
-    actions += `<button class="mbtn small" data-act="car">Auto liefern lassen – $250</button>`;
-    if (P.inCar) actions += `<button class="mbtn small" data-act="repair">Wagen reparieren – $150</button>`;
+    actions += `<button class="ph-btn2" data-act="car">🚗 Auto liefern lassen <em>$250</em></button>`;
+    if (P.inCar) actions += `<button class="ph-btn2" data-act="repair">🔧 Wagen reparieren <em>$150</em></button>`;
   }
-  if (c.id === 'anwalt') actions += G.police.level > 0 ? `<button class="mbtn small" data-act="lawyer">Fahndung löschen – $${G.police.level * 600}</button>` : '<div class="ph-note">Du wirst gerade nicht gesucht.</div>';
-  const hint = c.id === 'rosa' || c.id === 'val' || c.id === 'dex' ? `<div class="ph-bubble">${nextHint()}</div>` : '';
-  phoneScreen(c.name, `<div class="ph-call">${c.ic}</div><div class="ph-bubble">${say}</div>${hint}<div class="ph-actions">${actions}</div>`);
+  if (c.id === 'anwalt') actions += G.police.level > 0 ? `<button class="ph-btn2" data-act="lawyer">⚖️ Fahndung löschen <em>$${G.police.level * 600}</em></button>` : '<div class="ph-note">Du wirst gerade nicht gesucht.</div>';
+  phoneScreen(c.name, `<div class="ph-profile">${avatar(c, true)}<b>${c.name}</b><span>${c.role}</span></div>
+    <div class="ph-quick"><button data-call="1"><span>📞</span>Anrufen</button><button data-call="2"><span>💬</span>Nachricht</button></div>
+    <div id="ph-convo"></div><div class="ph-actions">${actions}</div>`);
+  const talk = (txt) => { const box = $('ph-convo'); const d = document.createElement('div'); d.className = 'ph-bubble in'; d.textContent = txt; box.appendChild(d); };
+  $('ph-screen').querySelectorAll('[data-call]').forEach((b) => b.onclick = () => {
+    $('ph-convo').innerHTML = '';
+    talk(c.lines[Math.floor(Math.random() * c.lines.length)]);
+    if (['rosa', 'val', 'dex', 'sami'].includes(c.id)) setTimeout(() => talk(nextHint() + '.'), 450);
+    if (G.audio.ready) G.audio.click();
+  });
   $('ph-screen').querySelectorAll('[data-act]').forEach((b) => b.onclick = () => phoneAction(b.dataset.act));
 }
 function phoneAction(a) {
@@ -382,23 +518,29 @@ function phoneAction(a) {
   }
 }
 function phoneMessages() {
-  const p = G.missions.progress;
-  const msgs = [['Tante Rosa', 'Willkommen zurück, Leo! Komm im Diner vorbei.']];
-  if (p >= 1) msgs.push(['Dex', 'Hab gehört, du kannst fahren. Komm in die Werkstatt.']);
-  if (p >= 3) msgs.push(['Val', 'Dex sagt, du bist zuverlässig. Wir sollten reden. Club Velvet.']);
-  if (p >= 4) msgs.push(['Club Velvet', 'Du stehst ab sofort auf der Gästeliste. 🪩']);
-  if (p >= 6) msgs.push(['Val', 'Bereite dich vor. Das große Ding steht an.']);
-  if (p >= 7) msgs.push(['Val', 'Die Bank hat schon wieder aufgefüllt … nur so als Info. 😉']);
-  msgs.push(['Port Solera News', 'Neon-Muscheln am Strand gesichtet! Sammler zahlen gut.']);
-  phoneScreen('Nachrichten', msgs.reverse().map(([f, t]) => `<div class="ph-msg"><b>${f}</b><span>${t}</span></div>`).join(''));
+  const p = G.missions.progress, P = G.player;
+  const msgs = [['rosa', `Willkommen zurück, ${P.name}! Komm im Diner vorbei.`]];
+  if (P.contacts && P.contacts.has('sami')) msgs.push(['sami', 'Schön, dass du jetzt nebenan wohnst. Wenn ich was höre, melde ich mich!']);
+  if (p >= 1) msgs.push(['dex', 'Hab gehört, du kannst fahren. Komm in die Werkstatt.']);
+  if (p >= 3) msgs.push(['val', 'Dex sagt, du bist zuverlässig. Wir sollten reden. Club Velvet.']);
+  if (p >= 4) msgs.push(['club', 'Du stehst ab sofort auf der Gästeliste. 🪩']);
+  if (p >= 6) msgs.push(['val', 'Bereite dich vor. Das große Ding steht an.']);
+  if (p >= 7) msgs.push(['val', 'Die Bank hat schon wieder aufgefüllt … nur so als Info. 😉']);
+  const byId = Object.fromEntries(CONTACTS.map((c) => [c.id, c]));
+  phoneScreen('Nachrichten', msgs.reverse().map(([id, t]) => { const c = byId[id]; return `<div class="ph-msg">${avatar(c)}<div><b>${c.name}</b><span>${t}</span></div></div>`; }).join(''));
 }
 function phoneRadio() {
   const A = G.audio;
   const n = A.tracks ? A.tracks.length : 0;
-  phoneScreen('Radio', STATIONS.map((s, i) => { const info = A.ready ? A.stationInfo(i) : s; return `<button class="ph-row ${A.station === i ? 'on' : ''}" data-st="${i}"><b>${info.name}</b><span>${info.genre || ''}</span></button>`; }).join('')
-    + `<div class="ph-note">Das Radio läuft im Auto. Bei „Mein Radio“ laufen Songs, die auf deinem Gerät gespeichert sind.</div>`
-    + `<div class="ph-actions"><button class="mbtn small" data-mus="add">🎵 Eigene Musik hinzufügen</button>${n ? `<button class="mbtn small" data-mus="clear">Eigene Musik löschen (${n})</button>` : ''}</div>`);
-  $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => { A.station = +b.dataset.st; A.nextBar = 0; if (A.ready) G.hud.radio(A.stationInfo(A.station)); phoneRadio(); });
+  const cur = A.ready ? A.stationInfo(A.station) : STATIONS[A.station];
+  phoneScreen('Radio', `<div class="ph-now"><div class="eq"><i></i><i></i><i></i><i></i><i></i></div><b>${cur.name}</b><span>${cur.genre || ''}</span>
+      <div class="ph-ctrl"><button data-step="-1">⏮</button><button data-step="1">⏭</button></div></div>`
+    + STATIONS.map((s, i) => { const info = A.ready ? A.stationInfo(i) : s; return `<button class="ph-row ${A.station === i ? 'on' : ''}" data-st="${i}"><b>${info.name}</b><span>${info.genre || ''}</span></button>`; }).join('')
+    + `<div class="ph-actions"><button class="ph-btn2" data-mus="add">🎵 Eigene Musik hinzufügen</button>${n ? `<button class="ph-btn2" data-mus="clear">🗑 Eigene Musik löschen (${n})</button>` : ''}</div>
+       <div class="ph-note">Das Radio läuft im Auto. „Mein Radio“ spielt Songs von deinem Gerät.</div>`);
+  const set = (i) => { A.station = (i + STATIONS.length) % STATIONS.length; A.nextBar = 0; if (A.ready) G.hud.radio(A.stationInfo(A.station)); phoneRadio(); };
+  $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => set(+b.dataset.st));
+  $('ph-screen').querySelectorAll('[data-step]').forEach((b) => b.onclick = () => set(A.station + +b.dataset.step));
   $('ph-screen').querySelectorAll('[data-mus]').forEach((b) => b.onclick = async () => {
     if (!A.ready) A.init();
     if (b.dataset.mus === 'add') $('music-file').click();
@@ -419,20 +561,40 @@ function setupPhone() {
   $('phone-btn').addEventListener('touchend', (e) => { e.preventDefault(); openPhone(); });
   $('ph-home').onclick = () => (phoneOpen ? phoneHome() : null);
   $('ph-close').onclick = () => closePhone();
+  $('ph-backdrop').onclick = () => closePhone();
   $('ph-screen').addEventListener('click', (e) => {
     const el = e.target.closest('[data-ph], [data-ct]');
     if (!el) return;
     if (el.dataset.ct) { phoneContact(CONTACTS.find((c) => c.id === el.dataset.ct)); return; }
     const app = el.dataset.ph;
     if (app === 'home') phoneHome();
-    else if (app === 'contacts') phoneScreen('Kontakte', CONTACTS.map((c) => `<button class="ph-row" data-ct="${c.id}"><b>${c.ic} ${c.name}</b></button>`).join(''));
+    else if (app === 'contacts') phoneScreen('Kontakte', contactList().map((c) => `<button class="ph-contact" data-ct="${c.id}">${avatar(c)}<div><b>${c.name}</b><span>${c.role}</span></div><em>›</em></button>`).join(''));
     else if (app === 'messages') phoneMessages();
     else if (app === 'radio') phoneRadio();
     else if (app === 'stats') phoneScreen('Statistik', statsHTML());
     else if (app === 'map') { closePhone(); showMap(); }
+    else if (app === 'settings') { closePhone(); setPaused(true); openPanel('EINSTELLUNGEN', settingsHTML(), [['Zurück', closePanel]]); bindSettings(); }
+    else if (app === 'save') {
+      if (G.missions.active && !G.missions.active.side) G.hud.toast('Während eines Auftrags kann nicht gespeichert werden.');
+      else { Save.write(); G.hud.toast(`Gespeichert in Speicherplatz ${Save.slot}`); }
+      closePhone();
+    }
     else if (app === 'photo') { closePhone(); document.body.classList.add('photo'); G.hud.toast('Fotomodus – zum Beenden irgendwo tippen oder Esc'); setTimeout(() => { const off = () => { document.body.classList.remove('photo'); window.removeEventListener('pointerdown', off); window.removeEventListener('keydown', off); }; window.addEventListener('pointerdown', off); window.addEventListener('keydown', off); }, 300); }
   });
 }
+
+// Kiosk
+G.openShop = function (kind) {
+  const P = G.player;
+  const pay = (n) => { if (P.money < n) { G.hud.toast('Nicht genug Geld.'); return false; } P.addMoney(-n); G.audio.cash(); return true; };
+  G.openMenu('SAMIS KIOSK', `Sami: „Was darf's sein, ${P.name}?“`, [
+    ['Sandwich – $6 (+25 Gesundheit)', () => { if (pay(6)) { P.health = Math.min(100, P.health + 25); G.hud.toast('Lecker!'); } }],
+    ['Energy-Drink – $4 (+15 Gesundheit)', () => { if (pay(4)) { P.health = Math.min(100, P.health + 15); G.hud.toast('Hellwach!'); } }],
+    ['Zigaretten – $8', () => { if (pay(8)) G.hud.toast('Eine Schachtel eingesteckt. Gesund ist das nicht …'); }],
+    ['Rubbellos – $5', () => { if (!pay(5)) return; if (Math.random() < 0.18) { const w = [20, 50, 100, 250, 500][Math.floor(Math.random() * 5)]; P.addMoney(w, `Gewonnen! +$${w}`); } else G.hud.toast('Leider eine Niete.'); }],
+    ['Zeitung – $2', () => { if (pay(2)) G.hud.toast('Schlagzeile: ' + nextHint()); }],
+  ]);
+};
 
 G.openService = function (kind) {
   if (G.state !== 'playing') return;
@@ -453,8 +615,8 @@ G.openService = function (kind) {
     };
     render();
   } else if (kind === 'safehouse') {
-    openPanel('UNTERSCHLUPF', 'Hier kannst du speichern, dich ausruhen und umziehen.', [
-      ['Speichern & ausruhen', () => { G.player.health = 100; Save.write(); G.hud.toast('Spiel gespeichert · Gesundheit aufgefüllt'); close(); }, 'primary'],
+    openPanel('DEINE WOHNUNG', `Hier bist du sicher. Speicherplatz ${Save.slot}.`, [
+      ['Speichern & ausruhen', () => { G.player.health = 100; Save.write(); G.hud.toast(`Gespeichert in Speicherplatz ${Save.slot} · Gesundheit aufgefüllt`); close(); }, 'primary'],
       ['Schlafen (+6 Std.)', () => { G.timeOfDay = (G.timeOfDay + 6) % 24; G.player.health = 100; Save.write(); G.hud.fadeIn(); G.hud.toast('Gut geschlafen. Spiel gespeichert.'); close(); }],
       [`Outfit wechseln`, () => { applyOutfit((G.player.outfit || 0) + 1); G.hud.toast('Outfit: ' + OUTFITS[G.player.outfit].name); }],
       ['Schließen', close],
@@ -463,11 +625,10 @@ G.openService = function (kind) {
 };
 
 function setupUI() {
-  $('btn-new').onclick = () => {
-    if (Save.exists()) openPanel('Neues Spiel?', 'Dein bisheriger Spielstand wird überschrieben.', [['Ja, neu starten', () => { closePanel(); startGame(false); }, 'primary'], ['Abbrechen', closePanel]]);
-    else startGame(false);
-  };
-  $('btn-continue').onclick = () => startGame(true);
+  $('btn-new').onclick = () => { if (!G.audio.ready) G.audio.init(); showSlots('new'); };
+  $('btn-load').onclick = () => showSlots('load');
+  $('btn-continue').onclick = () => { Save.setSlot(Save.latest()); startGame(true); };
+  refreshTitle();
   $('btn-controls').onclick = () => openPanel('STEUERUNG', controlsHTML(), [['Schließen', closePanel]]);
   $('btn-settings').onclick = () => { openPanel('EINSTELLUNGEN', settingsHTML(), [['Schließen', closePanel]]); bindSettings(); };
   setupPhone();
@@ -528,7 +689,7 @@ function frame(now) {
       G.vm.render();
       G.peds.render();
       if (composer) {
-        bloom.strength = 0.35 + G.world.env.night * 0.55;
+        bloom.strength = 0.22 + G.world.env.night * 0.18;
         composer.render();
       } else G.renderer.render(G.scene, G.camera);
     } catch (e) { reportError(e); }
@@ -585,6 +746,14 @@ function update(now, step, I) {
     G.hud.update(step);
     skids();
     autoQuality(step);
+  } else if (G.state === 'creator') {
+    const P = G.player;
+    P.anim.t += step; P.anim.amp = 0; P.yaw += step * 0.45;
+    G.time += step;
+    G.cam.update(step);
+    G.world.update(step);
+    G.world.env.update(step, G.timeOfDay, P);
+    G.audio.update(step);
   } else if (G.state === 'paused' || G.state === 'menu') {
     if (I.pressed('pause') && G.state === 'paused') setPaused(false);
     if (phoneOpen && (I.pressed('phone') || I.pressed('pause'))) closePhone();
@@ -636,7 +805,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '1.02';
+export const GAME_VERSION = '1.03';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));

@@ -271,7 +271,7 @@ export class Environment {
     this.waterUniforms.deepColor.value.setHex(0x0a3d5c).lerp(new THREE.Color(0x020a14), this.night * 0.85);
     this.waterUniforms.shallowColor.value.setHex(0x2fc4c0).lerp(new THREE.Color(0x05222a), this.night * 0.85);
 
-    this.renderer.toneMappingExposure = lerp(0.95, 1.15, this.night);
+    this.renderer.toneMappingExposure = lerp(0.95, 1.0, this.night);
 
     this.sky.position.copy(G.camera.position);
 

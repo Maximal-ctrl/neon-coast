@@ -72,7 +72,7 @@ export class PedManager {
       const t = rand(0.1, 0.9);
       const x = p0[0] + (p1[0] - p0[0]) * t, z = p0[1] + (p1[1] - p0[1]) * t;
       const d2 = dist2(x, z, px, pz);
-      if (d2 < 40 * 40 || d2 > 120 * 120) continue;
+      if (d2 < 30 * 30 || d2 > 115 * 115) continue;
       if (this.inView(x, z) && d2 < 80 * 80) continue;
       const beachy = C.districtOf(bi, bj) === 'seaside';
       const p = new Ped(x, z, randomLook(beachy), 'walk');
@@ -245,13 +245,13 @@ export class PedManager {
     const px = P.x, pz = P.z;
     // Zielanzahl je Gegend
     const d = C.districtAt(px, pz);
-    const dens = { downtown: 30, midtown: 26, westside: 24, heights: 14, seaside: 26, beach: 26, harbor: 8, pier: 22, sea: 4 }[d] || 20;
+    const dens = { downtown: 52, midtown: 44, westside: 40, heights: 24, seaside: 44, beach: 46, harbor: 14, pier: 36, sea: 4 }[d] || 34;
     const night = G.world.env.night;
-    this.target = Math.round(dens * (1 - night * 0.45) * (G.quality === 'low' ? 0.6 : 1));
+    this.target = Math.round(dens * (1 - night * 0.35) * (G.quality === 'low' ? 0.65 : 1));
     this.spawnT -= dt;
     if (G.interior) this.spawnT = 1;
     if (this.spawnT <= 0) {
-      this.spawnT = 0.25;
+      this.spawnT = 0.1;
       const n = this.list.filter((p) => !p.isCop && p.alive && !p.persistent).length;
       if (n < this.target) {
         if ((px > 300 || d === 'beach' || d === 'pier') && chance(0.6)) this.spawnBeach(px, pz);
