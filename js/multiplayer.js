@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { G } from './state.js';
 import { rayChar } from './physics.js';
 import { damp, dampAngle, dist2 } from './utils.js';
+import * as CFG from './config.js';
 
 const PREFIX = 'neoncoast-v1-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -129,6 +130,7 @@ export class Multiplayer {
   }
 
   async leave(silent = false) {
+    if (this.coop) { this.coop.ended = true; this.coop = null; if (G.missions && G.missions.active && G.missions.active.id === 'coop') G.missions.fail(silent ? '' : 'Multiplayer-Auftrag beendet.'); }
     for (const c of this.conns.values()) { try { c.close(); } catch (e) { /* */ } }
     this.conns.clear();
     for (const id of [...this.players.keys()]) this.removeRemote(id);
@@ -214,6 +216,11 @@ export class Multiplayer {
         if (m.to === this.myId) { const r = this.players.get(m.from); G.hud.toast(`Du hast ${r ? r.name : 'jemanden'} ausgeschaltet!`); }
         break;
       }
+      case 'mm': if (!this.host) this.onCoopStart(m); break;
+      case 'mmf': if (this.host && this.coop) this.hostFinish(m.id || conn.peer); break;
+      case 'mml': if (this.host && this.coop) this.hostClaim(m.i, conn.peer); break;
+      case 'mmlt': if (!this.host && this.coop) this.onTaken(m.i, m.by); break;
+      case 'mme': if (!this.host && this.coop) this.onEnd(m.result); break;
       case 'chat': {
         const id = m.from || conn.peer;
         if (this.host) this.broadcast({ ...m, from: id }, conn.peer);
@@ -295,6 +302,7 @@ export class Multiplayer {
       if (this.host) m.time = +G.timeOfDay.toFixed(3);
       this.broadcast(m);
     }
+    if (this.host && this.coop && !this.coop.ended) this.hostCoopCheck(dt);
     // Mitspieler glätten
     for (const r of this.players.values()) {
       if (!r.visible) continue;
@@ -348,5 +356,163 @@ export class Multiplayer {
     this.broadcast({ t: 'chat', from: this.myId, text });
     G.hud.toast(`💬 Du: ${text}`);
   }
+  // ------------------------------------------------------------ Gemeinsame Aufträge
+  nameOf(id) { if (id === this.myId) return G.player.name; const r = this.players.get(id); return r ? r.name : 'Spieler'; }
+  posOf(id) {
+    if (id === this.myId) { const P = G.player; return P.inCar ? P.vehicle : P; }
+    const r = this.players.get(id); if (!r || !r.visible) return null;
+    return r.car || r;
+  }
+  startCoop(mode) {
+    if (!this.host || !this.online) return false;
+    if (this.coop && !this.coop.ended) { G.hud.toast('Es läuft bereits ein gemeinsamer Auftrag.'); return false; }
+    const ids = [this.myId, ...[...this.players.values()].filter((r) => r.visible).map((r) => r.id)];
+    if (ids.length < 2) { G.hud.toast('Es muss mindestens ein Mitspieler im Spiel sein.'); return false; }
+    const W = G.world, rnd = (a) => a[Math.floor(Math.random() * a.length)];
+    const m = { t: 'mm', mode, ids };
+    if (mode === 'race') {
+      const inner = W.nodes.filter((n) => n.i >= 1 && n.i <= 8 && n.j >= 1 && n.j <= 8);
+      const S = rnd(inner), N1 = W.nodes[rnd(S.nbr)];
+      const route = [S.id, N1.id];
+      let prev = S, cur = N1;
+      for (let k = 0; k < 9; k++) {
+        const opts = cur.nbr.filter((id) => id !== prev.id && !route.includes(id));
+        if (!opts.length) break;
+        const nx = W.nodes[rnd(opts)]; route.push(nx.id); prev = cur; cur = nx;
+      }
+      const dx = Math.sign(N1.x - S.x), dz = Math.sign(N1.z - S.z);
+      m.grid = ids.map((id, k) => { const back = 24 - Math.floor(k / 2) * 9, lane = k % 2 ? 6 : 2; return [S.x + dx * back - dz * lane, S.z + dz * back + dx * lane, Math.atan2(dx, dz)]; });
+      m.cps = route.slice(1).map((id) => [W.nodes[id].x, W.nodes[id].z]);
+    } else if (mode === 'hunt') {
+      m.fugitive = rnd(ids); m.dur = 150;
+    } else if (mode === 'loot') {
+      m.bags = []; m.dur = 180;
+      for (let k = 0; k < 12; k++) {
+        const loop = G.peds.sidewalkLoop(1 + Math.floor(Math.random() * 7), 1 + Math.floor(Math.random() * 7), 0.6);
+        const c = Math.floor(Math.random() * 4), a = loop[c], b = loop[(c + 1) % 4], t = 0.2 + Math.random() * 0.6;
+        m.bags.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+      }
+    }
+    this.broadcast(m);
+    this.onCoopStart(m);
+    return true;
+  }
+  onCoopStart(m) {
+    this.coop = { ...m, finished: [], taken: {}, pending: {}, ended: false, result: null, startT: G.time, caughtT: 0 };
+    if (G.missions.active) G.missions.fail('');
+    if (G.interiors && G.interior) G.interiors.cleanup();
+    G.missions.start(coopDef(this, this.coop));
+  }
+  sendFinish() { if (this.host) this.hostFinish(this.myId); else this.broadcast({ t: 'mmf', id: this.myId }); }
+  hostFinish(id) {
+    const C = this.coop; if (!C || C.ended || C.finished.includes(id)) return;
+    C.finished.push(id);
+    if (C.firstT == null) C.firstT = G.time;
+    const active = C.ids.filter((x) => x === this.myId || this.players.has(x));
+    if (C.finished.length >= active.length) this.endCoop({ order: C.finished });
+  }
+  claimBag(i) { if (this.host) this.hostClaim(i, this.myId); else this.broadcast({ t: 'mml', i, by: this.myId }); }
+  hostClaim(i, by) {
+    const C = this.coop; if (!C || C.ended || C.taken[i] !== undefined) return;
+    this.broadcast({ t: 'mmlt', i, by });
+    this.onTaken(i, by);
+    if (Object.keys(C.taken).length >= C.bags.length) this.endCoop({ total: C.bags.length });
+  }
+  onTaken(i, by) {
+    const C = this.coop; if (!C) return;
+    C.taken[i] = by;
+    if (C.marks && C.marks[i]) { G.missions.removeMarker(C.marks[i]); C.marks[i] = null; }
+    G.hud.toast(`💰 ${by === this.myId ? 'Du hast' : this.nameOf(by) + ' hat'} einen Geldsack (${Object.keys(C.taken).length}/${C.bags.length})`);
+    G.audio.cash();
+  }
+  endCoop(result) { const C = this.coop; if (!C || C.ended) return; this.broadcast({ t: 'mme', result }); this.onEnd(result); }
+  onEnd(result) { const C = this.coop; if (!C) return; C.ended = true; C.result = result; }
+  hostCoopCheck(dt) {
+    const C = this.coop, el = G.time - C.startT;
+    if (C.mode === 'race') {
+      if (C.firstT != null && G.time - C.firstT > 45) this.endCoop({ order: C.finished });
+      if (el > 600) this.endCoop({ order: C.finished });
+    } else if (C.mode === 'hunt') {
+      const f = this.posOf(C.fugitive);
+      let close = false;
+      if (f) for (const id of C.ids) { if (id === C.fugitive) continue; const h = this.posOf(id); if (h && dist2(h.x, h.z, f.x, f.z) < 49) close = true; }
+      C.caughtT = close ? C.caughtT + dt : Math.max(0, C.caughtT - dt * 0.5);
+      if (C.caughtT > 3) this.endCoop({ winner: 'hunters' });
+      else if (el > C.dur) this.endCoop({ winner: 'fugitive' });
+    } else if (C.mode === 'loot') {
+      if (el > C.dur) this.endCoop({ total: Object.keys(C.taken).length });
+    }
+  }
+
   sendLook() { if (this.online) this.broadcast({ t: 'look', id: this.myId, name: G.player.name, look: this.myLook() }); }
+}
+
+// Ablauf der gemeinsamen Aufträge auf jedem Gerät
+function coopDef(M, C) {
+  return {
+    id: 'coop', title: 'Multiplayer-Auftrag', side: true, reward: 0,
+    *run(m) {
+      const P = G.player;
+      if (C.mode === 'race') {
+        const k = Math.max(0, C.ids.indexOf(M.myId));
+        const [x, z, h] = C.grid[k] || C.grid[0];
+        if (P.inCar) P.exitVehicle(true);
+        P.state = 'foot'; P.visible = true;
+        const car = m.spawnCar('zephyra', x, z, h, [0xe63946, 0x00b4d8, 0xffb703, 0x7cff6b][k % 4], { keep: true });
+        if (car) { car.parked = false; P.x = x; P.z = z; P.enterVehicle(car); }
+        G.cam.snap();
+        m.freeze = true;
+        G.hud.bigToast('MULTIPLAYER-RENNEN', `${C.cps.length} Checkpoints · 1. Platz: $2.000`);
+        for (const t of ['3', '2', '1']) { G.hud.countdown(t); G.audio.countdown(false); yield* m.wait(1); }
+        G.hud.countdown('LOS!'); G.audio.countdown(true);
+        m.freeze = false;
+        for (let i = 0; i < C.cps.length && !C.ended; i++) {
+          const [cx, cz] = C.cps[i], last = i === C.cps.length - 1;
+          const mk = m.marker(cx, cz, last ? 0xffd23f : 0xff2e88, { r: 10, h: 6, blipCol: last ? '#ffd23f' : '#ff2e88' });
+          m.objective(`Checkpoint <b>${i + 1}/${C.cps.length}</b>`);
+          yield* m.until(() => { const v = P.inCar ? P.vehicle : P; return C.ended || dist2(v.x, v.z, cx, cz) < 110; });
+          m.removeMarker(mk);
+          if (!C.ended) G.audio.checkpoint();
+        }
+        if (!C.ended) { M.sendFinish(); m.objective('Im Ziel! Warte auf die anderen …'); }
+        yield* m.until(() => C.ended);
+        const order = (C.result && C.result.order) || [];
+        const place = order.indexOf(M.myId) + 1;
+        const prize = [0, 2000, 1000, 500, 250][place] || 0;
+        G.hud.banner(place === 1 ? 'GEWONNEN!' : place ? `PLATZ ${place}` : 'RENNEN VORBEI', place === 1 ? '#ffd23f' : '#19e6ff', order.map((id, i) => `${i + 1}. ${M.nameOf(id)}`).join('  ·  ') + (prize ? `  ·  +$${prize}` : ''));
+        if (prize) P.addMoney(prize);
+        G.audio.jingle();
+      } else if (C.mode === 'hunt') {
+        const fug = C.fugitive === M.myId;
+        G.hud.bigToast(fug ? 'DU BIST DER FLÜCHTIGE!' : 'VERFOLGUNGSJAGD', fug ? 'Entkomme 2:30 Minuten lang!' : `Fang ${M.nameOf(C.fugitive)}! (3 Sekunden in 7 m Nähe bleiben)`);
+        if (!fug) {
+          const tgt = { get x() { const p = M.posOf(C.fugitive); return p ? p.x : 0; }, get y() { const p = M.posOf(C.fugitive); return p ? p.y : -50; }, get z() { const p = M.posOf(C.fugitive); return p ? p.z : 0; }, height: 1.8 };
+          m.marker(0, 0, 0xff3b5c, { arrow: true, follow: tgt, blipCol: '#ff3b5c' });
+        }
+        while (!C.ended) {
+          G.hud.timer(Math.max(0, C.dur - (G.time - C.startT)));
+          m.objective(fug ? 'Entkomme den Jägern! Bleib nicht stehen.' : `Fang <b>${M.nameOf(C.fugitive)}</b>!`);
+          yield;
+        }
+        G.hud.timer(null);
+        const fugWon = C.result && C.result.winner === 'fugitive', iWon = fug ? fugWon : !fugWon;
+        G.hud.banner(iWon ? 'GEWONNEN!' : 'VERLOREN', iWon ? '#ffd23f' : '#ff3b5c', (fugWon ? `${M.nameOf(C.fugitive)} ist entkommen` : `${M.nameOf(C.fugitive)} wurde gefasst`) + (iWon ? '  ·  +$1.500' : ''));
+        if (iWon) { P.addMoney(1500); G.audio.jingle(); } else G.audio.fail();
+      } else if (C.mode === 'loot') {
+        G.hud.bigToast('BEUTEJAGD (KOOP)', `Sammelt zusammen ${C.bags.length} Geldsäcke in 3 Minuten!`);
+        C.marks = C.bags.map(([x, z], i) => (C.taken[i] === undefined ? m.marker(x, z, 0x7cff6b, { r: 1.6, h: 3, label: '$', blipCol: '#7cff6b' }) : null));
+        while (!C.ended) {
+          G.hud.timer(Math.max(0, C.dur - (G.time - C.startT)));
+          m.objective(`Geldsäcke im Team: <b>${Object.keys(C.taken).length}/${C.bags.length}</b>`);
+          const v = P.inCar ? P.vehicle : P;
+          C.bags.forEach(([x, z], i) => { if (C.taken[i] === undefined && !C.pending[i] && dist2(v.x, v.z, x, z) < 12) { C.pending[i] = 1; M.claimBag(i); } });
+          yield;
+        }
+        G.hud.timer(null);
+        const got = Object.keys(C.taken).length, share = got * 300;
+        G.hud.banner('BEUTEJAGD BEENDET', '#7dffa0', `Team: ${got}/${C.bags.length} Säcke  ·  Dein Anteil: +$${share}`);
+        if (share) { P.addMoney(share); G.audio.jingle(); }
+      }
+    },
+  };
 }

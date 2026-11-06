@@ -25,6 +25,37 @@ const CONTAINER_COLS = [0xc0392b, 0x2471a3, 0x229954, 0xd68910, 0x7d3c98, 0x8391
 
 export const SIGN = { HOTEL: 0, MOTEL: 1, BAR: 2, CLUB: 3, DINER: 4, TACOS: 5, PIZZA: 6, H24: 7, SOLERA: 8, PARADISE: 9, DANCE: 10, VELVET: 11, NEONFM: 12, KLINIK: 13, SURF: 14, PIER: 15, GARAGE: 16, BANK: 17, POLIZEI: 18, WAFFEN: 19 };
 
+
+// ---------------------------------------------------------------- Gelände "Solera Hills"
+function vhash(ix, iz) { let h = Math.imul(ix | 0, 374761393) + Math.imul(iz | 0, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function vnoise(x, z) {
+  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+  const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
+  const a = vhash(ix, iz), b = vhash(ix + 1, iz), c = vhash(ix, iz + 1), d = vhash(ix + 1, iz + 1);
+  return a + (b - a) * sx + (c - a) * sz + (a - b - c + d) * sx * sz;
+}
+function fbm(x, z) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < 5; i++) { s += a * vnoise(x * f, z * f); f *= 2.03; a *= 0.5; } return s / 0.97; }
+export const HILLS = { x0: -560, x1: 760, z0: -1160, z1: -436 };
+export const CAUSEWAY = { x0: 32, x1: 48, z0: -492, z1: -384, y1: 0.9 };
+export function hillHeight(x, z) {
+  if (x < HILLS.x0 || x > HILLS.x1 || z < HILLS.z0 || z > HILLS.z1) return -6;
+  const shore = -478 + 22 * Math.sin(x * 0.011) + 10 * Math.sin(x * 0.033 + 1.3);
+  const d = shore - z; // > 0: landeinwärts
+  let h = d < 0 ? -1.4 + d * 0.12 : -1.4 + Math.min(d, 25) * 0.09;
+  const m = fbm(x * 0.0045 + 3.1, z * 0.0045 + 7.7);
+  const r = 1 - Math.abs(vnoise(x * 0.006 + 11, z * 0.006 - 4) * 2 - 1);
+  h += (Math.max(0, m - 0.3) * 270 + r * r * 32 + (fbm(x * 0.03, z * 0.03) - 0.5) * 3) * smoothstep(20, 300, d);
+  const ed = Math.min(x - HILLS.x0, HILLS.x1 - x, z - HILLS.z0);
+  const edge = smoothstep(0, 140, ed);
+  h = h * edge - 6 * (1 - edge);
+  // flaches Tal am Ende des Damms
+  const road = Math.max(0, 1 - Math.abs(x - 40) / 34) * (1 - smoothstep(70, 170, d));
+  h = h * (1 - road) + Math.max(0.85, Math.min(h, 1.6)) * road;
+  // unter dem Damm: Gelände unter Wasser halten, damit nichts durch die Fahrbahn ragt
+  if (z > CAUSEWAY.z0 && Math.abs(x - 40) < 16) h = Math.min(h, -1.2);
+  return Math.max(-6, h);
+}
+
 export class World {
   constructor(scene, quality) {
     this.scene = scene;
@@ -86,6 +117,9 @@ export class World {
   }
 
   groundHeight(x, z) {
+    const CW = CAUSEWAY;
+    if (x > CW.x0 && x < CW.x1 && z > CW.z0 && z < CW.z1) return lerp(0, CW.y1, (CW.z1 - z) / (CW.z1 - CW.z0));
+    if (z < HILLS.z1) return hillHeight(x, z);
     for (let i = 0; i < this.rooms.length; i++) { const r = this.rooms[i]; if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return r.y; }
     const P = C.PIER, PP = C.PIER_PLAT;
     if (z > P.z0 && z < P.z1 && x > P.x0 && x < P.x1) {
@@ -230,6 +264,8 @@ export class World {
     this.genQuay();
     this.genStreetProps();
     this.genRamps();
+    await tick(0.62, 'Berge werden geformt …');
+    this.genHills();
     await tick(0.7, 'Geometrie wird zusammengeführt …');
     this.finalizeMeshes();
     this.buildInstanced();
@@ -867,10 +903,72 @@ export class World {
     }
   }
 
+  genHills() {
+    const W = 1320, D = 724, cx = (HILLS.x0 + HILLS.x1) / 2, cz = (HILLS.z0 + HILLS.z1) / 2;
+    const g = new THREE.PlaneGeometry(W, D, 220, 120);
+    g.rotateX(-Math.PI / 2); g.translate(cx, 0, cz);
+    const p = g.attributes.position;
+    for (let k = 0; k < p.count; k++) p.setY(k, hillHeight(p.getX(k), p.getZ(k)));
+    g.computeVertexNormals();
+    const n = g.attributes.normal, cols = new Float32Array(p.count * 3), c = new THREE.Color(), c2 = new THREE.Color();
+    for (let k = 0; k < p.count; k++) {
+      const x = p.getX(k), y = p.getY(k), z = p.getZ(k), ny = n.getY(k);
+      const nz = vnoise(x * 0.05, z * 0.05), big = vnoise(x * 0.01 + 5, z * 0.01);
+      if (y < -0.6) c.setHex(0x8a7a58);
+      else if (y < 1.2) c.setHex(0xd8c08a);
+      else {
+        c.setHex(0x4f7f34).lerp(c2.setHex(0x8a9a4a), big * 0.7);
+        if (y > 40) c.lerp(c2.setHex(0x6b6a45), smoothstep(40, 80, y));
+        const rock = Math.max(smoothstep(0.86, 0.72, ny), smoothstep(75, 105, y));
+        c.lerp(c2.setHex(0x7d776d).lerp(new THREE.Color(0x5e5952), nz), rock);
+        if (y > 118) c.lerp(c2.setHex(0xd9d6cf), smoothstep(118, 140, y));
+      }
+      c.multiplyScalar(0.88 + nz * 0.24);
+      cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    // Wälder & Palmen
+    const rnd = mulberry32(4242);
+    for (let k = 0; k < 2600 && this.treePos.length < 900; k++) {
+      const x = HILLS.x0 + 60 + rnd() * (W - 120), z = HILLS.z0 + 60 + rnd() * (D - 80);
+      const y = hillHeight(x, z);
+      if (y < 1.4 || y > 85) continue;
+      const e = 2, sl = Math.abs(hillHeight(x + e, z) - y) + Math.abs(hillHeight(x, z + e) - y);
+      if (sl > 1.6) continue;
+      if (Math.abs(x - 40) < 12 && z > -620) continue;
+      if (vnoise(x * 0.012, z * 0.012) < 0.42 && y > 6) continue;
+      if (y < 5) this.addPalm(x, z, rnd); else this.addTree(x, z, rnd);
+    }
+    // Damm mit Straße
+    const CW = CAUSEWAY, P = this.B.props, cc = rgb(0xb9b5ad), asph = rgb(0x34363b), wh = rgb(0xe9e9e4);
+    P.quad([CW.x0, -0.02, CW.z1], [CW.x1, -0.02, CW.z1], [CW.x1, CW.y1 - 0.02, CW.z0], [CW.x0, CW.y1 - 0.02, CW.z0], [0, 0, 1, 1], asph);
+    P.box(CW.x0 - 0.6, -3, CW.z0, CW.x0, 0.2, CW.z1, { col: cc });
+    P.box(CW.x1, -3, CW.z0, CW.x1 + 0.6, 0.2, CW.z1, { col: cc });
+    for (let z = CW.z1 - 2; z > CW.z0; z -= 6) {
+      const t = (CW.z1 - z) / (CW.z1 - CW.z0), y = lerp(0, CW.y1, t) + 0.01;
+      P.quad([39.9, y, z], [40.1, y, z], [40.1, y, z - 3], [39.9, y, z - 3], [0, 0, 1, 1], rgb(0xe7b923));
+    }
+    for (const sx of [CW.x0, CW.x1]) {
+      const x0 = sx === CW.x0 ? sx - 0.6 : sx, x1 = x0 + 0.6;
+      for (let z = CW.z1; z > CW.z0; z -= 6) {
+        const t = (CW.z1 - z) / (CW.z1 - CW.z0), y = lerp(0, CW.y1, t);
+        P.box(x0, y, z - 6, x1, y + 0.9, z, { col: cc });
+      }
+      this.addBox(x0, CW.z0, x1, CW.z1, -1, 2, 'rail');
+      P.quad([sx === CW.x0 ? CW.x0 + 0.2 : CW.x1 - 0.35, 0.02, CW.z1], [sx === CW.x0 ? CW.x0 + 0.35 : CW.x1 - 0.2, 0.02, CW.z1], [sx === CW.x0 ? CW.x0 + 0.35 : CW.x1 - 0.2, CW.y1, CW.z0], [sx === CW.x0 ? CW.x0 + 0.2 : CW.x1 - 0.35, CW.y1, CW.z0], [0, 0, 1, 1], wh);
+    }
+    for (let z = CW.z1 - 10; z > CW.z0; z -= 24) { this.pierLamps.push([CW.x0 + 0.4, z, Math.PI / 2]); this.pierLamps.push([CW.x1 - 0.4, z - 12, -Math.PI / 2]); }
+    this.pois.hills = { x: 40, z: -720, name: 'Solera Hills' };
+  }
+
   genQuay() {
     const L = C.LAND, Pr = this.B.props, c = rgb(0xb9b5ad);
     const wall = (x0, z0, x1, z1) => { Pr.box(x0, -0.02, z0, x1, 0.9, z1, { col: c }); this.addBox(x0, z0, x1, z1, -1, 0.9, 'quay'); };
-    wall(L.minX, L.minZ, L.maxX, L.minZ + 0.5);
+    wall(L.minX, L.minZ, CAUSEWAY.x0 - 1, L.minZ + 0.5);
+    wall(CAUSEWAY.x1 + 1, L.minZ, L.maxX, L.minZ + 0.5);
     wall(L.minX, L.maxZ - 0.5, L.maxX, L.maxZ);
     wall(L.minX, L.minZ, L.minX + 0.5, L.maxZ);
     // Poller
@@ -1209,7 +1307,7 @@ export class World {
   // ------------------------------------------------------------- Karte
   drawMap() {
     const S = 2048;
-    const MB = { x0: -480, x1: 760, z0: -620, z1: 620 };
+    const MB = { x0: -700, x1: 1100, z0: -1180, z1: 620 };
     this.mapBounds = MB;
     const c = document.createElement('canvas');
     c.width = c.height = S;
@@ -1287,6 +1385,21 @@ export class World {
     // Hafen: Schiff & Kräne
     rect(-330, 398, -92, 426, '#232f48', 6);
     for (const cx of [-330, -250, -170, -90]) rect(cx - 6, 372, cx + 6, 384, '#5a4a1a');
+    // Solera Hills
+    const step = 8;
+    for (let z = HILLS.z0; z < HILLS.z1 + 20; z += step) for (let x = HILLS.x0; x < HILLS.x1; x += step) {
+      const y = hillHeight(x + step / 2, z + step / 2);
+      if (y < -0.7) continue;
+      const shade = Math.min(1, Math.max(0, (hillHeight(x + step, z) - hillHeight(x, z + step)) * 0.08 + 0.5));
+      let col;
+      if (y < 1.2) col = [74, 63, 44];
+      else if (y > 80) col = [92, 88, 82];
+      else col = [30 + y * 0.4, 52 + y * 0.25, 38];
+      const f = 0.7 + shade * 0.6;
+      g.fillStyle = `rgb(${col[0] * f | 0},${col[1] * f | 0},${col[2] * f | 0})`;
+      g.fillRect(sx(x), sz(z), step * sc + 1, step * sc + 1);
+    }
+    rect(CAUSEWAY.x0, CAUSEWAY.z0, CAUSEWAY.x1, CAUSEWAY.z1, '#56627f');
     this.mapCanvas = c;
     this.mapScale = sc;
     this.mapToPx = (x, z) => [sx(x), sz(z)];

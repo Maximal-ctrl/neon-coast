@@ -50,17 +50,28 @@ export class Input {
     c.addEventListener('mousedown', (e) => {
       if (G.isTouch && e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
       this.setTouchMode(false);
-      if (G.state === 'playing' && !this.locked && c.requestPointerLock) { try { const r = c.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* */ } }
+      if (G.state === 'playing' && !this.locked && c.requestPointerLock) {
+        // Erster Klick fängt nur die Maus ein (rohe Bewegung ohne Beschleunigung, falls verfügbar)
+        try {
+          const r = c.requestPointerLock({ unadjustedMovement: true });
+          if (r && r.catch) r.catch(() => { try { c.requestPointerLock(); } catch (e2) { /* */ } });
+        } catch (err) { try { c.requestPointerLock(); } catch (e3) { /* */ } }
+        return;
+      }
       const b = e.button === 0 ? 'fire' : e.button === 2 ? 'aim' : null;
       if (b) { this.mouse.add(b); this.taps.add(b); }
     });
     window.addEventListener('mouseup', (e) => { const b = e.button === 0 ? 'fire' : e.button === 2 ? 'aim' : null; if (b) this.mouse.delete(b); });
     window.addEventListener('mousemove', (e) => {
-      if (this.locked) { this._mdx += e.movementX; this._mdy += e.movementY; }
+      if (!this.locked) return;
+      const mx = e.movementX || 0, my = e.movementY || 0;
+      // Browser-Ausreißer (Sprünge beim Einfangen/Fensterwechsel) verwerfen
+      if (Math.abs(mx) > 280 || Math.abs(my) > 280) return;
+      this._mdx += mx; this._mdy += my;
     });
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('wheel', (e) => { if (G.state === 'playing') this.taps.add('weapon'); }, { passive: true });
-    document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === c; });
+    document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === c; document.body.classList.toggle('mouse-locked', this.locked); });
 
     // ---------------- Touch
     const opt = { passive: false };

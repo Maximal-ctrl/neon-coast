@@ -370,7 +370,7 @@ export class HUD {
     // Bezirksnamen
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.font = `${Math.round(13 * u)}px "Russo One", sans-serif`;
-    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95]];
+    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['SOLERA HILLS', 60, -820]];
     for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillText(t, sx + 1.5, sy + 1.5); g.fillStyle = 'rgba(200,220,255,0.62)'; g.fillText(t, sx, sy); }
     // Route
     const tgt = this.getRouteTarget();

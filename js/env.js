@@ -232,7 +232,7 @@ export class Environment {
     u.time.value += dt;
     this.waterUniforms.time.value += dt;
     // Sonnenstand: Aufgang 6 Uhr (Osten, +x), Untergang 18 Uhr (Westen)
-    const a = ((hour - 6) / 12) * Math.PI;
+    const a = ((hour - 5.5) / 15) * Math.PI;
     const el = Math.sin(a);
     const elevDeg = Math.asin(clamp(el, -1, 1)) * 57.3 * 0.82;
     const elRad = elevDeg / 57.3;
@@ -272,6 +272,17 @@ export class Environment {
     this.waterUniforms.shallowColor.value.setHex(0x2fc4c0).lerp(new THREE.Color(0x05222a), this.night * 0.85);
 
     this.renderer.toneMappingExposure = lerp(0.95, 1.0, this.night);
+    // Innenräume: eigenes, warmes Raumlicht statt Tageslicht
+    if (G.interior) {
+      const k = G.interior.kind;
+      const warm = { home: 0xffe6c8, shop: 0xf4f6ff, bank: 0xfff1dc, dealer: 0xffffff, club: 0xb48cff }[k] || 0xfff1dc;
+      this.hemi.color.setHex(warm);
+      this.hemi.groundColor.setHex(k === 'club' ? 0x2a1438 : 0x6a5c4c);
+      this.hemi.intensity = { club: 0.9, home: 0.85, shop: 1.0 }[k] || 1.2;
+      this.sun.intensity = 0.25;
+      this.sun.color.setHex(0xffffff);
+      this.renderer.toneMappingExposure = k === 'home' ? 0.88 : 1.0;
+    }
 
     this.sky.position.copy(G.camera.position);
 

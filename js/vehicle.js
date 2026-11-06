@@ -99,6 +99,8 @@ export class Vehicle {
       this.yawRate *= Math.exp(-0.5 * dt);
       this.h += this.yawRate * dt * 0.3;
     }
+    // Hangabtrieb: bergauf langsamer, bergab schneller
+    if (this.grounded && Math.abs(this.pitch) > 0.02) vf -= 9.8 * Math.sin(this.pitch) * dt * 0.9;
     if (this.grounded) {
       fx = Math.sin(this.h); fz = Math.cos(this.h); lx = fz; lz = -fx;
       this.vx = fx * vf + lx * vl;

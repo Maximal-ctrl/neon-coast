@@ -72,12 +72,14 @@ export const DISTRICT_NAMES = {
   midtown: 'Midtown',
   pier: 'Sunset Pier',
   sea: 'Offenes Meer',
+  hills: 'Solera Hills',
   club: 'Club Velvet',
   bank: 'Solera Bank',
 };
 
 export function districtAt(x, z) {
   if (x > PIER.rampEnd - 10 && z > PIER_PLAT.z0 - 10 && z < PIER_PLAT.z1 + 10 && x < PIER_PLAT.x1 + 5) return 'pier';
+  if (z < -440 && z > -1160 && x > -560 && x < 760) return 'hills';
   if (x > 470) return 'sea';
   if (x > BEACH_X0) return 'beach';
   if (x < LAND.minX || z < LAND.minZ || z > LAND.maxZ) return 'sea';

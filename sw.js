@@ -1,5 +1,5 @@
 // Service Worker: immer zuerst die neueste Version laden, offline auf den Speicher zurückgreifen
-const VERSION = 'neoncoast-1.06';
+const VERSION = 'neoncoast-1.07';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));

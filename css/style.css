@@ -554,3 +554,13 @@ input, textarea { -webkit-user-select: text; user-select: text; touch-action: ma
 .ph-btn2.small { width: auto; padding: 8px 14px; font-size: 14px; }
 .ph-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 40px 10px; font-size: 40px; }
 .ph-empty b { font-size: 20px; } .ph-empty span { font-size: 15px; opacity: .7; }
+
+#mouse-hint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); padding: 10px 18px; border-radius: 12px; background: rgba(10,8,18,.78); border: 1px solid rgba(255,255,255,.2); font-size: 18px; display: none; }
+body.playing:not(.touch):not(.mouse-locked) #mouse-hint { display: block; animation: fadein .4s; }
+body.cine #mouse-hint { display: none !important; }
+
+.mp-modes { display: flex; flex-direction: column; gap: 8px; }
+.mp-modes > b { font-family: 'Russo One'; font-weight: 400; letter-spacing: .14em; font-size: 13px; color: var(--gold); margin-top: 4px; }
+.mp-mode { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #fff; font: inherit; text-align: left; cursor: pointer; }
+.mp-mode:hover, .mp-mode:active { border-color: #4dd2ff; background: rgba(77,210,255,.12); }
+.mp-mode span { font-size: 28px; } .mp-mode div { display: flex; flex-direction: column; } .mp-mode b { font-size: 18px; } .mp-mode small { opacity: .65; font-size: 13px; }

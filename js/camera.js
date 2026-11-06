@@ -44,8 +44,8 @@ export class CameraRig {
     }
     const sens = G.settings.sensitivity * (G.isTouch ? 1.6 : 1);
     if (I.lookDX || I.lookDY) {
-      this.yaw -= I.lookDX * 0.0032 * sens;
-      this.pitch -= I.lookDY * 0.0026 * sens * (G.settings.invertY ? -1 : 1);
+      this.yaw -= I.lookDX * 0.0028 * sens;
+      this.pitch -= I.lookDY * 0.0024 * sens * (G.settings.invertY ? -1 : 1);
       this.userT = G.isTouch ? 2.2 : 1.4;
     }
     this.userT -= dt;

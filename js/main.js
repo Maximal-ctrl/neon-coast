@@ -644,6 +644,10 @@ function openMultiplayer() {
       html = `<div class="mp-code"><small>RAUM-CODE</small><b>${M.code}</b><span>${M.host ? 'Gib diesen Code deinen Freunden.' : 'Du bist verbunden.'}</span></div>
         <div class="mp-list">${list.join('')}</div>
         ${M.host && !M.conns.size ? '<div class="mp-wait small"><i class="mp-spin"></i>Warte auf Mitspieler …</div>' : ''}
+        <div class="mp-modes">${M.host ? `<b>GEMEINSAME AUFTRÄGE</b>
+          <button class="mp-mode" data-mode="race"><span>🏁</span><div><b>Straßenrennen</b><small>Alle starten nebeneinander · Sieger $2.000</small></div></button>
+          <button class="mp-mode" data-mode="hunt"><span>🚨</span><div><b>Verfolgungsjagd</b><small>Einer flieht, alle anderen jagen</small></div></button>
+          <button class="mp-mode" data-mode="loot"><span>💰</span><div><b>Beutejagd (Koop)</b><small>12 Geldsäcke · 3 Minuten · Team teilt</small></div></button>` : '<small class="mp-small">Der Host kann gemeinsame Aufträge starten (Rennen, Verfolgungsjagd, Beutejagd).</small>'}</div>
         <div class="mp-join"><input id="mp-msg" maxlength="80" placeholder="Nachricht an alle …" autocomplete="off"><button class="mbtn" id="mp-send">Senden</button></div>`;
     }
     const btns = M.status === 'online' ? [['Multiplayer verlassen', () => { M.leave(); }], ['Schließen', close, 'primary']] : [['Schließen', close]];
@@ -652,6 +656,7 @@ function openMultiplayer() {
     if (host) host.onclick = async () => { M.lastError = null; try { await M.hostGame(); } catch (e) { /* Meldung kommt per Toast */ } };
     if (join) join.onclick = async () => { M.lastError = null; try { await M.joinGame($('mp-code').value); } catch (e) { M.lastError = e.message || M.lastError; render(); } };
     if (send) { const go = () => { M.chat($('mp-msg').value); $('mp-msg').value = ''; }; send.onclick = go; $('mp-msg').onkeydown = (e) => { if (e.key === 'Enter') go(); }; }
+    $('dlg-body').querySelectorAll('[data-mode]').forEach((b) => b.onclick = () => { if (M.startCoop(b.dataset.mode)) close(); });
     const code = $('mp-code'); if (code) code.oninput = () => { code.value = code.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
   };
   G.mp.onChange = () => { if (!$('dialog').classList.contains('hidden') && $('dlg-title').textContent === 'MULTIPLAYER') render(); };
@@ -810,7 +815,7 @@ function update(now, step, I) {
     else if (I.pressed('map')) { showMap(); }
     G.time += step;
     G.stats.playTime += step;
-    G.timeOfDay = (G.timeOfDay + step * (24 / (18 * 60))) % 24;
+    { const h = G.timeOfDay, day = h > 5.5 && h < 20.5; G.timeOfDay = (h + step / (day ? 80 : 30)) % 24; }
     if (G.missions.freeze && G.player.inCar) {
       G.player.update(step);
       const v = G.player.vehicle;
@@ -895,7 +900,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '1.06';
+export const GAME_VERSION = '1.07';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));
