@@ -8,44 +8,94 @@ import { pick } from './utils.js';
 // =================================================================
 const PARTS = ['hips', 'torso', 'head', 'eyes', 'hair', 'hat', 'uarmL', 'uarmR', 'farmL', 'farmR', 'thighL', 'thighR', 'shinL', 'shinR', 'shoeL', 'shoeR', 'gun'];
 
+// Abgerundeter Quader mit weichen Normalen (optional verformbar)
+export function roundedBox(w, h, d, r, seg = 3, deform = null) {
+  r = Math.min(r, w / 2, h / 2, d / 2);
+  const g = new THREE.BoxGeometry(w, h, d, seg * 2, seg * 2, seg * 2);
+  const p = g.attributes.position, n = g.attributes.normal;
+  const ix = w / 2 - r, iy = h / 2 - r, iz = d / 2 - r;
+  const v = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let k = 0; k < p.count; k++) {
+    v.fromBufferAttribute(p, k);
+    c.set(Math.max(-ix, Math.min(ix, v.x)), Math.max(-iy, Math.min(iy, v.y)), Math.max(-iz, Math.min(iz, v.z)));
+    v.sub(c);
+    const l = v.length() || 1;
+    v.multiplyScalar(r / l);
+    n.setXYZ(k, v.x / r, v.y / r, v.z / r);
+    v.add(c);
+    if (deform) deform(v, h);
+    p.setXYZ(k, v.x, v.y, v.z);
+  }
+  if (deform) g.computeVertexNormals();
+  return g;
+}
+// Konisches Glied (Kapsel) – Drehpunkt oben, hängt nach unten
+export function limb(rTop, rBot, len, radial = 8) {
+  const pts = [];
+  for (let k = 0; k <= 3; k++) { const a = (k / 3) * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(0.0001, rTop * Math.sin(a)), rTop * Math.cos(a))); }
+  for (let k = 1; k <= 3; k++) { const a = (k / 3) * Math.PI / 2; pts.push(new THREE.Vector2(Math.max(0.0001, rBot * Math.cos(a)), -len - rBot * Math.sin(a))); }
+  return new THREE.LatheGeometry(pts.reverse(), radial);
+}
+
 function partGeos() {
   const box = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  const M = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
+  const S = (x, y, z, sx, sy, sz) => new THREE.Matrix4().makeTranslation(x, y, z).multiply(new THREE.Matrix4().makeScale(sx, sy, sz));
+  const sph = (r, ws = 12, hs = 8) => new THREE.SphereGeometry(r, ws, hs);
+  // Kopf: Schädel mit schmalerem Kiefer, Nase, Ohren, Kinn
   const head = new GeoBuilder(false);
-  head.addGeometry(box(0.23, 0.27, 0.25, 0, 0.15, 0.01), new THREE.Matrix4());
-  head.addGeometry(box(0.05, 0.06, 0.05, 0, 0.12, 0.15), new THREE.Matrix4()); // Nase
+  head.addGeometry(roundedBox(0.205, 0.255, 0.235, 0.095, 2, (v) => { const t = Math.max(0, -v.y) / 0.13; v.x *= 1 - 0.18 * t; v.z *= 1 - 0.06 * t; }), M(0, 0.155, 0.005));
+  head.addGeometry(roundedBox(0.038, 0.06, 0.05, 0.018, 1, (v) => { v.z += Math.max(0, -v.y) * 0.25; }), M(0, 0.135, 0.125));
+  for (const sx of [-1, 1]) head.addGeometry(sph(0.03, 6, 4), S(sx * 0.103, 0.155, -0.005, 0.45, 1, 0.8));
+  head.addGeometry(limb(0.052, 0.058, 0.06, 10), M(0, 0.03, -0.01)); // Hals (Haut)
+  // Augen, Brauen, Mund
   const eyes = new GeoBuilder(false);
-  eyes.addGeometry(box(0.045, 0.035, 0.02, -0.055, 0.19, 0.135), new THREE.Matrix4());
-  eyes.addGeometry(box(0.045, 0.035, 0.02, 0.055, 0.19, 0.135), new THREE.Matrix4());
+  for (const sx of [-1, 1]) {
+    eyes.addGeometry(sph(0.017, 6, 4), S(sx * 0.047, 0.18, 0.118, 1, 0.8, 0.5));
+    eyes.addGeometry(roundedBox(0.05, 0.012, 0.02, 0.005, 1), new THREE.Matrix4().makeTranslation(sx * 0.048, 0.212, 0.118).multiply(new THREE.Matrix4().makeRotationZ(-sx * 0.12)));
+  }
+  eyes.addGeometry(roundedBox(0.05, 0.008, 0.012, 0.004, 1), M(0, 0.088, 0.112));
+  // Haare: Kappe über Schädel + Hinterkopf
   const hair = new GeoBuilder(false);
-  hair.addGeometry(box(0.25, 0.08, 0.27, 0, 0.3, 0.0), new THREE.Matrix4());
-  hair.addGeometry(box(0.25, 0.16, 0.06, 0, 0.2, -0.11), new THREE.Matrix4());
-  hair.addGeometry(box(0.03, 0.12, 0.2, -0.12, 0.22, -0.01), new THREE.Matrix4());
-  hair.addGeometry(box(0.03, 0.12, 0.2, 0.12, 0.22, -0.01), new THREE.Matrix4());
+  hair.addGeometry(new THREE.SphereGeometry(0.128, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), S(0, 0.2, -0.005, 0.86, 0.95, 1.0));
+  hair.addGeometry(roundedBox(0.215, 0.16, 0.08, 0.04, 1), M(0, 0.2, -0.085));
+  for (const sx of [-1, 1]) hair.addGeometry(roundedBox(0.02, 0.09, 0.08, 0.008, 1), M(sx * 0.1, 0.2, 0.03));
+  hair.addGeometry(roundedBox(0.19, 0.04, 0.06, 0.02, 1), new THREE.Matrix4().makeTranslation(0, 0.28, 0.085).multiply(new THREE.Matrix4().makeRotationX(0.35)));
+  // Kappe mit Schirm
   const hat = new GeoBuilder(false);
-  hat.addGeometry(box(0.26, 0.1, 0.28, 0, 0.32, 0), new THREE.Matrix4());
-  hat.addGeometry(box(0.24, 0.02, 0.13, 0, 0.28, 0.18), new THREE.Matrix4());
+  hat.addGeometry(new THREE.SphereGeometry(0.132, 12, 6, 0, Math.PI * 2, 0, Math.PI * 0.5), S(0, 0.215, 0, 0.9, 0.85, 1.0));
+  hat.addGeometry(new THREE.CylinderGeometry(0.11, 0.11, 0.012, 16, 1, false, -Math.PI / 2, Math.PI), S(0, 0.222, 0.1, 1, 1, 0.9));
+  // Unterarm mit Hand
   const farm = new GeoBuilder(false);
-  farm.addGeometry(box(0.095, 0.27, 0.1, 0, -0.135, 0), new THREE.Matrix4());
-  farm.addGeometry(box(0.085, 0.09, 0.1, 0, -0.31, 0.01), new THREE.Matrix4());
+  farm.addGeometry(limb(0.048, 0.04, 0.24), M(0, -0.005, 0));
+  farm.addGeometry(roundedBox(0.07, 0.095, 0.035, 0.016, 1, (v) => { v.x *= 1 - Math.max(0, -v.y) * 1.2; }), M(0, -0.31, 0.008));
+  farm.addGeometry(roundedBox(0.022, 0.05, 0.022, 0.01, 1), new THREE.Matrix4().makeTranslation(0.03, -0.29, 0.03).multiply(new THREE.Matrix4().makeRotationZ(0.4)));
   const gun = new GeoBuilder(false);
   gun.addGeometry(box(0.05, 0.3, 0.08, 0, -0.18, 0.04), new THREE.Matrix4());
   gun.addGeometry(box(0.045, 0.06, 0.13, 0, -0.04, 0.02), new THREE.Matrix4());
+  // Oberkörper: Brustkorb verjüngt zur Taille, Schultern abgerundet, Kragen
   const torso = new GeoBuilder(false);
-  torso.addGeometry(box(0.42, 0.5, 0.24, 0, 0.33, 0), new THREE.Matrix4());
-  torso.addGeometry(box(0.36, 0.08, 0.22, 0, 0.06, 0), new THREE.Matrix4());
-  torso.addGeometry(box(0.12, 0.06, 0.12, 0, 0.6, 0), new THREE.Matrix4()); // Hals (Hemdfarbe)
+  torso.addGeometry(roundedBox(0.4, 0.5, 0.22, 0.085, 2, (v) => {
+    const t = (v.y + 0.25) / 0.5; // 0 unten .. 1 oben
+    v.x *= 0.82 + 0.18 * Math.min(1, t * 1.4);
+    v.z *= 0.92 + 0.14 * Math.sin(Math.min(1, t) * Math.PI) - (t > 0.85 ? (t - 0.85) * 0.6 : 0);
+    if (v.z > 0 && t > 0.45 && t < 0.85) v.z += 0.012 * Math.sin((t - 0.45) / 0.4 * Math.PI);
+  }), M(0, 0.33, 0));
+  torso.addGeometry(roundedBox(0.34, 0.12, 0.2, 0.05, 1), M(0, 0.07, 0));
+  for (const sx of [-1, 1]) torso.addGeometry(sph(0.062, 8, 5), S(sx * 0.185, 0.535, 0, 1, 0.8, 0.95));
+  torso.addGeometry(new THREE.TorusGeometry(0.06, 0.018, 5, 10).rotateX(Math.PI / 2), M(0, 0.59, 0.0));
   return {
-    hips: box(0.36, 0.2, 0.22, 0, -0.02, 0),
+    hips: roundedBox(0.35, 0.21, 0.22, 0.07, 2, (v) => { if (v.y < 0) v.x *= 1 - Math.min(0.12, -v.y * 0.8); }).translate(0, -0.02, 0),
     torso: torso.build(),
     head: head.build(),
     eyes: eyes.build(),
     hair: hair.build(),
     hat: hat.build(),
-    uarm: box(0.11, 0.3, 0.12, 0, -0.14, 0),
+    uarm: limb(0.064, 0.052, 0.255),
     farm: farm.build(),
-    thigh: box(0.15, 0.45, 0.16, 0, -0.21, 0),
-    shin: box(0.13, 0.43, 0.14, 0, -0.21, 0),
-    shoe: box(0.13, 0.09, 0.27, 0, -0.04, 0.05),
+    thigh: limb(0.088, 0.066, 0.4),
+    shin: limb(0.066, 0.05, 0.38),
+    shoe: roundedBox(0.12, 0.085, 0.27, 0.04, 2, (v) => { if (v.z > 0.04) v.y -= (v.z - 0.04) * 0.15 * (v.y > 0 ? 1 : 0); }).translate(0, -0.035, 0.05),
     gun: gun.build(),
     item: box(0.06, 0.06, 0.16, 0, 0, 0.05),
   };
@@ -66,7 +116,7 @@ export class CrowdRenderer {
   constructor(scene, max = 96) {
     this.max = max;
     const g = partGeos();
-    const mat = new THREE.MeshStandardMaterial({ roughness: 0.75, metalness: 0.02 });
+    const mat = new THREE.MeshStandardMaterial({ roughness: 0.68, metalness: 0.0 });
     const gunMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.7 });
     const geoFor = { hips: g.hips, torso: g.torso, head: g.head, eyes: g.eyes, hair: g.hair, hat: g.hat, uarmL: g.uarm, uarmR: g.uarm, farmL: g.farm, farmR: g.farm, thighL: g.thigh, thighR: g.thigh, shinL: g.shin, shinR: g.shin, shoeL: g.shoe, shoeR: g.shoe, gun: g.gun, item: g.item };
     this.im = {};
@@ -303,6 +353,39 @@ const PROFILES = {
   }),
 };
 
+const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+// Weiche Normalen bis zu einem Knickwinkel (harte Kanten bleiben hart)
+function creaseNormals(g, deg = 40) {
+  const pos = g.attributes.position, idx = g.index, cnt = idx ? idx.count : pos.count;
+  const vi = (k) => (idx ? idx.getX(k) : k);
+  const cosT = Math.cos((deg * Math.PI) / 180), nt = cnt / 3;
+  const fx = new Float32Array(nt), fy = new Float32Array(nt), fz = new Float32Array(nt);
+  const map = new Map(), key = (i) => Math.round(pos.getX(i) * 2000) + ',' + Math.round(pos.getY(i) * 2000) + ',' + Math.round(pos.getZ(i) * 2000);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < nt; t++) {
+    a.fromBufferAttribute(pos, vi(t * 3)); b.fromBufferAttribute(pos, vi(t * 3 + 1)); c.fromBufferAttribute(pos, vi(t * 3 + 2));
+    c.sub(b); a.sub(b); c.cross(a);
+    fx[t] = c.x; fy[t] = c.y; fz[t] = c.z;
+    for (let k = 0; k < 3; k++) { const kk = key(vi(t * 3 + k)); let l = map.get(kk); if (!l) map.set(kk, (l = [])); l.push(t); }
+  }
+  const nrm = g.attributes.normal || new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3);
+  for (let t = 0; t < nt; t++) {
+    const l0 = Math.hypot(fx[t], fy[t], fz[t]) || 1;
+    for (let k = 0; k < 3; k++) {
+      const v = vi(t * 3 + k);
+      let sx = 0, sy = 0, sz = 0;
+      for (const t2 of map.get(key(v))) {
+        const l2 = Math.hypot(fx[t2], fy[t2], fz[t2]) || 1;
+        if ((fx[t] * fx[t2] + fy[t] * fy[t2] + fz[t] * fz[t2]) / (l0 * l2) >= cosT) { sx += fx[t2]; sy += fy[t2]; sz += fz[t2]; }
+      }
+      const l = Math.hypot(sx, sy, sz) || 1;
+      nrm.setXYZ(v, sx / l, sy / l, sz / l);
+    }
+  }
+  g.setAttribute('normal', nrm);
+  return g;
+}
+
 const geoCache = {};
 function carGeos(key) {
   if (geoCache[key]) return geoCache[key];
@@ -323,7 +406,7 @@ function carGeos(key) {
   s.absarc(rz, yb, ar, 0, Math.PI, false);
   s.lineTo(-L / 2, yb);
   const bt = 0.08, bs = 0.05;
-  const body = new THREE.ExtrudeGeometry(s, { depth: W - bt * 2, bevelEnabled: true, bevelThickness: bt, bevelSize: bs, bevelSegments: 2, curveSegments: 10 });
+  const body = new THREE.ExtrudeGeometry(s, { depth: W - bt * 2, steps: 8, bevelEnabled: true, bevelThickness: bt, bevelSize: bs, bevelSegments: 3, curveSegments: 12 });
   body.rotateY(-Math.PI / 2);
   body.translate((W - bt * 2) / 2, 0, 0);
   const paint = new GeoBuilder(false);
@@ -331,7 +414,7 @@ function carGeos(key) {
   // Dach
   if (P.roof) {
     const [z0, z1, y0, y1] = P.roof, rw = W * P.cabinW / 2 + 0.03;
-    paint.box(-rw, y0, z0, rw, y1, z1, {});
+    paint.addGeometry(roundedBox(rw * 2, y1 - y0, z1 - z0, 0.045, 3), new THREE.Matrix4().makeTranslation(0, (y0 + y1) / 2, (z0 + z1) / 2));
   }
   if (P.spoiler) {
     const [z, y, f] = P.spoiler, sw = W * f / 2;
@@ -351,7 +434,7 @@ function carGeos(key) {
   for (let k = 1; k < cab.length; k++) gs.lineTo(cab[k][0], cab[k][1]);
   gs.lineTo(cab[0][0], cab[0][1]);
   const cw = W * P.cabinW;
-  const glass = new THREE.ExtrudeGeometry(gs, { depth: cw - 0.08, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.02, bevelSegments: 1 });
+  const glass = new THREE.ExtrudeGeometry(gs, { depth: cw - 0.08, steps: 6, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.02, bevelSegments: 2 });
   glass.rotateY(-Math.PI / 2);
   glass.translate((cw - 0.08) / 2, 0, 0);
   // Details (Stoßstangen etc.)
@@ -408,13 +491,35 @@ function carGeos(key) {
   holeG.box(W / 2 - 0.02, doorH0, hingeZ - doorLen, W / 2 + 0.004, doorH1, hingeZ, { col: rgb(0x0c0c0f) });
   holeG.box(W * 0.22 - 0.24, belt - 0.5, seatF - 0.25, W / 2 - 0.03, belt - 0.28, seatF + 0.25, { col: seatHi });
   // Fahrer-Dummy
-  const dT = new THREE.BoxGeometry(0.42, 0.55, 0.26).translate(W * 0.22, belt + 0.02, seatF - 0.05);
-  const dH = new THREE.BoxGeometry(0.22, 0.26, 0.24).translate(W * 0.22, belt + 0.45, seatF - 0.02);
+  const dT = roundedBox(0.42, 0.55, 0.26, 0.09, 2).translate(W * 0.22, belt + 0.02, seatF - 0.05);
+  const dH = roundedBox(0.2, 0.25, 0.23, 0.09, 2).translate(W * 0.22, belt + 0.45, seatF - 0.02);
+  // Karosserie runden: Draufsicht-Rundung, gewölbtes Dach/Haube, eingezogene Flanken
+  const topY = Math.max(...P.body.map((q) => q[1])), roofTop = P.roof ? P.roof[3] : Math.max(...cab.map((q) => q[1]));
+  const deform = (x, y, z) => {
+    const u = Math.max(-1.2, Math.min(1.2, x / (W / 2))), az = Math.abs(z), sz = Math.sign(z);
+    const e = smooth(L / 2 - 1.0, L / 2 + 0.05, az);
+    x *= 1 - 0.1 * e * e;
+    const c = smooth(0.55, 1.0, Math.abs(u));
+    z -= sz * 0.17 * c * c * smooth(L / 2 - 0.55, L / 2 + 0.02, az);
+    if (y > yb + 0.25) y += 0.032 * (1 - Math.min(1, u * u)) * smooth(yb + 0.25, topY, y);
+    x *= 1 - 0.05 * smooth(belt - 0.16, belt + 0.04, y);
+    if (T.profile !== 'van') x *= 1 - 0.13 * smooth(belt, roofTop, y);
+    return [x, y, z];
+  };
+  const deformGeo = (g, ox = 0, oz = 0) => {
+    const p = g.attributes.position;
+    for (let k = 0; k < p.count; k++) { const [x, y, z] = deform(p.getX(k) + ox, p.getY(k), p.getZ(k) + oz); p.setXYZ(k, x - ox, y, z - oz); }
+    p.needsUpdate = true;
+    return g;
+  };
+  const paintG = creaseNormals(deformGeo(paint.build()), 38);
+  creaseNormals(deformGeo(glass), 30);
+  const detailG = deformGeo(D.build()), headG = deformGeo(H.build()), tailG = deformGeo(R.build());
   const out = {
-    paint: paint.build(), glass, details: D.build(), head: H.build(), tail: R.build(),
+    paint: paintG, glass, details: detailG, head: headG, tail: tailG,
     wheels: [[W / 2 - 0.16, r, fz, 1], [-W / 2 + 0.16, r, fz, 1], [W / 2 - 0.16, r, rz, 0], [-W / 2 + 0.16, r, rz, 0]],
     height: P.roof ? P.roof[3] : 2.25, headY: hy, wheelbase: fz - rz,
-    door: doorG.build(), hole: holeG.build(), hinge: [W / 2 + 0.006, hingeZ], doorLen, seat: [W * 0.22, seatF], belt,
+    door: creaseNormals(deformGeo(doorG.build(), W / 2 + 0.006, hingeZ), 38), hole: deformGeo(holeG.build()), hinge: [W / 2 + 0.006, hingeZ], doorLen, seat: [W * 0.22, seatF], belt,
     dTorso: dT, dHead: dH, plateY: [yb + 0.04, yb + 0.08], L,
   };
   if (T.police) {
@@ -439,6 +544,7 @@ function carGeos(key) {
     for (let k = 0; k < 10; k++) ch2.box(-W / 2 - 0.02, 0.66, -1.2 + k * 0.24, -W / 2 - 0.005, 0.78, -1.08 + k * 0.24, {});
     out.stripe = ch2.build();
   }
+  for (const k of ['barBase', 'barRed', 'barBlue', 'stripe', 'taxiSign']) if (out[k]) deformGeo(out[k]);
   geoCache[key] = out;
   return out;
 }

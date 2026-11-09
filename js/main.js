@@ -4,6 +4,24 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+// Farbkorrektur im Kino-Look: leichte S-Kurve, Sättigung, Split-Toning, Vignette
+const GRADE_SHADER = {
+  uniforms: { tDiffuse: { value: null }, sat: { value: 1.1 }, contrast: { value: 1.07 }, vig: { value: 0.85 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vig; varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      c = mix(vec3(l), c, sat);
+      c = mix(c, c * c * (3.0 - 2.0 * c), contrast - 1.0);
+      c += vec3(0.018, 0.006, -0.02) * smoothstep(0.45, 1.0, l) + vec3(-0.004, 0.002, 0.006) * (1.0 - smoothstep(0.0, 0.4, l));
+      vec2 d = vUv - 0.5;
+      c *= 1.0 - dot(d, d) * vig * 0.55;
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`,
+};
 import { G } from './state.js';
 import { World } from './world.js';
 import { Environment } from './env.js';
@@ -103,6 +121,7 @@ async function boot() {
     bloom = new UnrealBloomPass(res, 0.4, 0.35, 0.9);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
+    composer.addPass(new ShaderPass(GRADE_SHADER));
   }
   G.player.x = 40; G.player.z = 0;
   G.timeOfDay = 18.2;
@@ -900,7 +919,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '1.07';
+export const GAME_VERSION = '1.08';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));

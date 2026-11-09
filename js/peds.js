@@ -64,7 +64,7 @@ export class PedManager {
   spawnSidewalk(px, pz) {
     for (let tries = 0; tries < 6; tries++) {
       const [pbi, pbj] = C.blockOf(px, pz);
-      const bi = clamp(pbi + Math.floor(rand(-2, 3)), 0, C.NB - 1), bj = clamp(pbj + Math.floor(rand(-2, 3)), 0, C.NB - 1);
+      const bi = clamp(pbi + Math.floor(rand(-2, 3)), C.I0, C.NB - 1), bj = clamp(pbj + Math.floor(rand(-2, 3)), 0, C.NB - 1);
       const off = rand(0, 1.2);
       const loop = this.sidewalkLoop(bi, bj, off);
       const k = Math.floor(rand(0, 4));
@@ -82,6 +82,19 @@ export class PedManager {
       return p;
     }
     return null;
+  }
+  spawnVillage(px, pz) {
+    const loops = G.world.villageLoops;
+    if (!loops || !loops.length) return null;
+    const loop = pick(loops), k = Math.floor(rand(0, loop.length)), p0 = loop[k], p1 = loop[(k + 1) % loop.length], t = rand(0.1, 0.9);
+    const x = p0[0] + (p1[0] - p0[0]) * t, z = p0[1] + (p1[1] - p0[1]) * t;
+    const d2 = dist2(x, z, px, pz);
+    if (d2 < 25 * 25 || d2 > 120 * 120 || (this.inView(x, z) && d2 < 70 * 70)) return null;
+    const p = new Ped(x, z, randomLook(), 'walk');
+    const dir = chance(0.5) ? 1 : -1;
+    p.loopPts = loop; p.path = { bi: 0, bj: 0, k: dir > 0 ? (k + 1) % loop.length : k, dir, off: 0 };
+    this.list.push(p);
+    return p;
   }
   spawnBeach(px, pz) {
     const z = clamp(pz + rand(-110, 110), -370, 370);
@@ -245,7 +258,7 @@ export class PedManager {
     const px = P.x, pz = P.z;
     // Zielanzahl je Gegend
     const d = C.districtAt(px, pz);
-    const dens = { downtown: 52, midtown: 44, westside: 40, heights: 24, seaside: 44, beach: 46, harbor: 14, pier: 36, sea: 4 }[d] || 34;
+    const dens = { downtown: 70, midtown: 60, westside: 54, heights: 32, seaside: 58, beach: 60, harbor: 20, pier: 46, sea: 4, oldtown: 62, village: 26, hills: 4 }[d] || 44;
     const night = G.world.env.night;
     this.target = Math.round(dens * (1 - night * 0.35) * (G.quality === 'low' ? 0.65 : 1));
     this.spawnT -= dt;
@@ -254,7 +267,8 @@ export class PedManager {
       this.spawnT = 0.1;
       const n = this.list.filter((p) => !p.isCop && p.alive && !p.persistent).length;
       if (n < this.target) {
-        if ((px > 300 || d === 'beach' || d === 'pier') && chance(0.6)) this.spawnBeach(px, pz);
+        if (d === 'village' || d === 'hills') this.spawnVillage(px, pz);
+        else if ((px > 300 || d === 'beach' || d === 'pier') && chance(0.6)) this.spawnBeach(px, pz);
         else this.spawnSidewalk(px, pz);
       }
     }
@@ -274,15 +288,16 @@ export class PedManager {
     switch (p.state) {
       case 'walk': {
         if (!p.path) { this.attachPath(p); }
-        const loop = this.sidewalkLoop(p.path.bi, p.path.bj, p.path.off);
+        const loop = p.loopPts || this.sidewalkLoop(p.path.bi, p.path.bj, p.path.off);
         const [tx, tz] = loop[p.path.k];
         p.tx = tx; p.tz = tz; p.moveSpeed = p.speed;
         if (dist2(p.x, p.z, tx, tz) < 0.6) {
           const corner = p.path.k;
+          if (p.loopPts) { p.path.k = (p.path.k + p.path.dir + loop.length) % loop.length; if (chance(0.12)) { p.state = 'idle'; p.timer = rand(2, 6); } break; }
           if (chance(0.22)) {
             const opts = CROSS[corner].filter(([dbi, dbj]) => {
               const nb = p.path.bi + dbi, nj = p.path.bj + dbj;
-              return nb >= 0 && nb < C.NB && nj >= 0 && nj < C.NB;
+              return nb >= C.I0 && nb < C.NB && nj >= 0 && nj < C.NB;
             });
             if (opts.length) {
               const [dbi, dbj, nk] = pick(opts);
@@ -369,7 +384,7 @@ export class PedManager {
 
   attachPath(p) {
     const [bi0, bj0] = C.blockOf(p.x, p.z);
-    const bi = clamp(bi0, 0, C.NB - 1), bj = clamp(bj0, 0, C.NB - 1);
+    const bi = clamp(bi0, C.I0, C.NB - 1), bj = clamp(bj0, 0, C.NB - 1);
     p.path = { bi, bj, k: Math.floor(rand(0, 4)), dir: chance(0.5) ? 1 : -1, off: rand(0, 1.2) };
   }
 

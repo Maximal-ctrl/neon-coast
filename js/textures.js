@@ -122,6 +122,11 @@ function facadeBase(size, style, seed) {
   const rnd = mulberry32(seed);
   const cell = size / 8, ec = size / 16;
   ge.fillStyle = '#000'; ge.fillRect(0, 0, size / 2, size / 2);
+  // Rauheit (G) & Metall (B): Wände matt, Glas spiegelnd
+  const [cr, gr0] = cv(size / 2);
+  gr0.fillStyle = style === 'glass' ? 'rgb(0,90,120)' : style === 'warehouse' ? 'rgb(0,170,90)' : 'rgb(0,225,0)';
+  gr0.fillRect(0, 0, size / 2, size / 2);
+  const glossy = (x, y, w, h) => { gr0.fillStyle = 'rgb(0,18,200)'; gr0.fillRect(x / 2, y / 2, w / 2, h / 2); };
   const litColors = ['#ffd9a0', '#ffe6bf', '#fff2d6', '#cfe3ff', '#ffc98a', '#b9d3ff'];
   const lit = (cx, cy, wx, wy, ww, wh, p = 0.38) => {
     if (rnd() < p) {
@@ -144,6 +149,7 @@ function facadeBase(size, style, seed) {
       gr.addColorStop(1, `rgb(${28 * b},${52 * b},${80 * b})`);
       g.fillStyle = gr;
       g.fillRect(x + cell * 0.04, y + cell * 0.04, cell * 0.92, cell * 0.74);
+      glossy(x + cell * 0.04, y + cell * 0.04, cell * 0.92, cell * 0.74);
       g.fillStyle = '#2a323c'; g.fillRect(x, y + cell * 0.8, cell, cell * 0.2);
       lit(0, 0, (fx * ec) + ec * 0.04, fy * ec + ec * 0.04, ec * 0.92, ec * 0.74, 0.32);
     }
@@ -158,6 +164,7 @@ function facadeBase(size, style, seed) {
         const gr = g.createLinearGradient(x, y + cell * 0.22, x, y + cell * 0.78);
         gr.addColorStop(0, '#5f7f99'); gr.addColorStop(1, '#22313f');
         g.fillStyle = gr; g.fillRect(x + cell * 0.1, y + cell * 0.25, cell * 0.8, cell * 0.5);
+        glossy(x + cell * 0.1, y + cell * 0.25, cell * 0.8, cell * 0.5);
         g.fillStyle = '#b8b1a4'; g.fillRect(x, y + cell * 0.22, cell * 0.08, cell * 0.56);
         lit(0, 0, fx * ec + ec * 0.1, fy * ec + ec * 0.25, ec * 0.8, ec * 0.5, 0.35);
       }
@@ -184,6 +191,7 @@ function facadeBase(size, style, seed) {
         const gr = g.createLinearGradient(wx, wy, wx, wy + cell * wh);
         gr.addColorStop(0, '#7894ad'); gr.addColorStop(1, '#2b3a4a');
         g.fillStyle = gr; g.fillRect(wx, wy, cell * ww, cell * wh);
+        glossy(wx, wy, cell * ww, cell * wh);
         g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(wx + cell * ww / 2 - 1, wy, 2, cell * wh);
         if (style === 'house') {
           g.fillStyle = 'rgba(70,90,80,0.85)';
@@ -209,11 +217,12 @@ function facadeBase(size, style, seed) {
     for (let fx = 0; fx < 8; fx += 2) {
       const x = fx * cell;
       g.fillStyle = '#34414c'; g.fillRect(x + cell * 0.2, cell * 0.3, cell * 1.6, cell * 0.35);
+      glossy(x + cell * 0.2, cell * 0.3, cell * 1.6, cell * 0.35);
       lit(0, 0, (fx + 0.2) * ec, ec * 0.3, ec * 1.6, ec * 0.35, 0.3);
     }
     g.fillStyle = 'rgba(80,60,40,0.18)'; g.fillRect(0, size * 0.9, size, size * 0.1);
   }
-  return { map: tex(c), emi: tex(ce) };
+  return { map: tex(c), emi: tex(ce), rm: tex(cr, { srgb: false }) };
 }
 
 function shade(hex, f) {

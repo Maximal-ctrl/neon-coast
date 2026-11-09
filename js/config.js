@@ -2,11 +2,14 @@
 export const CELL = 80;          // Abstand zwischen Straßenachsen (m)
 export const NB = 9;             // Blöcke pro Achse
 export const HALF = (NB * CELL) / 2; // 360
+export const I0 = -3;            // Westliche Erweiterung (Altstadt): Blockindizes -3..-1
+export const NI = NB + 1 - I0;   // Knoten pro Zeile
+export const WEST_X = -HALF + I0 * CELL; // -600
 export const ROAD_HW = 8;        // halbe Fahrbahnbreite
 export const WALK_HW = 12;       // Fahrbahn + Gehweg
 export const LANES = [2, 6];     // Spurmitte vom Mittelstreifen
 export const WATER_Y = -0.8;
-export const LAND = { minX: -HALF - WALK_HW - 12, maxX: HALF + WALK_HW, minZ: -HALF - WALK_HW - 12, maxZ: HALF + WALK_HW + 12 };
+export const LAND = { minX: WEST_X - WALK_HW - 12, maxX: HALF + WALK_HW, minZ: -HALF - WALK_HW - 12, maxZ: HALF + WALK_HW + 12 };
 export const BEACH_X0 = HALF + WALK_HW; // 372
 export const PIER = { x0: 405, x1: 640, z0: 33, z1: 47, y: 1.3, rampEnd: 452 };
 export const PIER_PLAT = { x0: 585, x1: 660, z0: 5, z1: 75 };
@@ -14,7 +17,7 @@ export const PIER_PLAT = { x0: 585, x1: 660, z0: 5, z1: 75 };
 export const roadPos = (i) => -HALF + i * CELL;
 export const blockCenter = (bi, bj) => [roadPos(bi) + CELL / 2, roadPos(bj) + CELL / 2];
 export const blockOf = (x, z) => [Math.floor((x + HALF) / CELL), Math.floor((z + HALF) / CELL)];
-export const nodeId = (i, j) => j * (NB + 1) + i;
+export const nodeId = (i, j) => j * NI + (i - I0);
 
 // Sandhöhe am Strand (identisch zum Wasser-Shader!)
 export function sandHeight(x, z) {
@@ -54,6 +57,7 @@ export function blockFrontPos(bi, bj) {
 
 export function districtOf(bi, bj) {
   if (bi >= NB) return 'beach';
+  if (bi < 0) return 'oldtown';
   if (bi === 8) return 'seaside';
   if (bj >= 7 && bi <= 4) return 'harbor';
   if (bj <= 1) return 'heights';
@@ -70,6 +74,8 @@ export const DISTRICT_NAMES = {
   downtown: 'Downtown',
   westside: 'Westside',
   midtown: 'Midtown',
+  oldtown: 'Altstadt',
+  village: 'Monte Solera',
   pier: 'Sunset Pier',
   sea: 'Offenes Meer',
   hills: 'Solera Hills',
@@ -79,12 +85,13 @@ export const DISTRICT_NAMES = {
 
 export function districtAt(x, z) {
   if (x > PIER.rampEnd - 10 && z > PIER_PLAT.z0 - 10 && z < PIER_PLAT.z1 + 10 && x < PIER_PLAT.x1 + 5) return 'pier';
+  if (Math.hypot(x + 160, z + 752) < 112) return 'village';
   if (z < -440 && z > -1160 && x > -560 && x < 760) return 'hills';
   if (x > 470) return 'sea';
   if (x > BEACH_X0) return 'beach';
   if (x < LAND.minX || z < LAND.minZ || z > LAND.maxZ) return 'sea';
   const [bi, bj] = blockOf(x, z);
-  return districtOf(Math.max(0, Math.min(NB - 1, bi)), Math.max(0, Math.min(NB - 1, bj)));
+  return districtOf(Math.max(I0, Math.min(NB - 1, bi)), Math.max(0, Math.min(NB - 1, bj)));
 }
 
 // Rampen für Stuntsprünge: Mittelpunkt Start, Richtung, Länge, Breite, Höhe

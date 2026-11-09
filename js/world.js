@@ -7,7 +7,7 @@ import { GeoBuilder, rgb } from './geo.js';
 import { mulberry32, lerp, clamp, smoothstep } from './utils.js';
 import { rayBox as rayBoxW } from './physics.js';
 
-const { CELL, NB, HALF, WALK_HW, roadPos } = C;
+const { CELL, NB, HALF, WALK_HW, roadPos, I0 } = C;
 
 const STYLE = {
   glass: { uw: 20, vh: 28.8 },
@@ -37,20 +37,72 @@ function vnoise(x, z) {
 function fbm(x, z) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < 5; i++) { s += a * vnoise(x * f, z * f); f *= 2.03; a *= 0.5; } return s / 0.97; }
 export const HILLS = { x0: -560, x1: 760, z0: -1160, z1: -436 };
 export const CAUSEWAY = { x0: 32, x1: 48, z0: -492, z1: -384, y1: 0.9 };
-export function hillHeight(x, z) {
-  if (x < HILLS.x0 || x > HILLS.x1 || z < HILLS.z0 || z > HILLS.z1) return -6;
+function rawHill(x, z) {
   const shore = -478 + 22 * Math.sin(x * 0.011) + 10 * Math.sin(x * 0.033 + 1.3);
   const d = shore - z; // > 0: landeinwärts
   let h = d < 0 ? -1.4 + d * 0.12 : -1.4 + Math.min(d, 25) * 0.09;
   const m = fbm(x * 0.0045 + 3.1, z * 0.0045 + 7.7);
   const r = 1 - Math.abs(vnoise(x * 0.006 + 11, z * 0.006 - 4) * 2 - 1);
   h += (Math.max(0, m - 0.3) * 270 + r * r * 32 + (fbm(x * 0.03, z * 0.03) - 0.5) * 3) * smoothstep(20, 300, d);
+  return [h, d];
+}
+// Bergdorf "Monte Solera" auf einem Plateau + Serpentinenstraße vom Damm hinauf
+export const VILLAGE = { x: -160, z: -752, r: 92, y: 26 };
+export const HILL_ROAD = (() => {
+  const ctrl = [[40, -490], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]];
+  const pts = [];
+  for (let k = 0; k < ctrl.length - 1; k++) {
+    const p0 = ctrl[Math.max(0, k - 1)], p1 = ctrl[k], p2 = ctrl[k + 1], p3 = ctrl[Math.min(ctrl.length - 1, k + 2)];
+    const n = Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 4);
+    for (let i = 0; i < n; i++) {
+      const t = i / n, t2 = t * t, t3 = t2 * t;
+      const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
+      pts.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  pts.push(ctrl[ctrl.length - 1]);
+  // Höhenprofil: geglättetes Gelände, Steigung begrenzt, Anfang = Dammhöhe, Ende = Dorf
+  let hs = pts.map(([x, z]) => Math.max(0.9, rawHill(x, z)[0]));
+  for (let it = 0; it < 6; it++) hs = hs.map((_, i) => { let s = 0, c = 0; for (let j = -6; j <= 6; j++) { const v = hs[i + j]; if (v !== undefined) { s += v; c++; } } return s / c; });
+  const n = hs.length; hs[0] = 0.9;
+  const fixed = pts.map(([x, z]) => Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4);
+  fixed[0] = true;
+  for (let i = 0; i < n; i++) if (fixed[i] && i) hs[i] = VILLAGE.y;
+  const seg = (i) => Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
+  for (let it = 0; it < 4; it++) {
+    for (let i = 1; i < n; i++) if (!fixed[i]) hs[i] = Math.min(hs[i], hs[i - 1] + seg(i - 1) * 0.11);
+    for (let i = n - 2; i > 0; i--) if (!fixed[i]) hs[i] = Math.max(hs[i], hs[i + 1] - seg(i) * 0.11);
+  }
+  const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
+  return { pts, hs, bb: [Math.min(...xs) - 30, Math.min(...zs) - 30, Math.max(...xs) + 30, Math.max(...zs) + 30] };
+})();
+// Abstand zur Bergstraße -> [abstand, straßenhöhe]
+export function hillRoadAt(x, z) {
+  const R = HILL_ROAD, b = R.bb;
+  if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) return null;
+  let best = 1e9, by = 0;
+  const P = R.pts;
+  for (let i = 0; i < P.length - 1; i++) {
+    const ax = P[i][0], az = P[i][1], dx = P[i + 1][0] - ax, dz = P[i + 1][1] - az;
+    const l2 = dx * dx + dz * dz;
+    let t = ((x - ax) * dx + (z - az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const ex = ax + dx * t - x, ez = az + dz * t - z, d2 = ex * ex + ez * ez;
+    if (d2 < best) { best = d2; by = R.hs[i] + (R.hs[i + 1] - R.hs[i]) * t; }
+  }
+  return [Math.sqrt(best), by];
+}
+export function hillHeight(x, z) {
+  if (x < HILLS.x0 || x > HILLS.x1 || z < HILLS.z0 || z > HILLS.z1) return -6;
+  let [h, d] = rawHill(x, z);
+  // Dorfplateau
+  const V = VILLAGE, dv = Math.hypot(x - V.x, z - V.z);
+  if (dv < V.r + 60) h = lerp(h, V.y, 1 - smoothstep(V.r, V.r + 60, dv));
   const ed = Math.min(x - HILLS.x0, HILLS.x1 - x, z - HILLS.z0);
   const edge = smoothstep(0, 140, ed);
   h = h * edge - 6 * (1 - edge);
-  // flaches Tal am Ende des Damms
-  const road = Math.max(0, 1 - Math.abs(x - 40) / 34) * (1 - smoothstep(70, 170, d));
-  h = h * (1 - road) + Math.max(0.85, Math.min(h, 1.6)) * road;
+  // Straße einschneiden / aufschütten
+  const r = hillRoadAt(x, z);
+  if (r) h = lerp(h, r[1] - 0.12, 1 - smoothstep(8.5, 26, r[0]));
   // unter dem Damm: Gelände unter Wasser halten, damit nichts durch die Fahrbahn ragt
   if (z > CAUSEWAY.z0 && Math.abs(x - 40) < 16) h = Math.min(h, -1.2);
   return Math.max(-6, h);
@@ -119,7 +171,11 @@ export class World {
   groundHeight(x, z) {
     const CW = CAUSEWAY;
     if (x > CW.x0 && x < CW.x1 && z > CW.z0 && z < CW.z1) return lerp(0, CW.y1, (CW.z1 - z) / (CW.z1 - CW.z0));
-    if (z < HILLS.z1) return hillHeight(x, z);
+    if (z < HILLS.z1) {
+      const r = hillRoadAt(x, z);
+      if (r && r[0] < 5) return r[1];
+      return hillHeight(x, z);
+    }
     for (let i = 0; i < this.rooms.length; i++) { const r = this.rooms[i]; if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return r.y; }
     const P = C.PIER, PP = C.PIER_PLAT;
     if (z > P.z0 && z < P.z1 && x > P.x0 && x < P.x1) {
@@ -179,19 +235,19 @@ export class World {
   // --------------------------------------------------------------- Graph
   buildGraph() {
     const rnd = mulberry32(99);
-    for (let j = 0; j <= NB; j++) for (let i = 0; i <= NB; i++) {
+    for (let j = 0; j <= NB; j++) for (let i = I0; i <= NB; i++) {
       const n = { id: C.nodeId(i, j), i, j, x: roadPos(i), z: roadPos(j), nbr: [], off: rnd() * 26 };
       this.nodes.push(n);
     }
     for (const n of this.nodes) {
-      if (n.i > 0) n.nbr.push(C.nodeId(n.i - 1, n.j));
+      if (n.i > I0) n.nbr.push(C.nodeId(n.i - 1, n.j));
       if (n.i < NB) n.nbr.push(C.nodeId(n.i + 1, n.j));
       if (n.j > 0) n.nbr.push(C.nodeId(n.i, n.j - 1));
       if (n.j < NB) n.nbr.push(C.nodeId(n.i, n.j + 1));
     }
   }
   nearestNode(x, z) {
-    const i = clamp(Math.round((x + HALF) / CELL), 0, NB), j = clamp(Math.round((z + HALF) / CELL), 0, NB);
+    const i = clamp(Math.round((x + HALF) / CELL), I0, NB), j = clamp(Math.round((z + HALF) / CELL), 0, NB);
     return this.nodes[C.nodeId(i, j)];
   }
   // Ampelphase: 'G' | 'Y' | 'R'
@@ -256,7 +312,7 @@ export class World {
     this.B.wood = new GeoBuilder(false);
     this.B.poolw = new GeoBuilder(false);
     this.palmPos = []; this.treePos = []; this.containers = []; this.umbrellas = []; this.towels = [];
-    for (let bj = 0; bj < NB; bj++) for (let bi = 0; bi < NB; bi++) this.genBlock(bi, bj);
+    for (let bj = 0; bj < NB; bj++) for (let bi = I0; bi < NB; bi++) this.genBlock(bi, bj);
     await tick(0.55, 'Strand & Pier werden angelegt …');
     this.genBeach();
     this.genPier();
@@ -278,7 +334,7 @@ export class World {
 
   makeMaterials() {
     const T = this.tex, F = T.facade;
-    const fac = (t, o = {}) => new THREE.MeshStandardMaterial({ map: t.map, emissiveMap: t.emi, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.7, metalness: 0.05, ...o });
+    const fac = (t, o = {}) => new THREE.MeshStandardMaterial({ map: t.map, emissiveMap: t.emi, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.7, metalness: 0.05, ...o, ...(t.rm ? { roughnessMap: t.rm, metalnessMap: t.rm, roughness: 1, metalness: 1, envMapIntensity: 1.2 } : {}) });
     this.M = {
       glass: fac(F.glass, { roughness: 0.12, metalness: 0.65, envMapIntensity: 1.4 }),
       office: fac(F.office, { roughness: 0.55, metalness: 0.15 }),
@@ -301,6 +357,8 @@ export class World {
       sand: new THREE.MeshStandardMaterial({ map: T.sand, vertexColors: true, roughness: 1 }),
       land: new THREE.MeshStandardMaterial({ map: T.concrete, color: 0x9a978f, roughness: 0.95 }),
     };
+    // Matte Flächen spiegeln den Himmel kaum (sonst Blaustich)
+    for (const k of ['road', 'land', 'concrete', 'grass', 'sand', 'roof', 'tile', 'wood']) this.M[k].envMapIntensity = 0.35;
     this.M.signs.color.setScalar(0.6);
     this.M.accent.color.setScalar(0.3);
   }
@@ -315,9 +373,10 @@ export class World {
     land.receiveShadow = true;
     this.scene.add(land);
     // Straßen
-    const ext = HALF + WALK_HW;
-    const rg = new THREE.PlaneGeometry(ext * 2, ext * 2, 1, 1);
+    const ext = HALF + WALK_HW, wx = C.WEST_X - WALK_HW;
+    const rg = new THREE.PlaneGeometry(ext - wx, ext * 2, 1, 1);
     rg.rotateX(-Math.PI / 2);
+    rg.translate((ext + wx) / 2, 0, 0);
     const pos = rg.attributes.position, uv = rg.attributes.uv;
     for (let k = 0; k < pos.count; k++) uv.setXY(k, (pos.getX(k) + HALF) / CELL, (pos.getZ(k) + HALF) / CELL);
     const road = new THREE.Mesh(rg, M.road);
@@ -516,6 +575,8 @@ export class World {
         this.sign(idx, X1 + 0.1, Math.min(h - 3, 12 + rnd() * 6), (za + zb) / 2, 7, 1, 0);
         if (rnd() < 0.6) this.sign([SIGN.TACOS, SIGN.PIZZA, SIGN.BAR, SIGN.SURF][Math.floor(rnd() * 4)], (xa + X1) / 2, 6.2, zb + 0.1, 5, 0, 1);
       }
+    } else if (d === 'oldtown') {
+      this.genOldtown(bi, bj, X0, Z0, X1, Z1, rnd);
     } else if (d === 'harbor') {
       if (rnd() < 0.5) {
         this.warehouse(X0, Z0, X1, Z0 + 24, rnd);
@@ -525,6 +586,88 @@ export class World {
         this.containerField(X0 + 30, Z0, X1, Z1, rnd);
       }
     }
+  }
+
+  // Altstadt: geschlossene Blockrandbebauung mit Ziegeldächern, Innenhof, Kirche & Plaza
+  genOldtown(bi, bj, X0, Z0, X1, Z1, rnd) {
+    const coast = bi === I0;
+    if (bi === -2 && bj === 4) return this.oldPlaza(X0, Z0, X1, Z1, rnd);
+    if (bi === -2 && bj === 2) this.church((X0 + X1) / 2, (Z0 + Z1) / 2, rnd);
+    const D = 13, cols = coast ? PASTEL : WEST;
+    const row = (a, b, c, e, alongX) => {
+      const len = alongX ? c - a : e - b;
+      let p = 0;
+      while (p < len - 4) {
+        let w = 7 + rnd() * 5; if (len - p - w < 6) w = len - p;
+        const floors = coast ? 4 + Math.floor(rnd() * 3) : 3 + Math.floor(rnd() * 3);
+        const h = floors * 3.2 + 1;
+        const [x0, z0, x1, z1] = alongX ? [a + p, b, a + p + w, e] : [a, b + p, c, b + p + w];
+        const tint = cols[Math.floor(rnd() * cols.length)];
+        const shop = rnd() < 0.6;
+        if (shop) this.B.store.box(x0 - 0.06, 0, z0 - 0.06, x1 + 0.06, 4.2, z1 + 0.06, { uw: 24, vh: 4.5, uo: Math.floor(rnd() * 4) / 4, top: false });
+        this.facadeBox(rnd() < 0.3 ? 'deco' : 'apt', x0, z0, x1, z1, shop ? 4.2 : 0, h, { rnd, tint, roof: false });
+        // Gesims
+        this.B.props.box(x0 - 0.25, h - 0.3, z0 - 0.25, x1 + 0.25, h, z1 + 0.25, { col: rgb(0xe9e2d4) });
+        if (rnd() < 0.8) this.B.tile.gable(x0, z0, x1, z1, h, 2.4 + rnd() * 1.4, alongX, rgb(rnd() < 0.75 ? 0xffffff : 0xb8a49a), 0.35);
+        else this.roofTop(x0, z0, x1, z1, h, true);
+        // Balkone
+        if (rnd() < 0.55) for (let f = 2; f < floors; f++) {
+          const y = f * 3.2 + 0.2, m = 1.2;
+          if (alongX) for (const zz of [z0, z1]) { const o = zz === z0 ? -1 : 1; this.B.props.box(x0 + m, y, Math.min(zz, zz + o * 0.9), x1 - m, y + 0.15, Math.max(zz, zz + o * 0.9), { col: rgb(0xd8d2c6) }); this.B.props.box(x0 + m, y + 0.15, zz + o * 0.85 - 0.04, x1 - m, y + 1.05, zz + o * 0.85 + 0.04, { col: rgb(0x2a2a2e) }); }
+          else for (const xx of [x0, x1]) { const o = xx === x0 ? -1 : 1; this.B.props.box(Math.min(xx, xx + o * 0.9), y, z0 + m, Math.max(xx, xx + o * 0.9), y + 0.15, z1 - m, { col: rgb(0xd8d2c6) }); this.B.props.box(xx + o * 0.85 - 0.04, y + 0.15, z0 + m, xx + o * 0.85 + 0.04, y + 1.05, z1 - m, { col: rgb(0x2a2a2e) }); }
+        }
+        this.collider(x0, z0, x1, z1, h + 2);
+        p += w;
+      }
+    };
+    row(X0, Z0, X1, Z0 + D, true);
+    row(X0, Z1 - D, X1, Z1, true);
+    row(X0, Z0 + D, X0 + D, Z1 - D, false);
+    row(X1 - D, Z0 + D, X1, Z1 - D, false);
+    // Innenhof
+    this.B.grass.box(X0 + D, 0.02, Z0 + D, X1 - D, 0.05, Z1 - D, { sides: false, topScale: 6 });
+    for (let k = 0; k < 4; k++) this.addTree(X0 + D + 3 + rnd() * (X1 - X0 - 2 * D - 6), Z0 + D + 3 + rnd() * (Z1 - Z0 - 2 * D - 6), rnd);
+  }
+
+  church(cx, cz, rnd) {
+    // steht im Innenhof des Blocks
+    const P = this.B.props, st = rgb(0xece3cf), w = 9, l = 17;
+    this.facadeBox('deco', cx - w / 2, cz - l / 2, cx + w / 2, cz + l / 2, 0, 11, { rnd, tint: 0xf3ead6, roof: false });
+    this.B.tile.gable(cx - w / 2, cz - l / 2, cx + w / 2, cz + l / 2, 11, 4.5, false, rgb(0xffffff), 0.4);
+    const tz = cz + l / 2 - 2.5;
+    this.facadeBox('deco', cx - 2.5, tz - 2.5, cx + 2.5, tz + 2.5, 0, 26, { rnd, tint: 0xf3ead6, roof: false });
+    P.box(cx - 2.8, 26, tz - 2.8, cx + 2.8, 26.6, tz + 2.8, { col: st });
+    P.addGeometry(new THREE.ConeGeometry(3.4, 8, 4).rotateY(Math.PI / 4), new THREE.Matrix4().makeTranslation(cx, 30.6, tz), rgb(0x8a4a32));
+    P.box(cx - 0.08, 34.6, tz - 0.08, cx + 0.08, 36.4, tz + 0.08, { col: rgb(0xd4af37) });
+    P.box(cx - 0.6, 35.6, tz - 0.08, cx + 0.6, 35.8, tz + 0.08, { col: rgb(0xd4af37) });
+    // Uhr
+    for (const s of [-1, 1]) P.addGeometry(new THREE.CylinderGeometry(1.1, 1.1, 0.1, 18).rotateX(Math.PI / 2), new THREE.Matrix4().makeTranslation(cx, 22, tz + s * 2.56), rgb(0xf8f4ea));
+    this.collider(cx - w / 2, cz - l / 2, cx + w / 2, cz + l / 2, 26);
+  }
+
+  oldPlaza(X0, Z0, X1, Z1, rnd) {
+    const P = this.B.props, cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2;
+    this.B.concrete.box(X0, 0, Z0, X1, 0.08, Z1, { col: rgb(0xb4aa98), topScale: 3, uw: 3, vh: 3 });
+    // Brunnen
+    P.addGeometry(new THREE.CylinderGeometry(5, 5.3, 0.8, 28), new THREE.Matrix4().makeTranslation(cx, 0.4, cz), rgb(0xe2d8c4));
+    this.B.poolw.addGeometry(new THREE.CircleGeometry(4.6, 28).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(cx, 0.72, cz));
+    P.addGeometry(new THREE.CylinderGeometry(0.5, 0.8, 3, 12), new THREE.Matrix4().makeTranslation(cx, 1.5, cz), rgb(0xe2d8c4));
+    P.addGeometry(new THREE.CylinderGeometry(1.8, 0.4, 0.5, 18), new THREE.Matrix4().makeTranslation(cx, 3.1, cz), rgb(0xe2d8c4));
+    this.addCircle(cx, cz, 5.2, 1, 'fountain');
+    // Cafés mit Schirmen am Rand
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2, r = 15 + rnd() * 6;
+      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+      P.addGeometry(new THREE.CylinderGeometry(0.5, 0.5, 0.05, 12), new THREE.Matrix4().makeTranslation(x, 0.75, z), rgb(0xf4f4f4));
+      P.box(x - 0.04, 0, z - 0.04, x + 0.04, 0.75, z + 0.04, { col: rgb(0x333333) });
+      if (k % 2 === 0) {
+        P.box(x - 0.04, 0.75, z - 0.04, x + 0.04, 2.5, z + 0.04, { col: rgb(0xdddddd) });
+        P.addGeometry(new THREE.ConeGeometry(1.7, 0.6, 8), new THREE.Matrix4().makeTranslation(x, 2.6, z), rgb([0xc0392b, 0xf4f1e8, 0x2a9d8f][k % 3]));
+      }
+    }
+    for (let k = 0; k < 8; k++) this.addPalm(X0 + 3 + rnd() * (X1 - X0 - 6), rnd() < 0.5 ? Z0 + 3 : Z1 - 3, rnd);
+    for (let k = 0; k < 6; k++) this.bench(X0 + 6 + k * 9, Z0 + 1.5, 0);
+    this.pois.plaza = { x: cx, z: cz, name: 'Plaza Vieja' };
   }
 
   grid2(X0, Z0, X1, Z1, nx, nz, gap, fn) {
@@ -927,7 +1070,7 @@ export class World {
       cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.4 }));
     mesh.receiveShadow = true;
     this.scene.add(mesh);
     // Wälder & Palmen
@@ -939,9 +1082,14 @@ export class World {
       const e = 2, sl = Math.abs(hillHeight(x + e, z) - y) + Math.abs(hillHeight(x, z + e) - y);
       if (sl > 1.6) continue;
       if (Math.abs(x - 40) < 12 && z > -620) continue;
+      const rr = hillRoadAt(x, z); if (rr && rr[0] < 9) continue;
+      if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 8) continue;
       if (vnoise(x * 0.012, z * 0.012) < 0.42 && y > 6) continue;
       if (y < 5) this.addPalm(x, z, rnd); else this.addTree(x, z, rnd);
     }
+    this.genHillRoad();
+    this.genVillage();
+    this.genObservatory();
     // Damm mit Straße
     const CW = CAUSEWAY, P = this.B.props, cc = rgb(0xb9b5ad), asph = rgb(0x34363b), wh = rgb(0xe9e9e4);
     P.quad([CW.x0, -0.02, CW.z1], [CW.x1, -0.02, CW.z1], [CW.x1, CW.y1 - 0.02, CW.z0], [CW.x0, CW.y1 - 0.02, CW.z0], [0, 0, 1, 1], asph);
@@ -962,6 +1110,140 @@ export class World {
     }
     for (let z = CW.z1 - 10; z > CW.z0; z -= 24) { this.pierLamps.push([CW.x0 + 0.4, z, Math.PI / 2]); this.pierLamps.push([CW.x1 - 0.4, z - 12, -Math.PI / 2]); }
     this.pois.hills = { x: 40, z: -720, name: 'Solera Hills' };
+  }
+
+  genHillRoad() {
+    const R = HILL_ROAD, P = this.B.props, pts = R.pts, n = pts.length;
+    const asph = rgb(0x323439), shoulder = rgb(0x8c8573), wh = rgb(0xe9e9e4), ye = rgb(0xe7b923);
+    const nrm = (i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; };
+    const strip = (o0, o1, dy, col, every = 0) => {
+      for (let i = 0; i < n - 1; i++) {
+        if (every && i % every >= every / 2) continue;
+        const [ax, az] = pts[i], [bx, bz] = pts[i + 1], na = nrm(i), nb = nrm(i + 1), ya = R.hs[i] + dy, yb = R.hs[i + 1] + dy;
+        P.quad([ax + na[0] * o0, ya, az + na[1] * o0], [ax + na[0] * o1, ya, az + na[1] * o1], [bx + nb[0] * o1, yb, bz + nb[1] * o1], [bx + nb[0] * o0, yb, bz + nb[1] * o0], [0, 0, 1, 1], col);
+      }
+    };
+    strip(-7, 7, -0.08, shoulder);
+    strip(-4.8, 4.8, 0.0, asph);
+    strip(-4.4, -4.2, 0.02, wh); strip(4.2, 4.4, 0.02, wh);
+    strip(-0.1, 0.1, 0.02, ye, 2);
+    // Leitplanke auf der Talseite + Laternen
+    for (let i = 4; i < n - 3; i += 9) {
+      const [x, z] = pts[i], [nx, nz] = nrm(i), side = i % 18 < 9 ? 1 : -1;
+      this.pierLamps.push([x + nx * 6.4 * side, z + nz * 6.4 * side, Math.atan2(-nx * side, -nz * side) - Math.PI / 2]);
+    }
+    for (let i = 0; i < n - 1; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1], [nx, nz] = nrm(i);
+      const side = hillHeight(ax + nx * 14, az + nz * 14) < hillHeight(ax - nx * 14, az - nz * 14) ? 1 : -1;
+      const o = 6.2 * side, ya = R.hs[i] - 0.1, yb = R.hs[i + 1] - 0.1;
+      const p0 = [ax + nx * o, az + nz * o], p1 = [bx + nx * o, bz + nz * o];
+      P.quad([p0[0], ya + 0.45, p0[1]], [p1[0], yb + 0.45, p1[1]], [p1[0], yb + 0.8, p1[1]], [p0[0], ya + 0.8, p0[1]], [0, 0, 1, 1], rgb(0xc9ccd0));
+      P.quad([p1[0], yb + 0.45, p1[1]], [p0[0], ya + 0.45, p0[1]], [p0[0], ya + 0.8, p0[1]], [p1[0], yb + 0.8, p1[1]], [0, 0, 1, 1], rgb(0xc9ccd0));
+      if (i % 2 === 0) P.box(p0[0] - 0.08, ya, p0[1] - 0.08, p0[0] + 0.08, ya + 0.8, p0[1] + 0.08, { col: rgb(0x77797d) });
+    }
+    this.villageRoads = [R.pts];
+  }
+
+  // Alles in fn wird auf Höhe dy angehoben (Geometrie & Kollision)
+  raised(dy, fn) {
+    const B = this.B, mark = {};
+    for (const k in B) mark[k] = B[k].p.length;
+    const nb = this.boxes.length, nc = this.circles.length;
+    fn();
+    for (const k in B) { const p = B[k].p; for (let i = mark[k] + 1; i < p.length; i += 3) p[i] += dy; }
+    for (let i = nb; i < this.boxes.length; i++) { this.boxes[i].y0 += dy; this.boxes[i].y1 += dy; }
+    for (let i = nc; i < this.circles.length; i++) { const c = this.circles[i]; if (c.kind !== 'palm' && c.kind !== 'tree') c.y1 += dy; }
+  }
+
+  genVillage() {
+    const V = VILLAGE, cx = V.x, cz = V.z, rnd = mulberry32(5150);
+    const L = [-45, 0, 45], E = 74;
+    this.villageLoops = [];
+    this.raised(V.y, () => {
+      const P = this.B.props, asph = rgb(0x34363b), walk = rgb(0xcfc7b8);
+      // Straßen
+      for (const o of L) {
+        const hw = o === 0 ? 4.5 : 3.6, ext = o === 0 ? 92 : E;
+        P.box(cx - ext, 0.02, cz + o - hw - 1.6, cx + ext, 0.1, cz + o + hw + 1.6, { col: walk });
+        P.box(cx + o - hw - 1.6, 0.02, cz - ext, cx + o + hw + 1.6, 0.1, cz + ext, { col: walk });
+      }
+      for (const o of L) {
+        const hw = o === 0 ? 4.5 : 3.6, ext = o === 0 ? 92 : E;
+        P.box(cx - ext, 0.1, cz + o - hw, cx + ext, 0.12, cz + o + hw, { col: asph, sides: false });
+        P.box(cx + o - hw, 0.1, cz - ext, cx + o + hw, 0.12, cz + ext, { col: asph, sides: false });
+        this.villageRoads.push([[cx - ext, cz + o], [cx + ext, cz + o]], [[cx + o, cz - ext], [cx + o, cz + ext]]);
+        for (let t = -ext + 8; t < ext; t += 26) { this.pierLamps.push([cx + t, cz + o + hw + 1.2, Math.PI]); this.pierLamps.push([cx + o - hw - 1.2, cz + t + 13, Math.PI / 2]); }
+      }
+      // Zellen zwischen den Straßen
+      const edges = [-E, -45, 0, 45, E];
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) {
+        const outerA = a === 0 || a === 3, outerB = b === 0 || b === 3;
+        if (outerA && outerB) continue;
+        const hwA0 = edges[a] === 0 ? 4.5 : 3.6, hwA1 = edges[a + 1] === 0 ? 4.5 : 3.6;
+        const x0 = cx + edges[a] + (a === 0 ? 0 : hwA0 + 2), x1 = cx + edges[a + 1] - (a === 3 ? 0 : hwA1 + 2);
+        const hwB0 = edges[b] === 0 ? 4.5 : 3.6, hwB1 = edges[b + 1] === 0 ? 4.5 : 3.6;
+        const z0 = cz + edges[b] + (b === 0 ? 0 : hwB0 + 2), z1 = cz + edges[b + 1] - (b === 3 ? 0 : hwB1 + 2);
+        this.villageLoops.push([[x0 - 1.2, z0 - 1.2], [x1 + 1.2, z0 - 1.2], [x1 + 1.2, z1 + 1.2], [x0 - 1.2, z1 + 1.2]]);
+        if (a === 1 && b === 1) { this.villageChurch(x0, z0, x1, z1, rnd); continue; }
+        if (a === 2 && b === 1) { this.villagePlaza(x0, z0, x1, z1, rnd); continue; }
+        if (!outerA && !outerB) {
+          // Ortskern: Häuserzeile mit Läden
+          const n = 3, w = (x1 - x0) / n;
+          for (let k = 0; k < n; k++) {
+            const hx0 = x0 + k * w + 0.4, hx1 = x0 + (k + 1) * w - 0.4, h = 7.4 + Math.floor(rnd() * 2) * 3.2;
+            this.B.store.box(hx0 - 0.06, 0, z1 - 12 - 0.06, hx1 + 0.06, 4, z1 + 0.06, { uw: 24, vh: 4.5, uo: Math.floor(rnd() * 4) / 4, top: false });
+            this.facadeBox('apt', hx0, z1 - 12, hx1, z1, 4, h, { rnd, tint: PASTEL[Math.floor(rnd() * PASTEL.length)], roof: false });
+            this.B.tile.gable(hx0, z1 - 12, hx1, z1, h, 2.6, true, rgb(0xffffff), 0.4);
+            this.collider(hx0, z1 - 12, hx1, z1, h + 2);
+          }
+          this.B.grass.box(x0, 0.03, z0, x1, 0.06, z1 - 12, { sides: false, topScale: 6 });
+          for (let k = 0; k < 3; k++) this.addTree(x0 + 4 + rnd() * (x1 - x0 - 8), z0 + 3 + rnd() * Math.max(1, z1 - 12 - z0 - 6), rnd);
+          continue;
+        }
+        // Rand: Villen
+        const nx = (x1 - x0) > 34 ? 2 : 1, nz = (z1 - z0) > 34 ? 2 : 1;
+        this.grid2(x0, z0, x1, z1, nx, nz, 3, (p, q, r, t) => { if (r - p > 14 && t - q > 14) this.house(p, q, r, t, rnd); });
+      }
+      // Parkplätze
+      for (let k = 0; k < 6; k++) this.parkingSpots.push([cx - 70 + k * 28, cz + 2.6, Math.PI / 2]);
+    });
+    this.pois.village = { x: cx, z: cz, name: 'Monte Solera' };
+  }
+
+  villageChurch(x0, z0, x1, z1, rnd) {
+    this.B.concrete.box(x0, 0.02, z0, x1, 0.1, z1, { col: rgb(0xd9cdb6), topScale: 3, uw: 3, vh: 3 });
+    this.church((x0 + x1) / 2, (z0 + z1) / 2 - 2, rnd);
+    for (let k = 0; k < 4; k++) this.addTree(x0 + 3 + k * (x1 - x0 - 6) / 3, z0 + 3, rnd);
+  }
+
+  villagePlaza(x0, z0, x1, z1, rnd) {
+    const P = this.B.props, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    this.B.concrete.box(x0, 0.02, z0, x1, 0.1, z1, { col: rgb(0xe0d4bd), topScale: 3, uw: 3, vh: 3 });
+    P.addGeometry(new THREE.CylinderGeometry(3.6, 3.8, 0.7, 24), new THREE.Matrix4().makeTranslation(cx, 0.45, cz), rgb(0xe2d8c4));
+    this.B.poolw.addGeometry(new THREE.CircleGeometry(3.3, 24).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(cx, 0.82, cz));
+    P.addGeometry(new THREE.CylinderGeometry(0.35, 0.6, 2.4, 10), new THREE.Matrix4().makeTranslation(cx, 1.5, cz), rgb(0xe2d8c4));
+    this.addCircle(cx, cz, 3.8, 1, 'fountain');
+    for (let k = 0; k < 6; k++) this.addPalm(x0 + 3 + rnd() * (x1 - x0 - 6), rnd() < 0.5 ? z0 + 2.5 : z1 - 2.5, rnd);
+    for (let k = 0; k < 4; k++) this.bench(x0 + 6 + k * 8, z1 - 1.5, Math.PI);
+    // Aussichtspunkt-Fernrohr
+    P.box(cx + 10, 0, cz - 8, cx + 10.15, 1.2, cz - 7.85, { col: rgb(0x333333) });
+    P.addGeometry(new THREE.CylinderGeometry(0.12, 0.16, 0.7, 10).rotateZ(Math.PI / 2.4), new THREE.Matrix4().makeTranslation(cx + 10.1, 1.35, cz - 7.9), rgb(0x2a6f97));
+  }
+
+  genObservatory() {
+    // Sternwarte auf dem höchsten Gipfel (Wahrzeichen, weithin sichtbar)
+    let bx = 560, bz = -840, by = -1;
+    for (let x = 480; x <= 660; x += 10) for (let z = -900; z <= -780; z += 10) { const y = hillHeight(x, z); if (y > by) { by = y; bx = x; bz = z; } }
+    const P = this.B.props, wh = rgb(0xf2f0ea);
+    this.B.concrete.box(bx - 16, by - 4, bz - 12, bx + 16, by + 0.3, bz + 12, { col: rgb(0xd8d2c6), topScale: 3, uw: 3, vh: 3 });
+    this.facadeBox('deco', bx - 12, bz - 7, bx + 12, bz + 7, by, by + 9, { tint: 0xf4efe4, roof: true });
+    for (const s of [-1, 1]) {
+      P.addGeometry(new THREE.CylinderGeometry(4.2, 4.2, 3, 24), new THREE.Matrix4().makeTranslation(bx + s * 7, by + 10.5, bz), wh);
+      P.addGeometry(new THREE.SphereGeometry(4.3, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.Matrix4().makeTranslation(bx + s * 7, by + 12, bz), rgb(0x9aa3ad));
+    }
+    this.addBox(bx - 12, bz - 7, bx + 12, bz + 7, by - 5, by + 16, 'bld');
+    this.footprints.push([bx - 12, bz - 7, bx + 12, bz + 7]);
+    this.pois.observatory = { x: bx, z: bz, name: 'Sternwarte' };
   }
 
   genQuay() {
@@ -988,24 +1270,28 @@ export class World {
     };
     const palmy = (x, z) => {
       const [bi, bj] = C.blockOf(x, z);
-      const d = C.districtOf(clamp(bi, 0, 8), clamp(bj, 0, 8));
-      return d === 'heights' || d === 'seaside' || d === 'westside' || x > 350;
+      const d = C.districtOf(clamp(bi, I0, 8), clamp(bj, 0, 8));
+      return d === 'heights' || d === 'seaside' || d === 'westside' || d === 'oldtown' || x > 350;
     };
-    for (let i = 0; i <= NB; i++) {
+    // vertikale Straßen x=r
+    for (let i = I0; i <= NB; i++) {
       const r = roadPos(i);
       for (let j = 0; j < NB; j++) {
         const s0 = roadPos(j);
-        for (const o of [20, 60]) {
-          // vertikale Straße x=r
-          addLamp(r + 9, s0 + o, -Math.PI / 2);
-          addLamp(r - 9, s0 + o + 6, Math.PI / 2);
-          // horizontale Straße z=r
-          addLamp(s0 + o, r + 9, Math.PI);
-          addLamp(s0 + o + 6, r - 9, 0);
-        }
+        for (const o of [20, 60]) { addLamp(r + 9, s0 + o, -Math.PI / 2); addLamp(r - 9, s0 + o + 6, Math.PI / 2); }
         for (const o of [32, 48]) {
           if (palmy(r + 9, s0 + o)) this.addPalm(r + 9, s0 + o, rnd, true);
           if (palmy(r - 9, s0 + o)) this.addPalm(r - 9, s0 + o, rnd, true);
+        }
+      }
+    }
+    // horizontale Straßen z=r
+    for (let j = 0; j <= NB; j++) {
+      const r = roadPos(j);
+      for (let i = I0; i < NB; i++) {
+        const s0 = roadPos(i);
+        for (const o of [20, 60]) { addLamp(s0 + o, r + 9, Math.PI); addLamp(s0 + o + 6, r - 9, 0); }
+        for (const o of [32, 48]) {
           if (palmy(s0 + o, r + 9)) this.addPalm(s0 + o, r + 9, rnd, true);
           if (palmy(s0 + o, r - 9)) this.addPalm(s0 + o, r - 9, rnd, true);
         }
@@ -1046,11 +1332,11 @@ export class World {
 
   addPalm(x, z, rnd, street = false) {
     this.palmPos.push([x, z, 0.75 + rnd() * 0.5, rnd() * Math.PI * 2]);
-    this.addCircle(x, z, 0.32, 9, 'palm');
+    this.addCircle(x, z, 0.32, this.groundHeight(x, z) + 9, 'palm');
   }
   addTree(x, z, rnd) {
     this.treePos.push([x, z, 0.8 + rnd() * 0.5, rnd() * Math.PI * 2]);
-    this.addCircle(x, z, 0.45, 6, 'tree');
+    this.addCircle(x, z, 0.45, this.groundHeight(x, z) + 6, 'tree');
   }
 
   // ------------------------------------------------------- Meshes bauen
@@ -1086,7 +1372,7 @@ export class World {
     const setM = (im, i, x, y, z, yaw, sc = 1) => { q.setFromAxisAngle(up, yaw); s.set(sc, sc, sc); p.set(x, y, z); mtx.compose(p, q, s); im.setMatrixAt(i, mtx); };
 
     // Palmen
-    const trunk = new THREE.CylinderGeometry(0.17, 0.3, 8.5, 7, 10, true);
+    const trunk = new THREE.CylinderGeometry(0.17, 0.3, 8.5, 7, 6, true);
     trunk.translate(0, 4.25, 0);
     const tp = trunk.attributes.position, tc = [];
     for (let k = 0; k < tp.count; k++) {
@@ -1128,19 +1414,63 @@ export class World {
     this.palmPos.forEach(([x, z, sc, yaw], i) => { const y = this.groundHeight(x, z); setM(tIM, i, x, y, z, yaw, sc); setM(cIM, i, x, y, z, yaw, sc); });
     for (const im of [tIM, cIM]) { im.castShadow = true; im.receiveShadow = false; im.computeBoundingSphere(); scene.add(im); }
 
-    // Laubbäume
-    const tb = new GeoBuilder(true);
-    tb.addGeometry(new THREE.CylinderGeometry(0.22, 0.32, 3.4, 6).translate(0, 1.7, 0), new THREE.Matrix4(), rgb(0x6b4a2f));
-    const can = new THREE.IcosahedronGeometry(2.6, 1);
-    can.scale(1, 0.85, 1); can.translate(0, 5, 0); can.computeVertexNormals();
-    const cc = [];
-    for (let k = 0; k < can.attributes.position.count; k += 3) { const v = 0.75 + Math.random() * 0.35; const c = rgb(0x3f8f3a, v); cc.push(...c, ...c, ...c); }
-    can.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3));
-    tb.addGeometry(can, new THREE.Matrix4());
-    const treeIM = new THREE.InstancedMesh(tb.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, flatShading: true }), Math.max(1, this.treePos.length));
-    this.treePos.forEach(([x, z, sc, yaw], i) => setM(treeIM, i, x, 0, z, yaw, sc));
-    treeIM.count = this.treePos.length;
-    treeIM.castShadow = true; treeIM.computeBoundingSphere(); scene.add(treeIM);
+    // Laubbäume (mehrere Blattwolken, weich schattiert) & Pinien für die Berge
+    const rndT = mulberry32(31337);
+    const lump = (cx, cy, cz, r, base, out) => {
+      const g = new THREE.IcosahedronGeometry(r, 1);
+      const pp = g.attributes.position, nn = g.attributes.normal, cl = [];
+      for (let k = 0; k < pp.count; k++) {
+        let x = pp.getX(k), y = pp.getY(k), z = pp.getZ(k);
+        const l = Math.hypot(x, y, z) || 1, ux = x / l, uy = y / l, uz = z / l;
+        const d = 1 + (vnoise(ux * 3 + cx * 7, uz * 3 + uy * 2 + cz * 5) - 0.5) * 0.45;
+        if (uy < -0.3) y *= 0.75;
+        pp.setXYZ(k, x * d + cx, y * d + cy, z * d + cz);
+        nn.setXYZ(k, ux, uy * 0.8 + 0.2, uz);
+        const ao = 0.62 + 0.38 * smoothstep(-0.9, 0.7, uy), v = (0.85 + vnoise(x * 3, z * 3 + y) * 0.3) * ao;
+        cl.push(base[0] * v, base[1] * v, base[2] * v);
+      }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3));
+      out.addGeometry(g, new THREE.Matrix4());
+    };
+    const broad = new GeoBuilder(true), bark = rgb(0x5a4030);
+    broad.addGeometry(new THREE.CylinderGeometry(0.17, 0.3, 3.8, 8).translate(0, 1.9, 0), new THREE.Matrix4(), bark);
+    for (const [bx, bz, a] of [[0.9, 0.2, 0.7], [-0.7, 0.5, -0.6], [0.1, -0.9, 0.5]]) {
+      const br = new THREE.CylinderGeometry(0.07, 0.12, 2.2, 5, 1, true).translate(0, 1.1, 0);
+      broad.addGeometry(br, new THREE.Matrix4().makeTranslation(0, 3, 0).multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(bz * a, 0, -bx * a))), bark);
+    }
+    const leaf = [rgb(0x3e7a2e), rgb(0x4d8a34), rgb(0x356b2a)];
+    lump(0, 5.4, 0, 2.2, leaf[0], broad);
+    for (let k = 0; k < 4; k++) {
+      const ang = (k / 4) * Math.PI * 2 + rndT(), rr = 1.5 + rndT() * 0.5;
+      lump(Math.cos(ang) * rr, 4.6 + rndT() * 1.6, Math.sin(ang) * rr, 1.3 + rndT() * 0.6, leaf[k % 3], broad);
+    }
+    lump(0.2, 6.9, -0.1, 1.4, leaf[1], broad);
+    const pine = new GeoBuilder(true);
+    pine.addGeometry(new THREE.CylinderGeometry(0.12, 0.26, 7, 7).translate(0, 3.5, 0), new THREE.Matrix4(), rgb(0x4e3a2a));
+    for (let k = 0; k < 5; k++) {
+      const y = 2.6 + k * 1.35, r = 2.3 - k * 0.38;
+      const cone = new THREE.ConeGeometry(r, 2.6, 10, 2, true);
+      const cp = cone.attributes.position, cl = [];
+      for (let i = 0; i < cp.count; i++) {
+        const yy = cp.getY(i), wob = 1 + (vnoise(cp.getX(i) * 4 + k, cp.getZ(i) * 4) - 0.5) * 0.35;
+        cp.setX(i, cp.getX(i) * wob); cp.setZ(i, cp.getZ(i) * wob);
+        if (yy < -1) cp.setY(i, yy - 0.25 * wob);
+        const v = 0.55 + 0.45 * ((yy + 1.3) / 2.6);
+        const c = rgb(0x2f5a2c, v * (0.9 + k * 0.04)); cl.push(...c);
+      }
+      cone.setAttribute('color', new THREE.Float32BufferAttribute(cl, 3));
+      cone.computeVertexNormals();
+      pine.addGeometry(cone, new THREE.Matrix4().makeTranslation(0, y + 1.3, 0));
+    }
+    const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, side: THREE.DoubleSide });
+    const bPos = [], pPos = [];
+    for (const t of this.treePos) (this.groundHeight(t[0], t[1]) > 9 && t[1] < HILLS.z1 ? pPos : bPos).push(t);
+    for (const [geo, list] of [[broad.build(), bPos], [pine.build(), pPos]]) {
+      const im = new THREE.InstancedMesh(geo, leafMat, Math.max(1, list.length));
+      list.forEach(([x, z, sc, yaw], i) => setM(im, i, x, this.groundHeight(x, z) - 0.1, z, yaw, sc * (geo === undefined ? 1 : 1)));
+      im.count = list.length;
+      im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); scene.add(im);
+    }
 
     // Straßenlaternen
     const lb = new GeoBuilder(true), dark = rgb(0x2e3136);
@@ -1346,8 +1676,8 @@ export class World {
     g.strokeStyle = 'rgba(25,230,255,0.35)'; g.lineWidth = 2;
     g.strokeRect(sx(L.minX), sz(L.minZ), (L.maxX - L.minX) * sc, (L.maxZ - L.minZ) * sc);
     // Blöcke
-    const dcol = { downtown: '#202a3e', midtown: '#1d2638', westside: '#1f2335', heights: '#1b2731', seaside: '#252036', harbor: '#1b222e' };
-    for (let bj = 0; bj < NB; bj++) for (let bi = 0; bi < NB; bi++) {
+    const dcol = { downtown: '#202a3e', midtown: '#1d2638', westside: '#1f2335', heights: '#1b2731', seaside: '#252036', harbor: '#1b222e', oldtown: '#26222e' };
+    for (let bj = 0; bj < NB; bj++) for (let bi = I0; bi < NB; bi++) {
       const x0 = roadPos(bi) + 9, z0 = roadPos(bj) + 9;
       rect(x0, z0, x0 + CELL - 18, z0 + CELL - 18, C.isPark(bi, bj) ? '#15392b' : (dcol[C.districtOf(bi, bj)] || '#1d2638'), 4);
       if (C.isPark(bi, bj)) { // Parkwege
@@ -1361,13 +1691,19 @@ export class World {
       g.fillStyle = 'rgba(160,190,255,0.08)'; g.fillRect(sx(x0 + 0.5), sz(z0 + 0.5), (x1 - x0 - 1) * sc, 2.2 * sc);
     }
     // Straßen: Kontur, Belag, Mittellinie
-    const major = (i) => i === 0 || i === NB || i === 4 || i === 5;
+    const major = (i) => i === I0 || i === 0 || i === NB || i === 4 || i === 5;
     const lines = (w, colFn) => {
-      for (let i = 0; i <= NB; i++) {
+      for (let i = I0; i <= NB; i++) {
         const r = roadPos(i);
         g.strokeStyle = colFn(i); g.lineWidth = w(i) * sc; g.lineCap = 'round';
         g.beginPath(); g.moveTo(sx(r), sz(-HALF - 6)); g.lineTo(sx(r), sz(HALF + 6)); g.stroke();
-        g.beginPath(); g.moveTo(sx(-HALF - 6), sz(r)); g.lineTo(sx(HALF + 6), sz(r)); g.stroke();
+        if (i >= 0) { g.beginPath(); g.moveTo(sx(C.WEST_X - 6), sz(r)); g.lineTo(sx(HALF + 6), sz(r)); g.stroke(); }
+      }
+    };
+    const hillLines = (w, col) => {
+      for (const pl of this.villageRoads || []) {
+        g.strokeStyle = col; g.lineWidth = w * sc; g.lineJoin = 'round'; g.lineCap = 'round';
+        g.beginPath(); pl.forEach(([x, z], k) => (k ? g.lineTo(sx(x), sz(z)) : g.moveTo(sx(x), sz(z)))); g.stroke();
       }
     };
     lines((i) => (major(i) ? 20 : 18), () => '#0b0f17');
@@ -1400,6 +1736,8 @@ export class World {
       g.fillRect(sx(x), sz(z), step * sc + 1, step * sc + 1);
     }
     rect(CAUSEWAY.x0, CAUSEWAY.z0, CAUSEWAY.x1, CAUSEWAY.z1, '#56627f');
+    for (const [x0, z0, x1, z1] of this.footprints) if (z1 < HILLS.z1) rect(x0 + 0.5, z0 + 0.5, x1 - 0.5, z1 - 0.5, '#2a3449');
+    hillLines(16, '#0b0f17'); hillLines(11, '#56627f');
     this.mapCanvas = c;
     this.mapScale = sc;
     this.mapToPx = (x, z) => [sx(x), sz(z)];

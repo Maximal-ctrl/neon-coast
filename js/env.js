@@ -4,6 +4,34 @@ import { G } from './state.js';
 import { clamp, lerp, smoothstep } from './utils.js';
 import { WATER_Y, BEACH_X0 } from './config.js';
 
+// Atmosphärischer Dunst: Entfernungsnebel + bodennaher Höhennebel (für alle Materialien)
+THREE.ShaderChunk.fog_pars_vertex = `#ifdef USE_FOG
+  varying float vFogDepth; varying float vFogY;
+#endif`;
+THREE.ShaderChunk.fog_vertex = `#ifdef USE_FOG
+  vFogDepth = - mvPosition.z;
+  vFogY = dot(viewMatrix[1].xyz, mvPosition.xyz - viewMatrix[3].xyz);
+#endif`;
+THREE.ShaderChunk.fog_pars_fragment = `#ifdef USE_FOG
+  uniform vec3 fogColor; varying float vFogDepth; varying float vFogY;
+  #ifdef FOG_EXP2
+    uniform float fogDensity;
+  #else
+    uniform float fogNear; uniform float fogFar;
+  #endif
+#endif`;
+THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
+  #ifdef FOG_EXP2
+    float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+  #else
+    float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+    float hzF = exp( - max( vFogY, 0.0 ) * 0.011 );
+    float haze = ( 1.0 - exp( - vFogDepth * ( 1.1 / fogFar ) ) ) * mix( 0.3, 0.8, hzF );
+    fogFactor = max( fogFactor, haze );
+  #endif
+  gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
+#endif`;
+
 const SKY_VERT = /* glsl */`
 varying vec3 vDir;
 void main(){
@@ -117,7 +145,7 @@ void main(){
   float waveFoam = smoothstep(0.55, 0.9, sin(depth * 9.0 - t * 2.2) * 0.5 + 0.5) * (1.0 - smoothstep(0.0, 0.9, depth));
   float foam = clamp(foamBand + waveFoam * 0.6, 0.0, 1.0) * (0.6 + 0.4 * vnoise(p * 2.0 + t));
   col = mix(col, vec3(0.95) * (1.0 - night * 0.75), foam * step(0.0, depth) * 0.85);
-  float fogF = smoothstep(fogNear, fogFar, dist);
+  float fogF = max(smoothstep(fogNear, fogFar, dist), (1.0 - exp(-dist * (1.1 / fogFar))) * 0.8);
   col = mix(col, fogColor, fogF);
   float alpha = mix(0.92, 0.55, shallow) ;
   alpha = mix(alpha, 1.0, fogF);
@@ -133,9 +161,9 @@ const KEYS = [
   { e: -8, zen: 0x0a1233, hor: 0x2b2450, sun: 0x8c7cff, gnd: 0x0a0a12, hs: 0x515a90, hg: 0x24222c },
   { e: -2, zen: 0x162a62, hor: 0xc0566e, sun: 0xff6b4a, gnd: 0x16121a, hs: 0x5a5080, hg: 0x2a1e22 },
   { e: 3, zen: 0x24489a, hor: 0xff8a50, sun: 0xff8a3c, gnd: 0x2a2228, hs: 0x8a7aa8, hg: 0x4a3a30 },
-  { e: 12, zen: 0x2e64c0, hor: 0xf6c49a, sun: 0xffc48a, gnd: 0x3a3a3a, hs: 0x9ab8e0, hg: 0x5a5040 },
-  { e: 30, zen: 0x2a6fd6, hor: 0xb4d8ff, sun: 0xfff2dc, gnd: 0x4a4a48, hs: 0xa8cdf5, hg: 0x6a604c },
-  { e: 90, zen: 0x1f62cc, hor: 0xa8d2ff, sun: 0xffffff, gnd: 0x4a4a48, hs: 0xb0d4ff, hg: 0x6a604c },
+  { e: 12, zen: 0x3468b8, hor: 0xf2c9a4, sun: 0xffc287, gnd: 0x3a3a3a, hs: 0xb4bccb, hg: 0x6a5c48 },
+  { e: 30, zen: 0x3a74c8, hor: 0xc4dcf2, sun: 0xffeed6, gnd: 0x4a4a48, hs: 0xbcc6d4, hg: 0x7a6e5a },
+  { e: 90, zen: 0x2f6cc4, hor: 0xbcd8f2, sun: 0xfff5e6, gnd: 0x4a4a48, hs: 0xc0cad6, hg: 0x7a6e5a },
 ];
 const _ca = new THREE.Color(), _cb = new THREE.Color();
 function lerpKey(e, field, out) {
@@ -253,9 +281,9 @@ export class Environment {
     const lightDir = sunUp ? this.sunDir : new THREE.Vector3(-this.sunDir.x, Math.max(0.35, -this.sunDir.y), -this.sunDir.z + 0.3).normalize();
     this.sun.color.copy(u.sunColor.value);
     if (!sunUp) this.sun.color.setHex(0x8fa6ff);
-    const sunI = sunUp ? lerp(0.6, 3.2, smoothstep(-3, 25, e)) : 0.7;
+    const sunI = sunUp ? lerp(0.6, 3.7, smoothstep(-3, 25, e)) : 0.7;
     this.sun.intensity = sunI;
-    this.hemi.intensity = lerp(1.3, 1.25, this.night);
+    this.hemi.intensity = lerp(0.85, 1.25, this.night);
     // Schattenkamera folgt dem Fokus (mit Texel-Snapping)
     const fx = focus.x, fz = focus.z;
     const snap = this.shadowSize ? (this.sun.shadow.camera.right * 2) / this.shadowSize : 1;

@@ -290,7 +290,7 @@ export class TrafficManager {
 
   randomEdgeNear(px, pz, minD, maxD) {
     const W = G.world;
-    for (let k = 0; k < 12; k++) {
+    for (let k = 0; k < 30; k++) {
       const n = W.nodes[Math.floor(Math.random() * W.nodes.length)];
       const nb = pick(n.nbr);
       const o = W.nodes[nb];
@@ -334,7 +334,7 @@ export class TrafficManager {
     const P = G.player;
     const px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
     const offMap = px > C.BEACH_X0 + 80 || px < C.LAND.minX - 20 || pz < C.LAND.minZ - 20 || pz > C.LAND.maxZ + 20;
-    this.target = offMap ? 6 : G.quality === 'low' ? 11 : G.quality === 'medium' ? 16 : 20;
+    this.target = offMap ? 6 : G.quality === 'low' ? 14 : G.quality === 'medium' ? 22 : 28;
     if (G.world.env.night > 0.5) this.target = Math.round(this.target * 0.75);
     // KI
     for (const v of G.vehicles) {
@@ -360,7 +360,7 @@ export class TrafficManager {
     this.spawnT -= dt;
     if (G.interior) this.spawnT = 1;
     if (this.spawnT <= 0) {
-      this.spawnT = 0.35;
+      this.spawnT = 0.25;
       if (this.carCount() < this.target) this.spawnCar(px, pz);
     }
   }
