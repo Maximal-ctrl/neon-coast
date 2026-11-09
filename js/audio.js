@@ -1,6 +1,7 @@
 // Komplett synthetisierter Sound (WebAudio) – Effekte & prozedurale Radiosender
 import { G } from './state.js';
 import { clamp, rand, pick, lerp } from './utils.js';
+import { PulseRadio } from './pulse.js';
 
 const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
@@ -34,7 +35,7 @@ export class AudioSys {
     comp.threshold.value = -14; comp.ratio.value = 4;
     this.master.connect(comp); comp.connect(ctx.destination);
     this.sfx = ctx.createGain(); this.sfx.connect(this.master);
-    this.music = ctx.createGain(); this.music.connect(this.master);
+    this.music = ctx.createGain(); this.duckG = ctx.createGain(); this.music.connect(this.duckG); this.duckG.connect(this.master);
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = 0; this.musicBus.connect(this.music);
     // Hall für Musik
     this.reverb = ctx.createConvolver();
@@ -92,7 +93,9 @@ export class AudioSys {
     this.userEl.addEventListener('ended', () => this.nextTrack());
     this.userGain = ctx.createGain(); this.userGain.gain.value = 0;
     try { ctx.createMediaElementSource(this.userEl).connect(this.userGain); this.userGain.connect(this.music); } catch (e) { /* */ }
+    this.pulse = new PulseRadio(this);
     this.loadLibrary();
+    this.loadPulse();
     this.applyVolumes();
     this.ready = true;
     this.resume();
@@ -249,6 +252,7 @@ export class AudioSys {
     G.hud.radio(this.stationInfo(this.station));
     if (STATIONS[this.station].style === 'user' && !this.tracks.length) G.hud.toast('Noch keine eigene Musik – im Handy unter Radio hinzufügen.');
     this.noiseHit(0.25, 'bandpass', 2500, 0.15, 800, 1);
+    if (STATIONS[this.station].style === 'techno' && this.pulse && this.pulse.cur) setTimeout(() => { const i = this.pulse.cur.info; G.hud.nowPlaying('PULSE 132', i.artist, i.name); }, 1500);
   }
 
   // ------------------------------------------------- Prozedurale Musik
@@ -257,6 +261,13 @@ export class AudioSys {
     const club = G.interior && G.interior.kind === 'club' && !(G.player && G.player.inCar);
     const st = G.state === 'title' || club ? STATIONS[club ? (G.interior.station ?? 3) : 0] : STATIONS[this.station];
     if (st.style === 'off' || st.style === 'user') return;
+    if (st.style === 'techno') {
+      const now = ctx.currentTime;
+      if (this.pulseLast && now - this.pulseLast > 3.0) this.pulse.stopAll();
+      this.pulseLast = now;
+      this.pulse.schedule();
+      return;
+    }
     const spb = 60 / st.bpm, bar = spb * 4;
     if (this.nextBar < ctx.currentTime) { this.nextBar = ctx.currentTime + 0.1; this.bar = 0; this.motif = null; }
     while (this.nextBar < ctx.currentTime + 0.4) {
@@ -319,26 +330,26 @@ export class AudioSys {
     }
   }
   env(g, t, a, d, vol) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + a); g.gain.exponentialRampToValueAtTime(0.0008, t + a + d); }
-  kick(t, v) { const ctx = this.ctx; const o = ctx.createOscillator(); const g = ctx.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12); this.env(g, t, 0.003, 0.3, 0.7 * v); o.connect(g); g.connect(this.musicBus); o.start(t); o.stop(t + 0.4); }
+  kick(t, v) { const ctx = this.ctx; const o = ctx.createOscillator(); const g = ctx.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12); this.env(g, t, 0.003, 0.3, 0.7 * v); o.connect(g); g.connect(this.out || this.musicBus); o.start(t); o.stop(t + 0.4); }
   snare(t, v, big, rim = false) {
     const ctx = this.ctx; const s = ctx.createBufferSource(); s.buffer = this.noiseBuf;
     const f = ctx.createBiquadFilter(); f.type = rim ? 'bandpass' : 'highpass'; f.frequency.value = rim ? 2200 : 1500;
     const g = ctx.createGain(); this.env(g, t, 0.002, big ? 0.25 : rim ? 0.06 : 0.14, v * (rim ? 0.6 : 0.5));
-    s.connect(f); f.connect(g); g.connect(this.musicBus); s.start(t, Math.random()); s.stop(t + 0.35);
-    if (!rim) { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 190; const og = ctx.createGain(); this.env(og, t, 0.002, 0.1, v * 0.3); o.connect(og); og.connect(this.musicBus); o.start(t); o.stop(t + 0.15); }
+    s.connect(f); f.connect(g); g.connect(this.out || this.musicBus); s.start(t, Math.random()); s.stop(t + 0.35);
+    if (!rim) { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 190; const og = ctx.createGain(); this.env(og, t, 0.002, 0.1, v * 0.3); o.connect(og); og.connect(this.out || this.musicBus); o.start(t); o.stop(t + 0.15); }
   }
   acid(freq, t, dur, v, cut) {
     const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = freq;
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 13; f.frequency.setValueAtTime(cut * 1.6, t); f.frequency.exponentialRampToValueAtTime(Math.max(120, cut * 0.25), t + dur);
     const g = ctx.createGain(); this.env(g, t, 0.003, dur, v);
-    o.connect(f); f.connect(g); g.connect(this.musicBus); o.start(t); o.stop(t + dur + 0.05);
+    o.connect(f); f.connect(g); g.connect(this.out || this.musicBus); o.start(t); o.stop(t + dur + 0.05);
   }
-  hat(t, v, dec = 0.05) { const ctx = this.ctx; const s = ctx.createBufferSource(); s.buffer = this.noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000; const g = ctx.createGain(); this.env(g, t, 0.001, dec, v); s.connect(f); f.connect(g); g.connect(this.musicBus); s.start(t, Math.random()); s.stop(t + 0.08); }
+  hat(t, v, dec = 0.05) { const ctx = this.ctx; const s = ctx.createBufferSource(); s.buffer = this.noiseBuf; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000; const g = ctx.createGain(); this.env(g, t, 0.001, dec, v); s.connect(f); f.connect(g); g.connect(this.out || this.musicBus); s.start(t, Math.random()); s.stop(t + 0.08); }
   synthBass(freq, t, dur, v, type = 'sawtooth') {
     const ctx = this.ctx; const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq;
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(200, t + dur);
     const g = ctx.createGain(); this.env(g, t, 0.005, dur, v);
-    o.connect(f); f.connect(g); g.connect(this.musicBus); o.start(t); o.stop(t + dur + 0.05);
+    o.connect(f); f.connect(g); g.connect(this.out || this.musicBus); o.start(t); o.stop(t + dur + 0.05);
   }
   pad(freqs, t, dur, v) {
     const ctx = this.ctx;
@@ -346,7 +357,7 @@ export class AudioSys {
       const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = fq; o.detune.value = det;
       const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400;
       const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v / freqs.length, t + dur * 0.3); g.gain.linearRampToValueAtTime(0.0001, t + dur);
-      o.connect(f); f.connect(g); g.connect(this.musicBus); o.start(t); o.stop(t + dur + 0.05);
+      o.connect(f); f.connect(g); g.connect(this.out || this.musicBus); o.start(t); o.stop(t + dur + 0.05);
     }
   }
   keys(freqs, t, dur, v) {
@@ -355,18 +366,44 @@ export class AudioSys {
       const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = fq;
       const m = ctx.createOscillator(); m.frequency.value = fq * 2; const mg = ctx.createGain(); mg.gain.value = fq * 0.4; m.connect(mg); mg.connect(o.frequency);
       const g = ctx.createGain(); this.env(g, t, 0.01, dur, v);
-      o.connect(g); g.connect(this.musicBus); o.start(t); m.start(t); o.stop(t + dur + 0.05); m.stop(t + dur + 0.05);
+      o.connect(g); g.connect(this.out || this.musicBus); o.start(t); m.start(t); o.stop(t + dur + 0.05); m.stop(t + dur + 0.05);
     }
   }
-  pluck(freq, t, dur, v, type) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(400, t + dur); const g = ctx.createGain(); this.env(g, t, 0.003, dur, v); o.connect(f); f.connect(g); g.connect(this.musicBus); o.start(t); o.stop(t + dur + 0.05); }
+  pluck(freq, t, dur, v, type) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = type; o.frequency.value = freq; const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(400, t + dur); const g = ctx.createGain(); this.env(g, t, 0.003, dur, v); o.connect(f); f.connect(g); g.connect(this.out || this.musicBus); o.start(t); o.stop(t + dur + 0.05); }
   lead(freq, t, dur, v) {
     const ctx = this.ctx;
     const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = freq;
     const vib = ctx.createOscillator(); vib.frequency.value = 5.5; const vg = ctx.createGain(); vg.gain.value = 4; vib.connect(vg); vg.connect(o.detune);
     const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2200;
     const g = ctx.createGain(); this.env(g, t, 0.02, dur, v);
-    o.connect(f); f.connect(g); g.connect(this.musicBus); o.start(t); vib.start(t); o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
+    o.connect(f); f.connect(g); g.connect(this.out || this.musicBus); o.start(t); vib.start(t); o.stop(t + dur + 0.05); vib.stop(t + dur + 0.05);
   }
+
+  // Musik absenken (für Moderation)
+  duck(level, time) { const t = this.ctx.currentTime; this.duckG.gain.cancelScheduledValues(t); this.duckG.gain.setTargetAtTime(level, t, time / 3); }
+  // Radio-Jingle: Whoosh + Akkord
+  sweeper() {
+    const ctx = this.ctx, t = ctx.currentTime;
+    const s = ctx.createBufferSource(); s.buffer = this.noiseBuf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 3; f.frequency.setValueAtTime(400, t); f.frequency.exponentialRampToValueAtTime(6000, t + 0.7);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.18, t + 0.5); g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    s.connect(f); f.connect(g); g.connect(this.master); s.start(t); s.stop(t + 1.1);
+    [57, 64, 69, 76].forEach((n, i) => { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 440 * Math.pow(2, (n - 69) / 12); const og = ctx.createGain(); og.gain.setValueAtTime(0.0001, t + 0.6 + i * 0.06); og.gain.linearRampToValueAtTime(0.06, t + 0.65 + i * 0.06); og.gain.exponentialRampToValueAtTime(0.001, t + 1.6); o.connect(og); og.connect(this.master); o.start(t + 0.6 + i * 0.06); o.stop(t + 1.7); });
+  }
+  // PULSE 132: eigene Songs & Einspieler (IndexedDB, nur auf diesem Gerät)
+  async loadPulse() {
+    try { const [songs, ids] = await Promise.all([dbAll('pulse'), dbAll('idents')]); await this.pulse.load(songs, ids); this.pulseCounts = { songs: songs.length, idents: ids.length }; } catch (e) { this.pulseCounts = { songs: 0, idents: 0 }; }
+  }
+  async addPulseFiles(files, store) {
+    let n = 0;
+    for (const f of files) {
+      if (!f.type.startsWith('audio') && !/\.(mp3|m4a|aac|wav|ogg)$/i.test(f.name)) continue;
+      try { await dbPut({ id: Date.now() + '_' + Math.random().toString(36).slice(2), name: f.name.replace(/\.[^.]+$/, ''), blob: f }, store); n++; } catch (e) { /* */ }
+    }
+    await this.loadPulse();
+    return n;
+  }
+  async clearPulse(store) { try { await dbClear(store); } catch (e) { /* */ } await this.loadPulse(); }
 
   // ------------------------------------------------- Eigene Musik
   stationInfo(i) {
@@ -403,7 +440,7 @@ export class AudioSys {
     this.trackIdx = (this.trackIdx + 1) % this.tracks.length;
     this.userEl.src = this.tracks[this.trackIdx].url;
     this.userEl.play().catch(() => {});
-    if (G.player && G.player.inCar && STATIONS[this.station].style === 'user') G.hud.radio({ name: 'MEIN RADIO', genre: '♪ ' + this.tracks[this.trackIdx].name });
+    if (G.player && G.player.inCar && STATIONS[this.station].style === 'user') G.hud.nowPlaying('MEIN RADIO', 'Eigene Musik', this.tracks[this.trackIdx].name);
   }
   currentTrack() { return this.tracks.length ? this.tracks[this.trackIdx].name : null; }
 }
@@ -418,14 +455,14 @@ function silentWav() {
   return new Blob([buf], { type: 'audio/wav' });
 }
 
-// IndexedDB für eigene Songs
+// IndexedDB für eigene Songs (tracks = Mein Radio, pulse = PULSE-Songs, idents = Einspieler)
 function db() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open('neoncoast_music', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('tracks', { keyPath: 'id' });
+    const r = indexedDB.open('neoncoast_music', 2);
+    r.onupgradeneeded = () => { const d = r.result; for (const n of ['tracks', 'pulse', 'idents']) if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: 'id' }); };
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
 }
-async function dbPut(rec) { const d = await db(); return new Promise((res, rej) => { const tx = d.transaction('tracks', 'readwrite'); tx.objectStore('tracks').put(rec); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
-async function dbAll() { const d = await db(); return new Promise((res, rej) => { const r = d.transaction('tracks').objectStore('tracks').getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
-async function dbClear() { const d = await db(); return new Promise((res, rej) => { const tx = d.transaction('tracks', 'readwrite'); tx.objectStore('tracks').clear(); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function dbPut(rec, store = 'tracks') { const d = await db(); return new Promise((res, rej) => { const tx = d.transaction(store, 'readwrite'); tx.objectStore(store).put(rec); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }
+async function dbAll(store = 'tracks') { const d = await db(); return new Promise((res, rej) => { const r = d.transaction(store).objectStore(store).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
+async function dbClear(store = 'tracks') { const d = await db(); return new Promise((res, rej) => { const tx = d.transaction(store, 'readwrite'); tx.objectStore(store).clear(); tx.oncomplete = res; tx.onerror = () => rej(tx.error); }); }

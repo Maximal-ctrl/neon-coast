@@ -149,3 +149,12 @@ select, input[type="range"] { accent-color: var(--accent); }
 .im-keys { display: flex; gap: 3px; margin-top: 3px; }
 .im-keys button { flex: 1; padding: 10px; border: none; background: rgba(0,0,0,.72); color: #fff; font: 500 15px var(--head); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .im-keys button:hover { background: #f2f2f2; color: #111; }
+
+/* ---------- Radio: aktueller Titel ---------- */
+#np { position: absolute; top: calc(205px + var(--sat)); right: calc(18px + var(--sar)); transform: translateX(16px); opacity: 0; transition: opacity .35s, transform .35s; display: flex; flex-direction: column; align-items: flex-end; text-align: right; pointer-events: none; text-shadow: 0 0 3px #000, 0 2px 6px #000; z-index: 5; }
+#np.show { opacity: 1; transform: none; }
+#np small { font: 700 14px var(--head); letter-spacing: .2em; color: var(--accent); }
+#np b { font: 700 26px var(--head); letter-spacing: .02em; color: #fff; line-height: 1.1; }
+#np span { font: 600 15px var(--ui); color: rgba(255,255,255,.9); }
+.ph-sec { margin: 12px 0 4px; font-size: 12px; letter-spacing: .14em; opacity: .6; text-transform: uppercase; }
+.ph-btn2 em { font-style: normal; opacity: .7; margin-left: 6px; }

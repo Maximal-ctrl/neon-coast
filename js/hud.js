@@ -83,6 +83,13 @@ export class HUD {
     $('weapon-name').textContent = w.name;
   }
   vehicleName(n) { const el = $('veh-name'); el.textContent = n; el.classList.add('show'); this.vehT = 3; }
+  // Einblendung des laufenden Titels (oben)
+  nowPlaying(station, artist, title) {
+    const el = $('np'); if (!el) return;
+    el.innerHTML = `<small>${station}</small><b>${title}</b><span>${artist}</span>`;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(this.npT); this.npT = setTimeout(() => el.classList.remove('show'), 6000);
+  }
   radio(st) { const el = $('radio-box'); el.innerHTML = `<b>${st.name}</b>${st.genre ? '<span>' + st.genre + '</span>' : ''}`; el.classList.add('show'); this.radioT = 3; }
   hitMarker(kill) { const el = $('hitmark'); el.className = kill ? 'show kill' : 'show'; this.hitT = 0.25; }
   damageFlash(a) { this.dmg = Math.min(1, this.dmg + a * 0.8); }

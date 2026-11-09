@@ -620,18 +620,28 @@ function phoneJobs() {
 function phoneRadio() {
   const A = G.audio;
   const n = A.tracks ? A.tracks.length : 0;
+  const pc = A.pulseCounts || { songs: 0, idents: 0 };
   const cur = A.ready ? A.stationInfo(A.station) : STATIONS[A.station];
   phoneScreen('Radio', `<div class="ph-now"><div class="eq"><i></i><i></i><i></i><i></i><i></i></div><b>${cur.name}</b><span>${cur.genre || ''}</span>
       <div class="ph-ctrl"><button data-step="-1">⏮</button><button data-step="1">⏭</button></div></div>`
     + STATIONS.map((s, i) => { const info = A.ready ? A.stationInfo(i) : s; return `<button class="ph-row ${A.station === i ? 'on' : ''}" data-st="${i}"><b>${info.name}</b><span>${info.genre || ''}</span></button>`; }).join('')
+    + (A.station === 3 && A.pulse ? `<div class="ph-note">▶ Läuft gerade: <b>${A.pulse.lastName || '–'}</b></div>` : '')
     + `<div class="ph-actions"><button class="ph-btn2" data-mus="add">🎵 Eigene Musik hinzufügen</button>${n ? `<button class="ph-btn2" data-mus="clear">🗑 Eigene Musik löschen (${n})</button>` : ''}</div>
-       <div class="ph-note">Das Radio läuft im Auto. „Mein Radio“ spielt Songs von deinem Gerät.</div>`);
+       <div class="ph-sec">PULSE 132 · Techno</div>
+       <div class="ph-actions"><button class="ph-btn2" data-mus="padd">🎧 Songs zu PULSE 132 hinzufügen${pc.songs ? ` <em>${pc.songs}</em>` : ''}</button>
+         <button class="ph-btn2" data-mus="iadd">🎙️ Eigene Einspieler hinzufügen${pc.idents ? ` <em>${pc.idents}</em>` : ''}</button>
+         ${pc.songs || pc.idents ? '<button class="ph-btn2" data-mus="pclear">🗑 PULSE-Dateien löschen</button>' : ''}</div>
+       <div class="ph-note">Das Radio läuft im Auto. Eigene Songs und Einspieler bleiben nur auf diesem Gerät. Ohne eigene Einspieler spricht der Moderator mit der Stimme deines Geräts.</div>`);
   const set = (i) => { A.station = (i + STATIONS.length) % STATIONS.length; A.nextBar = 0; if (A.ready) G.hud.radio(A.stationInfo(A.station)); phoneRadio(); };
   $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => set(+b.dataset.st));
   $('ph-screen').querySelectorAll('[data-step]').forEach((b) => b.onclick = () => set(A.station + +b.dataset.step));
   $('ph-screen').querySelectorAll('[data-mus]').forEach((b) => b.onclick = async () => {
     if (!A.ready) A.init();
-    if (b.dataset.mus === 'add') $('music-file').click();
+    const m = b.dataset.mus;
+    if (m === 'add') { $('music-file').dataset.target = 'tracks'; $('music-file').click(); }
+    else if (m === 'padd') { $('music-file').dataset.target = 'pulse'; $('music-file').click(); }
+    else if (m === 'iadd') { $('music-file').dataset.target = 'idents'; $('music-file').click(); }
+    else if (m === 'pclear') { await A.clearPulse('pulse'); await A.clearPulse('idents'); G.hud.toast('PULSE-Dateien gelöscht'); phoneRadio(); }
     else { await A.clearLibrary(); G.hud.toast('Eigene Musik gelöscht'); phoneRadio(); }
   });
 }
@@ -667,8 +677,9 @@ function setupPhone() {
     e.target.value = '';
     if (!files.length) return;
     if (!G.audio.ready) G.audio.init();
-    const n = await G.audio.addFiles(files);
-    G.hud.toast(n ? `${n} Song(s) zu „Mein Radio“ hinzugefügt` : 'Keine Audiodateien gefunden');
+    const tgt = e.target.dataset.target || 'tracks';
+    const n = tgt === 'tracks' ? await G.audio.addFiles(files) : await G.audio.addPulseFiles(files, tgt);
+    G.hud.toast(n ? (tgt === 'idents' ? `${n} Einspieler für PULSE 132 hinzugefügt` : tgt === 'pulse' ? `${n} Song(s) zu PULSE 132 hinzugefügt` : `${n} Song(s) zu „Mein Radio“ hinzugefügt`) : 'Keine Audiodateien gefunden');
     if (phoneOpen) phoneRadio();
   });
   $('phone-btn').addEventListener('click', () => openPhone());
@@ -984,7 +995,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '2.0 Beta';
+export const GAME_VERSION = '2.01 Beta';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));
