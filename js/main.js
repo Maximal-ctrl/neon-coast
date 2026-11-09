@@ -5,6 +5,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { loadPBR } from './realism.js';
 
 // Farbkorrektur im Kino-Look: leichte S-Kurve, Sättigung, Split-Toning, Vignette
 const GRADE_SHADER = {
@@ -36,7 +38,8 @@ import { Player } from './player.js';
 import { CameraRig } from './camera.js';
 import { Input } from './input.js';
 import { AudioSys, STATIONS } from './audio.js';
-import { HUD } from './hud.js';
+import { HUD, ICONS } from './hud.js';
+import { WeaponWheel } from './wheel.js';
 import { Missions, shopItems, CONTACT_INFO } from './missions.js';
 import { Save } from './save.js';
 import { Interiors } from './interiors.js';
@@ -86,11 +89,13 @@ async function boot() {
   camera.position.set(200, 80, 200);
   G.camera = camera;
 
-  setLoad(0.02, 'Port Solera wird erbaut …');
+  setLoad(0.01, 'Fototexturen & Himmel werden geladen …');
   const world = new World(scene, q);
   G.world = world;
   const env = new Environment(scene, renderer, q);
   world.env = env;
+  await Promise.all([loadPBR(renderer, q), env.loadSky()]);
+  setLoad(0.03, 'Port Solera wird erbaut …');
   env.setFogRange(q === 'low' ? 140 : 180, q === 'low' ? 520 : q === 'medium' ? 820 : 1050);
   await world.build(setLoad);
 
@@ -110,13 +115,23 @@ async function boot() {
   G.input = new Input(canvas);
   G.audio = new AudioSys();
   G.hud = new HUD();
+  G.wheel = new WeaponWheel(ICONS);
   G.missions = new Missions();
 
   // Nachbearbeitung (Leuchteffekte)
   if (q !== 'low') {
-    composer = new EffectComposer(renderer);
+    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: q === 'high' ? 4 : 2 });
+    composer = new EffectComposer(renderer, rt);
     composer.setPixelRatio(pixelRatio(q));
     composer.addPass(new RenderPass(scene, camera));
+    if (q === 'high') {
+      const ao = new GTAOPass(scene, camera, window.innerWidth, window.innerHeight);
+      ao.blendIntensity = 0.85;
+      ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 2, thickness: 2, scale: 1, samples: 12 });
+      ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+      composer.addPass(ao);
+      G.aoPass = ao;
+    }
     const res = new THREE.Vector2(window.innerWidth, window.innerHeight);
     bloom = new UnrealBloomPass(res, 0.4, 0.35, 0.9);
     composer.addPass(bloom);
@@ -794,8 +809,8 @@ function setupUI() {
   $('pause-btn').addEventListener('touchend', (e) => { e.preventDefault(); setPaused(true); });
   $('minimap').addEventListener('click', () => { if (G.state === 'playing') showMap(); });
   $('minimap').addEventListener('touchend', (e) => { if (G.state === 'playing') { e.preventDefault(); showMap(); } });
-  $('weapon-box').addEventListener('touchend', (e) => { if (G.state === 'playing') { e.preventDefault(); G.player.nextWeapon(); } });
-  $('weapon-box').addEventListener('click', () => { if (G.state === 'playing') G.player.nextWeapon(); });
+  $('weapon-box').addEventListener('touchend', (e) => { if (G.state === 'playing') { e.preventDefault(); G.wheel.show(false); } });
+  $('weapon-box').addEventListener('click', () => { if (G.state === 'playing') G.wheel.show(false); });
   $('pause').addEventListener('click', (e) => {
     const a = e.target.dataset && e.target.dataset.act;
     if (!a) return;
@@ -833,7 +848,7 @@ function frame(now) {
   let dt = (now - last) / 1000;
   last = now;
   if (dt > 0.1) dt = 0.1;
-  const step = Math.min(dt, 1 / 30);
+  const step = Math.min(dt, 1 / 30) * (G.slowmo || 1);
   G.dt = step;
   const I = G.input;
   I.update();
@@ -881,6 +896,7 @@ function update(now, step, I) {
     else if (I.pressed('phone')) { openPhone(); }
     else if (I.pressed('inv')) { G.ui.inventory(); }
     else if (I.pressed('map')) { showMap(); }
+    G.wheel.update(I);
     G.time += step;
     G.stats.playTime += step;
     { const h = G.timeOfDay, day = h > 5.5 && h < 20.5; G.timeOfDay = (h + step / (day ? 80 : 30)) % 24; }
@@ -968,7 +984,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '1.09';
+export const GAME_VERSION = '2.0 Beta';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));

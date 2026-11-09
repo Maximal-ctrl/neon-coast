@@ -42,6 +42,14 @@ void main(){
 
 const SKY_FRAG = /* glsl */`
 uniform vec3 zenith; uniform vec3 horizon; uniform vec3 sunColor; uniform vec3 sunDir; uniform vec3 groundColor;
+uniform sampler2D tDay; uniform sampler2D tDusk; uniform sampler2D tNight; uniform vec3 wSky; uniform vec3 rotSky; uniform float useImg; uniform float skyGain;
+vec3 photo(sampler2D t, vec3 d, float rot) {
+  float phi = atan(d.z, d.x) + rot;
+  float u = fract(phi / 6.2831853 + 0.5);
+  float e = asin(clamp(d.y, -1.0, 1.0));
+  float v = clamp((0.5 - e / 3.14159265) / 0.53, 0.0, 0.999);
+  return texture2D(t, vec2(u, 1.0 - v)).rgb;
+}
 uniform float night; uniform float time; uniform float clouds;
 varying vec3 vDir;
 float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
@@ -53,7 +61,15 @@ void main(){
   vec3 d = normalize(vDir);
   float h = d.y;
   vec3 col;
-  if (h >= 0.0) {
+  if (useImg > 0.5 && h >= -0.03) {
+    vec3 hd = normalize(vec3(d.x, max(d.y, 0.0), d.z));
+    vec3 pc = vec3(0.0);
+    if (wSky.x > 0.001) pc += photo(tDay, hd, rotSky.x) * wSky.x;
+    if (wSky.y > 0.001) pc += photo(tDusk, hd, rotSky.y) * wSky.y;
+    if (wSky.z > 0.001) pc += photo(tNight, hd, rotSky.z) * wSky.z;
+    col = pc * skyGain;
+    col = mix(col, horizon, smoothstep(0.02, -0.03, h));
+  } else if (h >= 0.0) {
     col = mix(horizon, zenith, pow(clamp(h, 0.0, 1.0), 0.45));
   } else {
     col = mix(horizon, groundColor, clamp(-h * 6.0, 0.0, 1.0));
@@ -66,14 +82,14 @@ void main(){
   float mdd = max(dot(d, md), 0.0);
   col += vec3(0.75, 0.82, 1.0) * (smoothstep(0.9993, 0.9996, mdd) * 1.4 + pow(mdd, 60.0) * 0.08) * night;
   // Sterne
-  if (night > 0.01 && h > 0.0) {
+  if (useImg < 0.5 && night > 0.01 && h > 0.0) {
     vec3 sp = floor(d * 420.0);
     float s = h31(sp);
     float tw = 0.6 + 0.4 * sin(time * 3.0 + s * 100.0);
     col += vec3(smoothstep(0.9975, 1.0, s)) * 1.6 * night * tw * smoothstep(0.0, 0.25, h);
   }
   // Wolken
-  if (h > 0.0) {
+  if (useImg < 0.5 && h > 0.0) {
     vec2 uv = d.xz / (h + 0.12) * 1.3;
     float n = fbm(uv * 0.9 + vec2(time * 0.004, time * 0.002));
     float c = smoothstep(0.52 - clouds * 0.25, 0.85, n) * smoothstep(0.0, 0.18, h);
@@ -189,6 +205,7 @@ export class Environment {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
       sunColor: { value: new THREE.Color() }, sunDir: { value: this.sunDir },
       groundColor: { value: new THREE.Color() }, night: { value: 0 }, time: { value: 0 }, clouds: { value: 0.35 },
+      tDay: { value: null }, tDusk: { value: null }, tNight: { value: null }, wSky: { value: new THREE.Vector3(1, 0, 0) }, rotSky: { value: new THREE.Vector3() }, useImg: { value: 0 }, skyGain: { value: 1 },
     };
     this.skyUniforms = u;
     this.skyMat = new THREE.ShaderMaterial({ uniforms: u, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false });
@@ -229,6 +246,22 @@ export class Environment {
     const envSky = new THREE.Mesh(new THREE.SphereGeometry(100, 24, 12), this.skyMat);
     this.envScene.add(envSky);
     this.envRT = null;
+  }
+
+  // Echte Himmelsfotos (CC0, Poly Haven) für Tag, Dämmerung und Nacht
+  async loadSky() {
+    try {
+      const info = await (await fetch('assets/sky/sky.json')).json();
+      const L = new THREE.TextureLoader();
+      const ld = (n) => new Promise((res) => L.load(`assets/sky/${n}.jpg`, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.wrapS = THREE.RepeatWrapping; res(t); }, undefined, () => res(null)));
+      const [d, k, n] = await Promise.all([ld('day'), ld('dusk'), ld('night')]);
+      if (!d || !k || !n) return;
+      const u = this.skyUniforms;
+      u.tDay.value = d; u.tDusk.value = k; u.tNight.value = n; u.useImg.value = 1;
+      const lin = (a) => new THREE.Color().setRGB(a[0], a[1], a[2], THREE.SRGBColorSpace);
+      this.skyInfo = { day: info.day, dusk: info.dusk, night: info.night, hor: [lin(info.day.hor), lin(info.dusk.hor), lin(info.night.hor)], zen: [lin(info.day.zen), lin(info.dusk.zen), lin(info.night.zen)] };
+      this.lastEnvHour = -10;
+    } catch (e) { /* prozeduraler Himmel bleibt */ }
   }
 
   setShadows(q) {
@@ -275,6 +308,19 @@ export class Environment {
     lerpKey(e, 'hg', this.hemi.groundColor);
     this.night = smoothstep(2, -9, e);
     u.night.value = this.night;
+    if (this.skyInfo) {
+      const S = this.skyInfo;
+      const wd = smoothstep(3, 16, e), wn = smoothstep(-3, -11, e), wk = Math.max(0, 1 - wd - wn);
+      u.wSky.value.set(wd, wk, wn);
+      const phiSun = Math.atan2(this.sunDir.z, this.sunDir.x), phiMoon = Math.atan2(-this.sunDir.z + 0.3, -this.sunDir.x);
+      u.rotSky.value.set((S.day.sunU - 0.5) * Math.PI * 2 - phiSun, (S.dusk.sunU - 0.5) * Math.PI * 2 - phiSun, (S.night.sunU - 0.5) * Math.PI * 2 - phiMoon);
+      const gain = 1.35 * wd + 1.05 * wk + 0.11 * wn;
+      u.skyGain.value = gain;
+      const hc = new THREE.Color(0, 0, 0), zc = new THREE.Color(0, 0, 0);
+      [wd, wk, wn].forEach((w, i) => { hc.add(S.hor[i].clone().multiplyScalar(w * gain)); zc.add(S.zen[i].clone().multiplyScalar(w * gain)); });
+      if (wk > 0.05) hc.lerp(u.sunColor.value.clone().multiplyScalar(0.8), wk * 0.25);
+      u.horizon.value.copy(hc); u.zenith.value.copy(zc);
+    }
 
     // Sonne oder Mond als gerichtetes Licht
     const sunUp = e > -3;

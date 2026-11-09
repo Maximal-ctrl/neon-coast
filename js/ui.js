@@ -178,28 +178,70 @@ function bar() {
 
 // ------------------------------------------------------------ Inventar
 function inventory() {
-  let sel = null, first = true;
-  const render = () => {
+  // Interaktionsmenü (seitliche Liste mit Banner, Kategorien und Beschreibung)
+  let idx = 0, cat = null;
+  const P = G.player;
+  const cats = [
+    ['food', 'Essen & Trinken', (it) => it.anim === 'eat' || it.anim === 'drink'],
+    ['smoke', 'Rauchwaren', (it) => it.anim === 'smoke'],
+    ['lotto', 'Lose', (it) => it.use === 'scratch'],
+  ];
+  const rows = () => {
     const list = Inventory.list();
-    if (!sel || !Inventory.count(sel)) sel = list.length ? list[0][0] : null;
-    const it = sel ? ITEMS[sel] : null;
-    $('ui-layer').innerHTML = `<div class="st ${first ? 'anim' : ''}" style="--a:#4dd2ff">
-      <header class="st-h"><div class="st-logo">🎒</div><div class="st-t"><b>INVENTAR</b><span>${list.length ? list.reduce((s, [, n]) => s + n, 0) + ' Gegenstände' : 'Leer'}</span></div>
-        <div class="st-money">${money(G.player.money)}</div><button class="st-x" data-x>✕</button></header>
-      <div class="st-body">
-        <div class="st-grid">${list.length ? list.map(([id, n]) => `<button class="st-card ${id === sel ? 'on' : ''}" data-it="${id}"><span class="st-ic">${ITEMS[id].icon}</span><b>${esc(ITEMS[id].name)}</b><em>×${n}</em></button>`).join('') : '<div class="st-empty">Dein Inventar ist leer.<br>Kauf etwas in <b>Samis 24/7</b> neben deinem Hochhaus!</div>'}</div>
-        <aside class="st-detail">${it ? `<div class="st-big">${it.icon}</div><h3>${esc(it.name)}</h3><p>${esc(it.desc)}</p><div class="st-tag">Anzahl: ${Inventory.count(sel)}</div>
-          <button class="st-buy" id="inv-use">${it.use === 'scratch' ? 'Freirubbeln' : it.anim === 'smoke' ? 'Rauchen' : it.anim === 'drink' ? 'Trinken' : 'Essen'}</button>` : '<p>Nichts ausgewählt.</p>'}</aside>
-      </div></div>`;
-    first = false;
+    if (!cat) {
+      const r = cats.map(([id, name, f]) => ({ kind: 'cat', id, name, n: list.filter(([k]) => f(ITEMS[k])).reduce((s, [, n]) => s + n, 0) }));
+      r.push({ kind: 'cat', id: 'weapons', name: 'Waffen', n: Object.keys(WEAPONS).filter((w) => w !== 'fists' && P.ammo[w] > 0).length });
+      r.push({ kind: 'info', name: 'Bargeld', val: money(P.money), desc: 'Dein Bargeld. Verdiene mehr mit Aufträgen, Taxi-Fahrten oder … anderen Methoden.' });
+      return r;
+    }
+    if (cat === 'weapons') return Object.keys(WEAPONS).filter((w) => w === 'fists' || P.ammo[w] > 0).map((w) => ({ kind: 'weapon', id: w, name: WEAPONS[w].name, val: WEAPONS[w].melee ? '' : P.ammo[w] + ' Schuss', desc: P.weapon === w ? 'Aktuell ausgerüstet.' : 'Auswählen zum Ausrüsten. Tipp: Tab gedrückt halten (oder Waffensymbol antippen) öffnet das Waffenrad.' }));
+    const f = cats.find((c) => c[0] === cat)[2];
+    const r = list.filter(([k]) => f(ITEMS[k])).map(([k, n]) => ({ kind: 'item', id: k, name: ITEMS[k].name, icon: ITEMS[k].icon, val: '×' + n, desc: ITEMS[k].desc }));
+    return r.length ? r : [{ kind: 'info', name: 'Nichts vorhanden', val: '', desc: 'Kauf Nachschub in einem der Samis 24/7-Läden.' }];
   };
-  if (!open('', 'ui-store')) return;
+  const verb = (it) => (it.use === 'scratch' ? 'Freirubbeln' : it.anim === 'smoke' ? 'Rauchen' : it.anim === 'drink' ? 'Trinken' : 'Essen');
+  const render = () => {
+    const r = rows();
+    idx = Math.max(0, Math.min(idx, r.length - 1));
+    const cur = r[idx];
+    const title = cat ? (cat === 'weapons' ? 'Waffen' : cats.find((c) => c[0] === cat)[1]) : 'Inventar';
+    let desc = cur.desc || '';
+    if (cur.kind === 'cat') desc = cur.n ? `${cur.n} ${cur.id === 'weapons' ? 'Waffe(n)' : 'Gegenstand/Gegenstände'} – auswählen zum Öffnen.` : 'Leer.';
+    if (cur.kind === 'item') desc = `${desc}  ·  Auswählen: ${verb(ITEMS[cur.id])}`;
+    $('ui-layer').innerHTML = `<div class="im">
+      <div class="im-banner"><b>${esc(P.name || 'Leo').toUpperCase()}</b><span>Port Solera</span></div>
+      <div class="im-sub"><b>${title.toUpperCase()}</b><span>${idx + 1}/${r.length}</span></div>
+      <div class="im-list">${r.map((x, i) => `<button class="im-row ${i === idx ? 'on' : ''} ${x.kind}" data-i="${i}"><span>${x.icon ? x.icon + ' ' : ''}${esc(x.name)}</span><em>${x.kind === 'cat' ? (x.n ? x.n + ' ›' : '›') : x.kind === 'weapon' && P.weapon === x.id ? '✔ ' + esc(x.val) : esc(x.val || '')}</em></button>`).join('')}</div>
+      <div class="im-desc">${esc(desc)}</div>
+      <div class="im-keys">${cat ? '<button data-back>‹ Zurück</button>' : ''}<button data-x>Schließen</button></div>
+    </div>`;
+  };
+  const activate = () => {
+    const r = rows(), cur = r[idx]; if (!cur) return;
+    G.audio.click();
+    if (cur.kind === 'cat') { cat = cur.id; idx = 0; render(); return; }
+    if (cur.kind === 'weapon') { P.weapon = cur.id; G.hud.weapon(); render(); return; }
+    if (cur.kind === 'item') Inventory.use(cur.id);
+  };
+  if (!open('', 'ui-im')) return;
   render();
+  const key = (e) => {
+    if (!G.ui.isOpen || !document.querySelector('.im')) { window.removeEventListener('keydown', key, true); return; }
+    const n = rows().length;
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') { idx = (idx + 1) % n; render(); }
+    else if (e.code === 'ArrowUp' || e.code === 'KeyW') { idx = (idx - 1 + n) % n; render(); }
+    else if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyE') activate();
+    else if (e.code === 'Backspace' || e.code === 'ArrowLeft' || e.code === 'KeyA') { if (cat) { cat = null; idx = 0; render(); } else { close(); } }
+    else if (e.code === 'Escape' || e.code === 'KeyI') close();
+    else return;
+    e.preventDefault(); e.stopPropagation();
+  };
+  window.addEventListener('keydown', key, true);
   $('ui-layer').onclick = (e) => {
-    const t = e.target.closest('button'); if (!t) return;
+    const t = e.target.closest('button'); if (!t) { if (!e.target.closest('.im')) close(); return; }
     if (t.dataset.x !== undefined) { close(); return; }
-    if (t.dataset.it) { sel = t.dataset.it; render(); G.audio.click(); return; }
-    if (t.id === 'inv-use') Inventory.use(sel);
+    if (t.dataset.back !== undefined) { cat = null; idx = 0; render(); G.audio.click(); return; }
+    if (t.dataset.i !== undefined) { const i = +t.dataset.i; if (i === idx || G.isTouch) { idx = i; activate(); } else { idx = i; render(); G.audio.click(); } }
   };
 }
 

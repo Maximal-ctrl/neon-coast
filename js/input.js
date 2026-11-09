@@ -6,7 +6,7 @@ const KEYMAP = {
   KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
   ShiftLeft: 'sprint', ShiftRight: 'sprint', Space: 'jump', KeyF: 'enter', KeyE: 'enter', Enter: 'enter',
   KeyQ: 'weapon', KeyR: 'radio', KeyH: 'horn', KeyM: 'map', Escape: 'pause', KeyP: 'pause', KeyC: 'camera', KeyG: 'siren',
-  KeyX: 'handbrake', KeyT: 'phone', KeyI: 'inv',
+  KeyX: 'handbrake', KeyT: 'phone', KeyI: 'inv', Tab: 'wheel',
 };
 
 export class Input {
@@ -34,6 +34,7 @@ export class Input {
   bind() {
     window.addEventListener('keydown', (e) => {
       if (e.target && (e.target.tagName === 'INPUT')) return;
+      if (e.code === 'Tab') e.preventDefault();
       const k = KEYMAP[e.code];
       if (k) {
         if (!this.keys.has(k)) this.taps.add(k);

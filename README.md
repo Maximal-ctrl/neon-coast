@@ -47,3 +47,7 @@ Läuft auf PC, Mac und als Vollbild-App auf dem **iPad** (ohne Installation aus 
 Reines HTML/JavaScript mit [three.js](https://threejs.org) (MIT-Lizenz, im Ordner `lib/` enthalten).
 Alle Texturen, Modelle, Musik und Soundeffekte werden zur Laufzeit erzeugt – es gibt keine externen Assets.
 Schriften: Russo One & Rajdhani (SIL Open Font License).
+
+## Quellen (ab Version 2.0)
+- Foto-Texturen und Himmelspanoramen: [Poly Haven](https://polyhaven.com) (CC0)
+- Schriften: Inter und Oswald (SIL Open Font License, siehe `fonts/`)

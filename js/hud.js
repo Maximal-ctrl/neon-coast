@@ -8,7 +8,7 @@ import { clamp, fmtMoney, fmtTime, lerp } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
 
-const ICONS = {
+export const ICONS = {
   fist: '<svg viewBox="0 0 64 40"><path d="M14 10h30a6 6 0 0 1 6 6v10a8 8 0 0 1-8 8H22a8 8 0 0 1-8-8z" fill="currentColor"/><path d="M20 10v8M28 10v8M36 10v8M44 10v8" stroke="#000" stroke-width="2" opacity=".35"/></svg>',
   pistol: '<svg viewBox="0 0 64 40"><path d="M6 8h48v8H30l-3 4h-6l2 16h-9l-3-18H6z" fill="currentColor"/><rect x="50" y="6" width="6" height="4" fill="currentColor"/></svg>',
   smg: '<svg viewBox="0 0 64 40"><path d="M2 10h52v8H40v4h-8l1 14h-7l-1-14h-5l-2 8h-6l1-12H2z" fill="currentColor"/><rect x="54" y="12" width="8" height="3" fill="currentColor"/><rect x="34" y="22" width="5" height="12" fill="currentColor"/></svg>',
@@ -202,7 +202,7 @@ export class HUD {
     const rr = S * 0.12;
     g.roundRect ? g.roundRect(0, 0, S, H, rr) : g.rect(0, 0, S, H);
     g.clip();
-    g.fillStyle = '#0b2a40'; g.fillRect(0, 0, S, H);
+    g.fillStyle = '#3f7299'; g.fillRect(0, 0, S, H);
     g.save();
     g.translate(S / 2, H / 2);
     g.rotate(th);
@@ -245,7 +245,7 @@ export class HUD {
       g.beginPath();
       if (shape === 'sq') g.rect(sx - rad, sy - rad, rad * 2, rad * 2); else g.arc(sx, sy, rad, 0, Math.PI * 2);
       g.fill(); g.stroke();
-      if (label) { g.fillStyle = '#000'; g.font = `bold ${Math.round(rad * 1.4)}px Rajdhani, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, sx, sy + 1); }
+      if (label) { g.fillStyle = '#000'; g.font = `bold ${Math.round(rad * 1.4)}px Inter, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, sx, sy + 1); }
     };
     for (const b of G.missions.mapBlips()) blip(b.x, b.z, b.col, b.r || 0.04, b.shape, b.label, b.edge);
     const flash = Math.floor(G.time * 4) % 2 === 0;
@@ -278,7 +278,7 @@ export class HUD {
     const [nx, ny] = (() => { const dx = 0, dz = -1; return [dx * cs - dz * sn, dx * sn + dz * cs]; })();
     const nr = S / 2 - S * 0.07;
     g.fillStyle = 'rgba(0,0,0,0.6)'; g.beginPath(); g.arc(S / 2 + nx * nr, H / 2 + ny * nr, S * 0.045, 0, 7); g.fill();
-    g.fillStyle = '#fff'; g.font = `bold ${Math.round(S * 0.06)}px Rajdhani, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#fff'; g.font = `bold ${Math.round(S * 0.06)}px Inter, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('N', S / 2 + nx * nr, H / 2 + ny * nr + 1);
     g.restore();
   }
@@ -362,16 +362,16 @@ export class HUD {
       }
     }
     const V = this.mapView, k = V.zoom;
-    g.fillStyle = '#070f1c'; g.fillRect(0, 0, cv.width, cv.height);
+    g.fillStyle = '#3f7299'; g.fillRect(0, 0, cv.width, cv.height);
     g.imageSmoothingEnabled = true;
     g.drawImage(img, V.ox, V.oy, img.width * k, img.height * k);
     const toS = (x, z) => { const [mx, mz] = W.mapToPx(x, z); return [V.ox + mx * k, V.oy + mz * k]; };
     const u = dpr * Math.min(1.6, Math.max(0.9, k / (Math.min(cv.width, cv.height) / img.width)));
     // Bezirksnamen
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.font = `${Math.round(13 * u)}px "Russo One", sans-serif`;
+    g.font = `600 ${Math.round(13 * u)}px Oswald, sans-serif`;
     const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['SOLERA HILLS', 200, -900], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860]];
-    for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.fillStyle = 'rgba(0,0,0,0.55)'; g.fillText(t, sx + 1.5, sy + 1.5); g.fillStyle = 'rgba(200,220,255,0.62)'; g.fillText(t, sx, sy); }
+    for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.lineWidth = 3 * u; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.strokeText(t, sx, sy); g.fillStyle = 'rgba(40,44,52,0.9)'; g.fillText(t, sx, sy); }
     // Route
     const tgt = this.getRouteTarget();
     if (tgt && this.route) {
@@ -386,13 +386,13 @@ export class HUD {
       g.shadowColor = col; g.shadowBlur = 14 * u;
       g.fillStyle = '#0d1220'; g.beginPath(); g.arc(sx, sy, rad, 0, 7); g.fill();
       g.shadowBlur = 0; g.lineWidth = 3 * u; g.strokeStyle = col; g.stroke();
-      g.fillStyle = col; g.font = `${Math.round(rad * 1.15)}px "Russo One", sans-serif`; g.fillText(label, sx, sy + 1 * u);
+      g.fillStyle = col; g.font = `700 ${Math.round(rad * 1.15)}px Oswald, sans-serif`; g.fillText(label, sx, sy + 1 * u);
       g.restore();
       return [sx, sy, rad];
     };
     for (const b of G.missions.mapBlips(true)) {
       const [sx, sy, rad] = icon(b.x, b.z, b.col, b.label || '•', b.label ? 13 : 9);
-      if (b.name && k > V.min * 1.5) { g.font = `${Math.round(11 * u)}px Rajdhani, sans-serif`; g.fillStyle = '#fff'; g.fillText(b.name, sx, sy + rad + 9 * u); }
+      if (b.name && k > V.min * 1.5) { g.font = `600 ${Math.round(11 * u)}px Inter, sans-serif`; g.fillStyle = '#1b1e24'; g.fillText(b.name, sx, sy + rad + 9 * u); }
     }
     if (G.missions.waypoint) icon(G.missions.waypoint.x, G.missions.waypoint.z, '#be6eff', '⚑', 12);
     // Spieler

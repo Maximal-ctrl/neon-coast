@@ -1,0 +1,151 @@
+/* ================================================================
+   NEON COAST 2.0 – realistischer Oberflächenstil
+   Schriften: Inter & Oswald (SIL Open Font License, siehe fonts/)
+   ================================================================ */
+@font-face { font-family: 'Inter'; src: url('../fonts/inter-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('../fonts/inter-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Inter'; src: url('../fonts/inter-latin-800-normal.woff2') format('woff2'); font-weight: 800; font-display: swap; }
+@font-face { font-family: 'Oswald'; src: url('../fonts/oswald-latin-500-normal.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Oswald'; src: url('../fonts/oswald-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+
+:root {
+  --ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --head: 'Oswald', 'Inter', sans-serif;
+  --cash: #72cc72; --hp: #5aa857; --ar: #4ba1db; --accent: #f0a03c; --hl: #f0c850;
+  --dark: rgba(0, 0, 0, .72);
+}
+body, button, input, select { font-family: var(--ui); }
+
+/* ---------- Logo ---------- */
+.logo { font-family: var(--head) !important; font-weight: 700; transform: none !important; letter-spacing: .03em; text-align: left; line-height: .88; }
+.logo .l1 { color: #fff !important; text-shadow: 0 6px 30px rgba(0,0,0,.65) !important; font-size: clamp(56px, 9vw, 112px) !important; }
+.logo .l2 { background: linear-gradient(180deg, #ffe2a0 0%, #f39a3d 52%, #c4372b 100%) !important; -webkit-background-clip: text !important; background-clip: text !important; color: transparent !important; filter: drop-shadow(0 8px 20px rgba(0,0,0,.55)) !important; font-size: clamp(56px, 9vw, 112px) !important; }
+
+/* ---------- Ladebildschirm ---------- */
+#loading { background: linear-gradient(180deg, rgba(0,0,0,.05) 30%, rgba(0,0,0,.85) 100%), url('../assets/sky/dusk.jpg') center 30% / cover #120a08 !important; align-items: flex-start !important; justify-content: flex-end !important; padding: 0 0 calc(7vh + var(--sab)) max(6vw, var(--sal)); }
+#loading .logo { margin-bottom: 18px; }
+#loading .load-bar { width: min(420px, 70vw); height: 3px; background: rgba(255,255,255,.18); border-radius: 0; box-shadow: none; border: none; overflow: hidden; }
+#loading .load-bar i { background: #fff !important; box-shadow: none !important; }
+#load-msg { font-family: var(--ui); font-size: 14px; letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
+
+/* ---------- Titel ---------- */
+#title { background: linear-gradient(90deg, rgba(0,0,0,.82) 0%, rgba(0,0,0,.5) 36%, rgba(0,0,0,0) 62%), linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 35%) !important; }
+.title-card { background: none !important; border: none !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; padding: 0 !important; align-items: flex-start !important; }
+.tagline { font-family: var(--ui) !important; font-weight: 600; letter-spacing: .38em !important; font-size: 13px !important; color: rgba(255,255,255,.75) !important; margin: 10px 0 26px !important; text-shadow: 0 2px 6px #000; }
+.ver { font-family: var(--head) !important; letter-spacing: .08em !important; background: var(--accent) !important; color: #140c02 !important; border: none !important; border-radius: 2px !important; padding: 2px 8px !important; font-size: 13px !important; box-shadow: none !important; }
+.tmenu { gap: 2px !important; min-width: min(380px, 80vw); }
+.tbtn { font-family: var(--head) !important; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; font-size: 23px !important; color: rgba(255,255,255,.72) !important; background: transparent !important; border: none !important; border-left: 4px solid transparent !important; border-radius: 0 !important; box-shadow: none !important; text-align: left !important; padding: 9px 18px !important; transform: none !important; transition: background .15s, color .15s, border-color .15s; }
+.tbtn small { font-family: var(--ui); text-transform: none; letter-spacing: 0; color: rgba(255,255,255,.6); font-size: 13px; }
+.tbtn:hover, .tbtn:focus-visible, .tbtn.primary { color: #fff !important; background: linear-gradient(90deg, rgba(255,255,255,.17), rgba(255,255,255,0)) !important; border-left-color: var(--accent) !important; }
+.credits { font-family: var(--ui) !important; letter-spacing: .1em; text-transform: uppercase; font-size: 11px !important; opacity: .55; }
+.install { background: rgba(0,0,0,.6) !important; border: none !important; border-radius: 2px !important; }
+
+/* ---------- Charakter-Editor ---------- */
+.cr-panel { background: rgba(0,0,0,.78) !important; border: none !important; border-radius: 2px !important; box-shadow: 0 20px 60px rgba(0,0,0,.5) !important; }
+.cr-panel h2 { font-family: var(--head) !important; color: #fff !important; text-shadow: none !important; letter-spacing: .08em; }
+
+/* ---------- HUD ---------- */
+#clock { font-family: var(--head) !important; font-weight: 500; font-size: 20px !important; text-shadow: 0 2px 4px #000, 0 0 2px #000 !important; }
+#money { font-family: var(--head) !important; font-weight: 700; color: var(--cash) !important; font-size: 34px !important; letter-spacing: .02em; text-shadow: 0 0 2px #000, 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000 !important; }
+#money-delta { font-family: var(--head) !important; font-weight: 700; }
+#wanted { opacity: 1 !important; }
+#wanted .star { background: rgba(255,255,255,.14) !important; filter: drop-shadow(0 0 1px #000) !important; }
+#wanted .star.on { background: #fff !important; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000) !important; }
+#wanted .star.on.dim { background: rgba(255,255,255,.45) !important; }
+#wanted:not(.active) { visibility: hidden; }
+#weapon-box { background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.6)) !important; border-radius: 0 !important; padding: 6px 12px 6px 22px !important; border: none !important; box-shadow: none !important; }
+#weapon-icon svg { fill: #fff !important; filter: drop-shadow(0 1px 1px #000); }
+#weapon-ammo { font-family: var(--head) !important; font-weight: 500; color: #fff !important; font-size: 22px !important; text-shadow: 0 1px 2px #000; }
+#weapon-name { font-family: var(--ui) !important; text-transform: uppercase; letter-spacing: .08em; font-size: 10px !important; color: rgba(255,255,255,.8) !important; }
+
+#minimap { border-radius: 4px !important; box-shadow: 0 0 0 3px rgba(0,0,0,.78), 0 8px 22px rgba(0,0,0,.45) !important; }
+#bars { gap: 3px !important; margin-top: 5px !important; }
+#bars .bar { height: 7px !important; border-radius: 0 !important; background: rgba(0,0,0,.62) !important; box-shadow: none !important; }
+#bars .bar i { background: var(--hp) !important; }
+#bars .bar.armor i { background: var(--ar) !important; }
+#bars .bar i.low { background: #c0392b !important; }
+
+#hint, .toast { font-family: var(--ui) !important; background: var(--dark) !important; border: none !important; border-left: none !important; border-radius: 2px !important; box-shadow: 0 4px 18px rgba(0,0,0,.35) !important; color: #fff; font-size: 15px !important; line-height: 1.4; }
+#hint b, .toast b { color: var(--hl) !important; }
+#objective { font-family: var(--ui) !important; font-weight: 600; background: none !important; border: none !important; box-shadow: none !important; text-shadow: 0 0 3px #000, 0 2px 4px #000, 0 0 1px #000 !important; font-size: 19px !important; }
+#objective b { color: var(--hl) !important; }
+#subtitle { font-family: var(--ui) !important; font-weight: 600; background: none !important; border: none !important; box-shadow: none !important; text-shadow: 0 0 3px #000, 0 2px 4px #000 !important; font-size: 20px !important; }
+#timer, #race-pos { font-family: var(--head) !important; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.65)) !important; border: none !important; border-radius: 0 !important; box-shadow: none !important; }
+
+#bigtoast #bt-title { font-family: var(--head) !important; font-weight: 700; color: #fff !important; letter-spacing: .04em; text-shadow: 0 4px 18px rgba(0,0,0,.7), 0 0 2px #000 !important; transform: none !important; }
+#bigtoast #bt-sub { font-family: var(--ui) !important; font-weight: 600; color: var(--hl) !important; text-shadow: 0 2px 6px #000 !important; letter-spacing: .06em; }
+#banner { background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.72) 18%, rgba(0,0,0,.72) 82%, rgba(0,0,0,0)) !important; border: none !important; box-shadow: none !important; padding: 18px 0 16px !important; }
+#banner-text { font-family: var(--head) !important; font-weight: 700; letter-spacing: .05em; font-size: clamp(40px, 6vw, 72px) !important; text-shadow: 0 3px 0 rgba(0,0,0,.6) !important; transform: none !important; }
+#banner-sub { font-family: var(--ui) !important; font-weight: 600; color: #fff !important; letter-spacing: .08em; text-transform: uppercase; font-size: 15px !important; }
+#area-name { font-family: var(--head) !important; font-weight: 700; letter-spacing: .03em; text-shadow: 0 0 3px #000, 2px 2px 0 #000 !important; color: #fff !important; transform: none !important; }
+#veh-name { font-family: var(--head) !important; font-weight: 700; color: var(--hl) !important; text-shadow: 0 0 3px #000, 2px 2px 0 #000 !important; transform: none !important; }
+#radio-box { font-family: var(--ui) !important; background: none !important; border: none !important; box-shadow: none !important; text-shadow: 0 0 3px #000, 0 2px 4px #000; }
+#radio-box b { font-family: var(--head) !important; color: #fff !important; font-weight: 700; }
+#speedo { font-family: var(--head) !important; }
+#speed-val { font-family: var(--head) !important; font-weight: 700; text-shadow: 0 0 3px #000, 2px 2px 0 #000 !important; }
+#speedo .sbar { border-radius: 0 !important; }
+#crosshair i { background: #fff !important; box-shadow: 0 0 2px #000 !important; }
+#pause-btn, #phone-btn, #inv-btn { background: rgba(0,0,0,.55) !important; border: none !important; border-radius: 4px !important; box-shadow: none !important; }
+
+/* ---------- Menüs (Pause, Dialoge) ---------- */
+.panel-screen { background: rgba(0,0,0,.55) !important; backdrop-filter: blur(10px) saturate(.8) !important; -webkit-backdrop-filter: blur(10px) saturate(.8) !important; }
+.panel { background: rgba(0,0,0,.8) !important; border: none !important; border-top: 4px solid var(--accent) !important; border-radius: 0 !important; box-shadow: 0 30px 80px rgba(0,0,0,.55) !important; font-family: var(--ui); }
+.panel h2 { font-family: var(--head) !important; font-weight: 700; color: #fff !important; text-shadow: none !important; letter-spacing: .06em; text-transform: uppercase; }
+.mbtn { font-family: var(--head) !important; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; border: none !important; border-radius: 0 !important; background: rgba(255,255,255,.06) !important; color: rgba(255,255,255,.85) !important; box-shadow: none !important; transform: none !important; }
+.mbtn:hover, .mbtn:active, .mbtn:focus-visible { background: rgba(255,255,255,.92) !important; color: #111 !important; }
+.mbtn.primary { background: rgba(255,255,255,.92) !important; color: #111 !important; }
+#pause .panel { width: min(980px, 92vw); display: flex; flex-wrap: wrap; gap: 3px; padding: 18px 20px 20px !important; }
+#pause .panel h2 { flex: 0 0 100%; font-size: 34px !important; margin: 0 0 10px !important; }
+#pause .panel h2::after { content: ' · NEON COAST'; color: rgba(255,255,255,.4); font-weight: 500; font-size: .55em; letter-spacing: .2em; }
+#pause .mbtn { flex: 1 1 22%; padding: 14px 10px !important; font-size: 17px !important; }
+select, input[type="range"] { accent-color: var(--accent); }
+
+/* ---------- Karte ---------- */
+#mapscreen { background: #3f7299 !important; }
+.map-legend { font-family: var(--ui); background: rgba(0,0,0,.78) !important; border: none !important; border-radius: 0 !important; backdrop-filter: blur(8px); }
+.map-legend b { font-family: var(--head) !important; color: #fff !important; letter-spacing: .12em !important; font-weight: 700; }
+.map-legend i { font-family: var(--head) !important; }
+.map-zoom button { border-radius: 0 !important; background: rgba(0,0,0,.72) !important; border: none !important; }
+
+/* ---------- Handy: neutraler, edler ---------- */
+.ph-body { font-family: var(--ui); }
+
+/* ---------- Waffenrad ---------- */
+#wwheel { position: fixed; inset: 0; z-index: 70; display: none; align-items: center; justify-content: center; background: radial-gradient(circle at center, rgba(0,0,0,.25) 0%, rgba(0,0,0,.6) 70%); }
+#wwheel.on { display: flex; animation: wwIn .14s ease-out; }
+@keyframes wwIn { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+.ww-ring { position: relative; width: min(64vmin, 460px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, rgba(0,0,0,0) 0 27%, rgba(10,10,12,.78) 27.5% 63%, rgba(0,0,0,0) 63.5%); box-shadow: 0 0 0 2px rgba(255,255,255,.08) inset; }
+.ww-hl { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; transition: transform .12s ease-out;
+  background: conic-gradient(from -36deg, rgba(255,255,255,.22) 0deg 72deg, transparent 72deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 27.5%, #000 28% 62.5%, transparent 63%); mask: radial-gradient(circle, transparent 0 27.5%, #000 28% 62.5%, transparent 63%); }
+.ww-seg { position: absolute; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%); border: none; background: none; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; cursor: pointer; z-index: 2; }
+.ww-seg .ww-ic { width: 72%; display: block; }
+.ww-seg .ww-ic svg { width: 100%; height: auto; fill: #fff; opacity: .78; filter: drop-shadow(0 2px 3px #000); }
+.ww-seg.on .ww-ic svg { opacity: 1; fill: #fff; }
+.ww-seg.lock .ww-ic svg { opacity: .18; }
+.ww-seg small { font-family: var(--head); font-size: 14px; color: rgba(255,255,255,.85); text-shadow: 0 1px 2px #000; }
+.ww-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 52%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; pointer-events: none; }
+.ww-name { font-family: var(--head); font-weight: 700; font-size: clamp(18px, 3vmin, 26px); letter-spacing: .05em; }
+.ww-ammo { font-size: 14px; color: var(--hl); font-weight: 600; }
+.ww-hint { font-size: 11px; opacity: .55; letter-spacing: .06em; text-transform: uppercase; margin-top: 6px; }
+
+/* ---------- Inventar (Interaktionsmenü) ---------- */
+.ui-layer.ui-im { background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,0) 55%); align-items: flex-start !important; justify-content: flex-start !important; }
+.im { position: absolute; left: calc(max(3vw, var(--sal)) + 4px); top: calc(4vh + var(--sat)); width: min(400px, 86vw); font-family: var(--ui); color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.45); animation: imIn .18s ease-out; }
+@keyframes imIn { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+.im-banner { height: 92px; display: flex; flex-direction: column; justify-content: flex-end; padding: 0 18px 12px; background: linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0)), url('../assets/sky/dusk.jpg') center 40% / cover; }
+.im-banner b { font-family: var(--head); font-size: 34px; font-weight: 700; letter-spacing: .03em; line-height: 1; text-shadow: 0 3px 10px rgba(0,0,0,.6); }
+.im-banner span { font-size: 12px; letter-spacing: .25em; text-transform: uppercase; opacity: .8; }
+.im-sub { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: #000; font-size: 13px; letter-spacing: .1em; }
+.im-sub b { color: var(--accent); font-weight: 800; }
+.im-sub span { opacity: .75; }
+.im-list { display: flex; flex-direction: column; background: rgba(0,0,0,.72); max-height: 52vh; overflow: auto; }
+.im-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 14px; background: none; border: none; color: #fff; font: 600 16px var(--ui); text-align: left; cursor: pointer; }
+.im-row em { font-style: normal; font-weight: 600; opacity: .85; white-space: nowrap; }
+.im-row.on { background: #f2f2f2; color: #111; }
+.im-row.on em { opacity: 1; }
+.im-row.info em { color: var(--cash); } .im-row.info.on em { color: #2c7a2c; }
+.im-desc { padding: 11px 14px; background: rgba(0,0,0,.85); border-top: 2px solid var(--accent); font-size: 14px; line-height: 1.45; color: rgba(255,255,255,.9); min-height: 44px; }
+.im-keys { display: flex; gap: 3px; margin-top: 3px; }
+.im-keys button { flex: 1; padding: 10px; border: none; background: rgba(0,0,0,.72); color: #fff; font: 500 15px var(--head); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.im-keys button:hover { background: #f2f2f2; color: #111; }

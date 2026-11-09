@@ -6,6 +6,7 @@ import * as TX from './textures.js';
 import { GeoBuilder, rgb } from './geo.js';
 import { mulberry32, lerp, clamp, smoothstep } from './utils.js';
 import { rayBox as rayBoxW } from './physics.js';
+import { TEX, applyDetail } from './realism.js';
 
 const { CELL, NB, HALF, WALK_HW, roadPos, I0 } = C;
 
@@ -361,6 +362,19 @@ export class World {
     // Matte Flächen spiegeln den Himmel kaum (sonst Blaustich)
     for (const k of ['road', 'land', 'concrete', 'grass', 'sand', 'roof', 'tile', 'wood']) this.M[k].envMapIntensity = 0.35;
     this.M.signs.color.setScalar(0.6);
+    // Fotorealistische Detailschicht (echte PBR-Texturen)
+    if (TEX.asphalt) {
+      const M = this.M;
+      applyDetail(M.road, { a: 'asphalt', b: 'pavement', mode: 'xz', scale: 3.2, scaleB: 2.6, split: 'lum', col: 0.95, nrm: 0.9 });
+      for (const k of ['apt', 'deco', 'house']) applyDetail(M[k], { a: 'plaster', mode: 'box', scale: 3, col: 0.6, nrm: 0.75, mask: 'metal' });
+      for (const k of ['office', 'warehouse']) applyDetail(M[k], { a: 'concrete', mode: 'box', scale: 7, col: 0.25, nrm: 0.5, mask: 'metal' });
+      applyDetail(M.roof, { a: 'concrete', mode: 'xz', scale: 4, col: 0.6 });
+      applyDetail(M.tile, { a: 'rooftile', mode: 'uv', scale: 3.5, col: 0.9, nrm: 1 });
+      applyDetail(M.grass, { a: 'grass', mode: 'xz', scale: 2.5, col: 0.9 });
+      applyDetail(M.sand, { a: 'sand', mode: 'xz', scale: 4, col: 0.8 });
+      applyDetail(M.concrete, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.7 });
+      applyDetail(M.land, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.6 });
+    }
     this.M.accent.color.setScalar(0.3);
   }
 
@@ -1072,7 +1086,9 @@ export class World {
       cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.4 }));
+    const terrMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.4 });
+    if (TEX.grass) applyDetail(terrMat, { a: 'grass', b: 'rock', mode: 'terrain', scale: 3, scaleB: 7, col: 0.85, nrm: 0.9 });
+    const mesh = new THREE.Mesh(g, terrMat);
     mesh.receiveShadow = true;
     this.scene.add(mesh);
     // Wälder & Palmen
@@ -1723,10 +1739,10 @@ export class World {
     };
     // Meer mit dezentem Verlauf
     const gr = g.createRadialGradient(S * 0.45, S * 0.5, S * 0.1, S * 0.5, S * 0.5, S * 0.75);
-    gr.addColorStop(0, '#10233a'); gr.addColorStop(1, '#070f1c');
+    gr.addColorStop(0, '#5b8db3'); gr.addColorStop(1, '#3f7299');
     g.fillStyle = gr; g.fillRect(0, 0, S, S);
     // feines Raster
-    g.strokeStyle = 'rgba(120,170,255,0.05)'; g.lineWidth = 1;
+    g.strokeStyle = 'rgba(255,255,255,0.06)'; g.lineWidth = 1;
     for (let k = 0; k <= S; k += 64) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k, S); g.moveTo(0, k); g.lineTo(S, k); g.stroke(); }
     // Küste (Strand) mit Glühkante
     const shore = [];
@@ -1738,29 +1754,29 @@ export class World {
     g.beginPath(); g.moveTo(sx(C.BEACH_X0), sz(-460));
     for (const [x, z] of shore) g.lineTo(sx(x), sz(z));
     g.lineTo(sx(C.BEACH_X0), sz(460)); g.closePath();
-    g.fillStyle = '#4a3f2c'; g.fill();
-    g.save(); g.shadowColor = 'rgba(25,230,255,0.6)'; g.shadowBlur = 18; g.strokeStyle = 'rgba(25,230,255,0.55)'; g.lineWidth = 3;
+    g.fillStyle = '#e6d6ad'; g.fill();
+    g.save(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 3;
     g.beginPath(); shore.forEach(([x, z], i) => (i ? g.lineTo(sx(x), sz(z)) : g.moveTo(sx(x), sz(z)))); g.stroke(); g.restore();
     // Landmasse mit Uferlinie
     const L = C.LAND;
-    g.save(); g.shadowColor = 'rgba(25,230,255,0.45)'; g.shadowBlur = 22;
-    rect(L.minX, L.minZ, L.maxX, L.maxZ, '#151b28', 6); g.restore();
-    g.strokeStyle = 'rgba(25,230,255,0.35)'; g.lineWidth = 2;
+    g.save(); g.shadowColor = 'rgba(20,40,60,0.45)'; g.shadowBlur = 14;
+    rect(L.minX, L.minZ, L.maxX, L.maxZ, '#d9d4c6', 6); g.restore();
+    g.strokeStyle = 'rgba(70,80,90,0.5)'; g.lineWidth = 2;
     g.strokeRect(sx(L.minX), sz(L.minZ), (L.maxX - L.minX) * sc, (L.maxZ - L.minZ) * sc);
     // Blöcke
-    const dcol = { downtown: '#202a3e', midtown: '#1d2638', westside: '#1f2335', heights: '#1b2731', seaside: '#252036', harbor: '#1b222e', oldtown: '#26222e' };
+    const dcol = { downtown: '#cbc6ba', midtown: '#d1ccbf', westside: '#d6d0c2', heights: '#d3d6c4', seaside: '#ddd4c2', harbor: '#c4c3bd', oldtown: '#ddd0bd' };
     for (let bj = 0; bj < NB; bj++) for (let bi = I0; bi < NB; bi++) {
       const x0 = roadPos(bi) + 9, z0 = roadPos(bj) + 9;
-      rect(x0, z0, x0 + CELL - 18, z0 + CELL - 18, C.isPark(bi, bj) ? '#15392b' : (dcol[C.districtOf(bi, bj)] || '#1d2638'), 4);
+      rect(x0, z0, x0 + CELL - 18, z0 + CELL - 18, C.isPark(bi, bj) ? '#a9c98d' : (dcol[C.districtOf(bi, bj)] || '#1d2638'), 4);
       if (C.isPark(bi, bj)) { // Parkwege
-        g.strokeStyle = 'rgba(124,255,107,0.18)'; g.lineWidth = 3 * sc;
+        g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 3 * sc;
         g.beginPath(); g.moveTo(sx(x0 + 31), sz(z0)); g.lineTo(sx(x0 + 31), sz(z0 + 62)); g.moveTo(sx(x0), sz(z0 + 31)); g.lineTo(sx(x0 + 62), sz(z0 + 31)); g.stroke();
       }
     }
     // Gebäude (leicht erhaben)
     for (const [x0, z0, x1, z1] of this.footprints) {
-      rect(x0 + 0.5, z0 + 0.5, x1 - 0.5, z1 - 0.5, '#2a3449');
-      g.fillStyle = 'rgba(160,190,255,0.08)'; g.fillRect(sx(x0 + 0.5), sz(z0 + 0.5), (x1 - x0 - 1) * sc, 2.2 * sc);
+      rect(x0 + 0.5, z0 + 0.5, x1 - 0.5, z1 - 0.5, '#b3ada1');
+      g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(sx(x0 + 0.5), sz(z0 + 0.5), (x1 - x0 - 1) * sc, 2.2 * sc);
     }
     // Straßen: Kontur, Belag, Mittellinie
     const major = (i) => i === I0 || i === 0 || i === NB || i === 4 || i === 5;
@@ -1778,21 +1794,21 @@ export class World {
         g.beginPath(); pl.forEach(([x, z], k) => (k ? g.lineTo(sx(x), sz(z)) : g.moveTo(sx(x), sz(z)))); g.stroke();
       }
     };
-    lines((i) => (major(i) ? 20 : 18), () => '#0b0f17');
-    lines((i) => (major(i) ? 15 : 13), (i) => (major(i) ? '#56627f' : '#3d4760'));
+    lines((i) => (major(i) ? 18 : 15), () => '#9a968d');
+    lines((i) => (major(i) ? 15 : 12), (i) => (major(i) ? '#fbe9a6' : '#ffffff'));
     g.setLineDash([3 * sc, 4 * sc]);
-    lines(() => 0.7, (i) => (major(i) ? 'rgba(255,210,63,0.55)' : 'rgba(255,255,255,0.18)'));
+    lines(() => 0.7, (i) => (major(i) ? 'rgba(200,150,30,0.55)' : 'rgba(0,0,0,0)'));
     g.setLineDash([]);
     // Kreuzungen
-    for (const n of this.nodes) { g.fillStyle = '#4a5570'; g.beginPath(); g.arc(sx(n.x), sz(n.z), 6.5 * sc, 0, 7); g.fill(); }
+    for (const n of this.nodes) { g.fillStyle = '#ffffff'; g.beginPath(); g.arc(sx(n.x), sz(n.z), 6 * sc, 0, 7); g.fill(); }
     // Pier & Riesenrad
-    rect(C.PIER.x0, C.PIER.z0, C.PIER.x1, C.PIER.z1, '#6b5038', 2);
-    rect(C.PIER_PLAT.x0, C.PIER_PLAT.z0, C.PIER_PLAT.x1, C.PIER_PLAT.z1, '#6b5038', 4);
-    g.save(); g.shadowColor = '#ff2e88'; g.shadowBlur = 16; g.strokeStyle = '#ff6fb0'; g.lineWidth = 3;
+    rect(C.PIER.x0, C.PIER.z0, C.PIER.x1, C.PIER.z1, '#a88b62', 2);
+    rect(C.PIER_PLAT.x0, C.PIER_PLAT.z0, C.PIER_PLAT.x1, C.PIER_PLAT.z1, '#a88b62', 4);
+    g.save(); g.strokeStyle = '#6d6a64'; g.lineWidth = 3;
     g.beginPath(); g.arc(sx(632), sz(40), 24 * sc, 0, 7); g.stroke(); g.restore();
     // Hafen: Schiff & Kräne
-    rect(-330, 398, -92, 426, '#232f48', 6);
-    for (const cx of [-330, -250, -170, -90]) rect(cx - 6, 372, cx + 6, 384, '#5a4a1a');
+    rect(-330, 398, -92, 426, '#5d6b78', 6);
+    for (const cx of [-330, -250, -170, -90]) rect(cx - 6, 372, cx + 6, 384, '#d9a520');
     // Solera Hills
     const step = 8;
     for (let z = HILLS.z0; z < HILLS.z1 + 20; z += step) for (let x = HILLS.x0; x < HILLS.x1; x += step) {
@@ -1800,16 +1816,17 @@ export class World {
       if (y < -0.7) continue;
       const shade = Math.min(1, Math.max(0, (hillHeight(x + step, z) - hillHeight(x, z + step)) * 0.08 + 0.5));
       let col;
-      if (y < 1.2) col = [74, 63, 44];
-      else if (y > 80) col = [92, 88, 82];
-      else col = [30 + y * 0.4, 52 + y * 0.25, 38];
-      const f = 0.7 + shade * 0.6;
+      if (y < 1.2) col = [226, 212, 172];
+      else if (y > 105) col = [236, 236, 232];
+      else if (y > 70) col = [176, 168, 150];
+      else col = [150 - y * 0.6, 176 - y * 0.5, 120 - y * 0.3];
+      const f = 0.78 + shade * 0.44;
       g.fillStyle = `rgb(${col[0] * f | 0},${col[1] * f | 0},${col[2] * f | 0})`;
       g.fillRect(sx(x), sz(z), step * sc + 1, step * sc + 1);
     }
-    rect(CAUSEWAY.x0, CAUSEWAY.z0, CAUSEWAY.x1, CAUSEWAY.z1, '#56627f');
-    for (const [x0, z0, x1, z1] of this.footprints) if (z1 < HILLS.z1) rect(x0 + 0.5, z0 + 0.5, x1 - 0.5, z1 - 0.5, '#2a3449');
-    hillLines(16, '#0b0f17'); hillLines(11, '#56627f');
+    rect(CAUSEWAY.x0, CAUSEWAY.z0, CAUSEWAY.x1, CAUSEWAY.z1, '#fbe9a6');
+    for (const [x0, z0, x1, z1] of this.footprints) if (z1 < HILLS.z1) rect(x0 + 0.5, z0 + 0.5, x1 - 0.5, z1 - 0.5, '#b3ada1');
+    hillLines(14, '#9a968d'); hillLines(10, '#ffffff');
     this.mapCanvas = c;
     this.mapScale = sc;
     this.mapToPx = (x, z) => [sx(x), sz(z)];
