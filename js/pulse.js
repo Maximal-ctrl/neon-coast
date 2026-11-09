@@ -179,8 +179,12 @@ export class PulseRadio {
       A.sweeper();
       A.duck(0.32, 0.6);
       const done = () => { A.duck(1, 1.2); this.talking = false; };
-      if (this.idents.length) {
-        const id = this.idents[Math.floor(Math.random() * this.idents.length)];
+      const pool = this.idents.length ? this.idents : this.builtin || [];
+      if (pool.length) {
+        let k = Math.floor(Math.random() * pool.length);
+        if (pool.length > 1 && k === this.lastIdent) k = (k + 1) % pool.length;
+        this.lastIdent = k;
+        const id = pool[k];
         const src = ctx.createBufferSource(); src.buffer = id.buffer;
         // Radioklang: Bandpass + Kompressor
         const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 160;
@@ -209,6 +213,13 @@ export class PulseRadio {
   async load(songs, idents) {
     const ctx = this.A.ctx;
     const dec = async (list) => { const out = []; for (const r of list) { try { const ab = await r.blob.arrayBuffer(); out.push({ name: r.name, buffer: await ctx.decodeAudioData(ab) }); } catch (e) { /* ungültige Datei */ } } return out; };
+    if (!this.builtin) {
+      // Moderationsstimme des Senders (KI-Stimme, ElevenLabs)
+      const files = ['assets/radio/ident1.mp3', 'assets/radio/ident2.mp3'];
+      const out = [];
+      for (const f of files) { try { const r = await fetch(f); out.push({ name: f, buffer: await ctx.decodeAudioData(await r.arrayBuffer()) }); } catch (e) { /* */ } }
+      this.builtin = out;
+    }
     this.userTracks = await dec(songs);
     this.idents = await dec(idents);
     this.buildList();

@@ -51,3 +51,4 @@ Schriften: Russo One & Rajdhani (SIL Open Font License).
 ## Quellen (ab Version 2.0)
 - Foto-Texturen und Himmelspanoramen: [Poly Haven](https://polyhaven.com) (CC0)
 - Schriften: Inter und Oswald (SIL Open Font License, siehe `fonts/`)
+- Radio-Moderation (PULSE 132): KI-Stimme erzeugt mit [ElevenLabs](https://elevenlabs.io)

@@ -631,7 +631,7 @@ function phoneRadio() {
        <div class="ph-actions"><button class="ph-btn2" data-mus="padd">🎧 Songs zu PULSE 132 hinzufügen${pc.songs ? ` <em>${pc.songs}</em>` : ''}</button>
          <button class="ph-btn2" data-mus="iadd">🎙️ Eigene Einspieler hinzufügen${pc.idents ? ` <em>${pc.idents}</em>` : ''}</button>
          ${pc.songs || pc.idents ? '<button class="ph-btn2" data-mus="pclear">🗑 PULSE-Dateien löschen</button>' : ''}</div>
-       <div class="ph-note">Das Radio läuft im Auto. Eigene Songs und Einspieler bleiben nur auf diesem Gerät. Ohne eigene Einspieler spricht der Moderator mit der Stimme deines Geräts.</div>`);
+       <div class="ph-note">Das Radio läuft im Auto. Eigene Songs und Einspieler bleiben nur auf diesem Gerät. Ohne eigene Einspieler spricht die Sender-Moderatorin.</div>`);
   const set = (i) => { A.station = (i + STATIONS.length) % STATIONS.length; A.nextBar = 0; if (A.ready) G.hud.radio(A.stationInfo(A.station)); phoneRadio(); };
   $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => set(+b.dataset.st));
   $('ph-screen').querySelectorAll('[data-step]').forEach((b) => b.onclick = () => set(A.station + +b.dataset.step));
@@ -995,7 +995,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '2.01 Beta';
+export const GAME_VERSION = '2.02 Beta';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));
