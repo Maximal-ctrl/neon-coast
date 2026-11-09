@@ -169,7 +169,7 @@ export class PedManager {
     }
     if (knock > 3) {
       p.state = 'knock'; p.vx = dx * knock; p.vz = dz * knock; p.vy = 2 + knock * 0.25; p.timer = 1.8; p.spinX = 0;
-    } else if (!p.isCop) {
+    } else if (!p.isCop && !p.isGang) {
       if (!p.hostile && chance(p.look.scale > 0.97 ? 0.3 : 0.12) && source === 'player' && G.player.state === 'foot') {
         p.hostile = true; p.state = 'attack'; p.speed = 5;
       } else if (!p.hostile) { p.state = 'flee'; p.fleeFrom = { x: G.player.x, z: G.player.z }; p.timer = rand(8, 14); }
@@ -181,7 +181,7 @@ export class PedManager {
     p.alive = false; p.health = 0;
     p.state = 'dead'; p.deadT = 0;
     p.anim.gun = false;
-    if (source === 'player') {
+    if (source === 'player' && !p.isGang) {
       G.police.crime(p.isCop ? 'killCop' : 'killPed', p);
       if (!p.isCop && chance(0.6)) G.missions.dropMoney(p.x, p.z, Math.floor(rand(5, 60)));
       if (p.isCop && chance(0.5)) G.missions.dropWeapon(p.x, p.z, 'pistol', 12);
@@ -356,10 +356,11 @@ export class PedManager {
         break;
       }
       case 'cop': this.copThink(p, dt); break;
+      case 'gang': this.gangThink(p, dt); break;
       case 'knock': {
         p.moveSpeed = 0;
         if (p.vy === 0 && p.timer <= 0 && p.y <= p.gy + 0.05) {
-          if (p.alive) { p.lie = 0; p.state = p.isCop ? 'cop' : 'flee'; p.fleeFrom = { x: P.x, z: P.z }; p.timer = 10; }
+          if (p.alive) { p.lie = 0; p.state = p.isCop ? 'cop' : p.isGang ? 'gang' : 'flee'; p.fleeFrom = { x: P.x, z: P.z }; p.timer = 10; }
         }
         break;
       }
@@ -386,6 +387,39 @@ export class PedManager {
     const [bi0, bj0] = C.blockOf(p.x, p.z);
     const bi = clamp(bi0, C.I0, C.NB - 1), bj = clamp(bj0, 0, C.NB - 1);
     p.path = { bi, bj, k: Math.floor(rand(0, 4)), dir: chance(0.5) ? 1 : -1, off: rand(0, 1.2) };
+  }
+
+  // Gangmitglied: greift den Spieler (oder ein Ziel) an
+  gangThink(p, dt) {
+    const P = G.player;
+    if (p.anim.punch > 0) p.anim.punch = Math.max(0, p.anim.punch - dt * 2.5);
+    if (P.state === 'dead') { p.moveSpeed = 0; p.anim.aim = false; return; }
+    const tx = P.inCar ? P.vehicle.x : P.x, tz = P.inCar ? P.vehicle.z : P.z, ty = P.inCar ? P.vehicle.y + 1 : P.y + 1.2;
+    const d = Math.hypot(tx - p.x, tz - p.z);
+    const aggro = d < (p.aggroR || 45);
+    if (!aggro && p.goal) { p.tx = p.goal.x; p.tz = p.goal.z; p.moveSpeed = Math.hypot(p.goal.x - p.x, p.goal.z - p.z) > 1.5 ? 4.2 : 0; p.anim.aim = false; p.anim.gun = !!p.gangGun; return; }
+    p.tx = tx; p.tz = tz;
+    if (p.gangGun) {
+      p.anim.gun = true;
+      p.losT = (p.losT || 0) - dt;
+      if (p.losT <= 0) { p.losT = 0.4; p.see = d < 38 && G.world.lineOfSight(p.x, p.y + 1.6, p.z, tx, ty, tz); }
+      if (p.see && d < 32) {
+        p.moveSpeed = d > 18 ? 3.6 : 0;
+        p.anim.aim = true;
+        p.yaw = dampAngle(p.yaw, Math.atan2(tx - p.x, tz - p.z), 10, dt);
+        p.shootT = (p.shootT || rand(0.5, 1.5)) - dt;
+        if (p.shootT <= 0) { p.shootT = rand(0.9, 1.9) * (p.slow || 1); G.combat.npcShoot(p, tx, ty, tz); }
+      } else { p.anim.aim = false; p.moveSpeed = d > 2 ? 4.8 : 0; }
+    } else {
+      p.anim.gun = false; p.anim.aim = false;
+      p.moveSpeed = d > 1.5 ? 5.2 : 0;
+      p.punchT = (p.punchT || 0) - dt;
+      if (d < 1.6 && p.punchT <= 0 && P.state === 'foot') {
+        p.punchT = 1.0; p.anim.punch = 1;
+        p.yaw = Math.atan2(P.x - p.x, P.z - p.z);
+        setTimeout(() => { if (p.alive && dist2(p.x, p.z, P.x, P.z) < 3) P.damage(6, p); }, 180);
+      }
+    }
   }
 
   copThink(p, dt) {
@@ -468,7 +502,7 @@ export class PedManager {
       p.gy = W.groundHeight(p.x, p.z);
       p.y = damp(p.y, p.gy, 20, dt);
       if (p.gy < C.WATER_Y - 1.0 && p.alive) { p.state = 'swim'; }
-      A.tilt = -p.lie * Math.PI / 2; A.lift = p.lie * 0.14;
+      A.tilt = -p.lie * Math.PI / 2; A.lift = p.lie * 0.14 + (p.seatLift || 0);
     }
     this.collide(p);
     // Animation

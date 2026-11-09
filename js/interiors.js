@@ -1,5 +1,6 @@
 // Begehbare Innenräume: Club Velvet (Nachtclub) & Solera Bank (Banküberfall)
 import * as THREE from 'three';
+import { OUTFITS } from './models.js';
 import { G } from './state.js';
 import { Marker } from './missions.js';
 import { randomLook, copLook, buildCar, addWheels, CAR_TYPES } from './models.js';
@@ -41,6 +42,11 @@ export class Interiors {
     this.buildShop();
     this.buildDealer();
     this.buildDealerFront();
+    this.buildCafe();
+    this.buildBoutique();
+    this.buildVilla();
+    this.buildOffice();
+    this.residents = {};
     const sh = G.world.pois.safehouse, shop = G.world.pois.shop, dl = G.world.pois.dealer;
     this.doors = [
       { kind: 'club', m: new Marker(234, 106.5, 0xff2e88, { label: 'C', r: 1.2 }), out: { x: 234, z: 109.8, yaw: 0 } },
@@ -49,7 +55,196 @@ export class Interiors {
       { kind: 'shop', m: new Marker(shop.x, shop.z, 0xffd23f, { label: '24', r: 1.1 }), out: { x: shop.x, z: shop.z + 2.4, yaw: 0 } },
       { kind: 'dealer', m: new Marker(dl.x, dl.z, 0xff2e88, { label: 'A', r: 1.2 }), out: { x: dl.x, z: dl.z + 2.8, yaw: 0 } },
     ];
+    for (const e of G.world.entrances || []) {
+      this.doors.push({ kind: e.kind, name: e.name, id: e.id, m: new Marker(e.x, e.z, new THREE.Color(e.col).getHex(), { label: e.label, r: 1.1 }), out: e.out });
+    }
     for (const d of this.doors) d.latch = false;
+  }
+  doorPos(id) { const d = this.doors.find((o) => (o.id || o.kind) === id); return d ? { x: d.m.x, z: d.m.z } : null; }
+
+  // Gemeinsamer Möbelbau für die neuen Räume
+  furnish(R, build) {
+    const B = new GeoBuilder(true);
+    build(B, (x0, z0, x1, z1, h) => G.world.addBox(x0, z0, x1, z1, -1, h, 'bld'));
+    const mesh = new THREE.Mesh(B.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }));
+    R.g.add(mesh);
+  }
+  lamp(R, x, y, z, col = [2.2, 1.7, 1.1], r = 0.28) {
+    const l = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(...col) }));
+    l.position.set(x, y, z); R.g.add(l);
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1, 4), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+    cord.position.set(x, y + 0.6, z); R.g.add(cord);
+  }
+  textPlane(R, text, col, x, y, z, ry, w = 3) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: textTex(text, col, 512, 128, 64), transparent: true, depthWrite: false }));
+    m.position.set(x, y, z); m.rotation.y = ry; R.g.add(m);
+  }
+
+  // ------------------------------------------------------------ Café Vieja (Altstadt)
+  buildCafe() {
+    const tiles = canvasTex(256, 256, (g, w) => { for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.fillStyle = (i + j) % 2 ? '#d9c3a0' : '#7a4a32'; g.fillRect(i * 32, j * 32, 32, 32); } }, true);
+    tiles.repeat.set(6, 4);
+    const R = this.room('cafe', 1500, 750, 18, 13, 3.6, {
+      floor: new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.4 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0x5a3a28, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xe8d6b8, emissive: 0x1a120a, roughness: 0.9 }),
+    });
+    R.name = 'Café Vieja'; R.spawn = { x: 1500, z: 754.4, yaw: Math.PI };
+    R.lightCfg = [1500, 3, 750, 0xffc890, 30];
+    this.furnish(R, (B, col) => {
+      // Theke mit Vitrine & Espressomaschine
+      B.box(1493, 0, 744.6, 1503, 1.05, 745.9, { col: rgb(0x5a3422) });
+      B.box(1492.9, 1.05, 744.5, 1503.1, 1.12, 746, { col: rgb(0xe9e4da) });
+      B.box(1497, 1.12, 745.2, 1500, 1.5, 745.9, { col: rgb(0xbfe6ff) });
+      for (let i = 0; i < 8; i++) B.box(1497.2 + i * 0.34, 1.13, 745.4, 1497.45 + i * 0.34, 1.22, 745.7, { col: rgb([0xc68642, 0xf2d0a4, 0x8a4b2a, 0xff8fab][i % 4]) });
+      B.box(1493.6, 1.12, 744.7, 1494.6, 1.75, 745.4, { col: rgb(0xb8bec7) });
+      B.box(1493.5, 1.75, 744.6, 1494.7, 1.85, 745.5, { col: rgb(0x2b2b2b) });
+      col(1492.9, 744.5, 1503.1, 746, 1.12);
+      // Regal mit Bohnen & Flaschen
+      B.box(1493, 1.3, 743.6, 1503, 1.36, 743.95, { col: rgb(0x5a3422) });
+      B.box(1493, 2.0, 743.6, 1503, 2.06, 743.95, { col: rgb(0x5a3422) });
+      for (let i = 0; i < 24; i++) B.box(1493.2 + i * 0.4, 1.36, 743.7, 1493.42 + i * 0.4, 1.66 + (i % 3) * 0.06, 743.9, { col: rgb([0x2a9d8f, 0x8a4b2a, 0xe9c46a, 0x264653][i % 4]) });
+      // Tische mit Stühlen
+      for (const [x, z] of [[1494, 749], [1498.5, 749.6], [1503, 749], [1505.5, 745.5], [1494.5, 753], [1505, 753]]) {
+        B.addGeometry(new THREE.CylinderGeometry(0.55, 0.55, 0.05, 16), new THREE.Matrix4().makeTranslation(x, 0.76, z), rgb(0xf4f1ea));
+        B.addGeometry(new THREE.CylinderGeometry(0.05, 0.05, 0.74, 6), new THREE.Matrix4().makeTranslation(x, 0.37, z), rgb(0x222222));
+        for (const [ox, oz] of [[0.9, 0], [-0.9, 0], [0, 0.9]]) { B.box(x + ox - 0.22, 0.44, z + oz - 0.22, x + ox + 0.22, 0.5, z + oz + 0.22, { col: rgb(0x8a4b2a) }); B.box(x + ox - 0.22 + (ox > 0 ? 0.38 : 0), 0.5, z + oz - 0.22, x + ox - 0.22 + (ox > 0 ? 0.44 : 0.06), 1.0, z + oz + 0.22, { col: rgb(0x8a4b2a) }); }
+        col(x - 0.6, z - 0.6, x + 0.6, z + 0.6, 0.8);
+      }
+      // Pflanzen & Bilder
+      for (const x of [1491.6, 1508.4]) { B.box(x - 0.3, 0, 755.6, x + 0.3, 0.6, 756.2, { col: rgb(0x9a5a3a) }); B.addGeometry(new THREE.IcosahedronGeometry(0.55, 1), new THREE.Matrix4().makeTranslation(x, 1.1, 755.9), rgb(0x3e7a2e)); }
+      for (const [x, c] of [[1492, 0xe76f51], [1508, 0x2a9d8f]]) B.box(x - 0.8, 1.6, 743.45, x + 0.8, 2.7, 743.5, { col: rgb(c) });
+    });
+    for (const x of [1495, 1499, 1503]) this.lamp(R, x, 2.7, 749.5);
+    this.textPlane(R, 'CAFÉ VIEJA', '#ffb35c', 1498, 3.0, 743.4, 0, 3.6);
+    R.exit = new Marker(1500, 756.3, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.counter = new Marker(1498, 747.0, 0xffb35c, { label: '☕', r: 0.9 });
+    R.markers = [R.exit, R.counter];
+    R.resident = { id: 'ines', x: 1498, z: 744.1, yaw: 0, look: () => ({ ...randomLook(), skin: C(0xd9a066), shirt: C(0x7a2e1e), sleeve: C(0xd9a066), pants: C(0x2b2b2b), legs: C(0x2b2b2b), hair: C(0x2b1a10), hat: null, bald: false, scale: 0.9 }) };
+    R.guests = [[1494.9, 749, -Math.PI / 2, 'sit'], [1502.1, 749, Math.PI / 2, 'sit'], [1505, 753.9, Math.PI, 'sit']];
+    for (const m of R.markers) m.group.visible = false;
+  }
+
+  // ------------------------------------------------------------ Moda Solera (Boutique)
+  buildBoutique() {
+    const R = this.room('boutique', 1500, 900, 16, 12, 3.8, {
+      floor: new THREE.MeshStandardMaterial({ color: 0xe9e4dc, roughness: 0.15, metalness: 0.1 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x555555, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xf6efe9, emissive: 0x2a2626, roughness: 0.8 }),
+    });
+    R.name = 'Moda Solera'; R.spawn = { x: 1500, z: 903.8, yaw: Math.PI };
+    R.lightCfg = [1500, 3.4, 900, 0xfff2ea, 22];
+    const cloth = [0xff6b6b, 0xf6f1e9, 0x222222, 0x19e6ff, 0xffd166, 0x3ec1d3, 0x9b5de5, 0x2a9d8f];
+    this.furnish(R, (B, col) => {
+      for (const z of [897, 900.5]) {
+        B.box(1493.5, 1.55, z - 0.03, 1499.5, 1.6, z + 0.03, { col: rgb(0xc9ced6) });
+        for (const x of [1493.5, 1499.5]) B.box(x - 0.04, 0, z - 0.04, x + 0.04, 1.6, z + 0.04, { col: rgb(0xc9ced6) });
+        for (let i = 0; i < 16; i++) B.box(1493.8 + i * 0.36, 0.55, z - 0.25, 1494.0 + i * 0.36, 1.5, z + 0.25, { col: rgb(cloth[(i + (z > 899 ? 3 : 0)) % cloth.length]) });
+        col(1493.4, z - 0.3, 1499.6, z + 0.3, 1.6);
+      }
+      // Regalwand & Kasse
+      B.box(1506.6, 0, 894.5, 1507.9, 2.8, 905, { col: rgb(0xf4efe6) });
+      for (let r = 0; r < 4; r++) for (let i = 0; i < 14; i++) B.box(1506.5, 0.35 + r * 0.62, 894.9 + i * 0.72, 1506.6, 0.75 + r * 0.62, 895.4 + i * 0.72, { col: rgb(cloth[(i + r) % cloth.length]) });
+      col(1506.5, 894.5, 1508, 905, 2.8);
+      B.box(1500.5, 0, 894.4, 1504.5, 1.0, 895.5, { col: rgb(0x2b2d42) });
+      col(1500.5, 894.4, 1504.5, 895.5, 1.0);
+      // Spiegel & Podest
+      B.box(1492.2, 0, 903.2, 1494.2, 0.15, 905.2, { col: rgb(0xd4af37) });
+      B.box(1492.1, 0.2, 905.75, 1494.3, 2.5, 905.85, { col: rgb(0xdfe9f2) });
+      // Schaufensterpuppen (vereinfacht)
+      for (const x of [1503, 1504.6]) { B.addGeometry(new THREE.CylinderGeometry(0.18, 0.12, 1.1, 10), new THREE.Matrix4().makeTranslation(x, 1.0, 903.5), rgb(0xff6fb0)); B.addGeometry(new THREE.SphereGeometry(0.13, 10, 8), new THREE.Matrix4().makeTranslation(x, 1.75, 903.5), rgb(0xf2f2f2)); B.box(x - 0.02, 0, 903.48, x + 0.02, 0.5, 903.52, { col: rgb(0x888888) }); }
+    });
+    for (const x of [1495, 1500, 1505]) this.lamp(R, x, 3.2, 900, [2.4, 2.3, 2.1], 0.22);
+    this.textPlane(R, 'MODA SOLERA', '#ff6fb0', 1500, 3.0, 894.05, 0, 3.6);
+    R.exit = new Marker(1500, 905.6, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.rack = new Marker(1496.5, 898.8, 0xff6fb0, { label: '👕', r: 1.0 });
+    R.markers = [R.exit, R.rack];
+    R.resident = { id: 'clerk', x: 1502.5, z: 893.9, yaw: 0, look: () => ({ ...randomLook(), shirt: C(0x222222), sleeve: C(0x222222), pants: C(0x222222), legs: C(0x222222), hat: null }) };
+    for (const m of R.markers) m.group.visible = false;
+  }
+
+  // ------------------------------------------------------------ Villa Aurelio (Monte Solera)
+  buildVilla() {
+    const marble = canvasTex(256, 256, (g, w) => { g.fillStyle = '#efece6'; g.fillRect(0, 0, w, w); g.strokeStyle = 'rgba(120,110,100,0.18)'; for (let i = 0; i < 18; i++) { g.beginPath(); g.moveTo(Math.random() * w, 0); g.bezierCurveTo(Math.random() * w, w / 3, Math.random() * w, w / 1.5, Math.random() * w, w); g.stroke(); } g.strokeStyle = 'rgba(0,0,0,0.08)'; g.strokeRect(0, 0, w, w); }, true);
+    marble.repeat.set(6, 5);
+    const R = this.room('villa', 1500, 1050, 22, 16, 4.2, {
+      floor: new THREE.MeshStandardMaterial({ map: marble, color: 0xd8d2c8, roughness: 0.3, metalness: 0.05 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xf8f4ec, emissive: 0x3a3630, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xf1e8da, emissive: 0x241e18, roughness: 0.85 }),
+    });
+    R.name = 'Villa Aurelio'; R.spawn = { x: 1500, z: 1055.6, yaw: Math.PI };
+    R.lightCfg = [1500, 3.8, 1050, 0xfff0d8, 20];
+    this.furnish(R, (B, col) => {
+      // Ledersofas um Couchtisch
+      B.box(1494, 0, 1046, 1499, 0.5, 1047.2, { col: rgb(0x5a3422) }); B.box(1494, 0.5, 1046, 1499, 1.1, 1046.4, { col: rgb(0x5a3422) });
+      B.box(1494, 0, 1050.8, 1499, 0.5, 1052, { col: rgb(0x5a3422) }); B.box(1494, 0.5, 1051.6, 1499, 1.1, 1052, { col: rgb(0x5a3422) });
+      B.box(1495.3, 0, 1048.3, 1497.7, 0.42, 1049.9, { col: rgb(0x1d1d1f) });
+      col(1494, 1046, 1499, 1047.2, 1.1); col(1494, 1050.8, 1499, 1052, 1.1); col(1495.3, 1048.3, 1497.7, 1049.9, 0.42);
+      // Schreibtisch des Paten
+      B.box(1503.5, 0, 1044.6, 1507.5, 0.85, 1045.9, { col: rgb(0x3b2416) });
+      B.box(1503.4, 0.85, 1044.5, 1507.6, 0.92, 1046, { col: rgb(0x2a1a10) });
+      B.box(1505, 0.92, 1044.8, 1505.6, 1.3, 1044.9, { col: rgb(0x111111) });
+      col(1503.4, 1044.5, 1507.6, 1046, 0.92);
+      B.box(1504.9, 0, 1043.4, 1506.1, 1.4, 1044.1, { col: rgb(0x7a1e1e) });
+      // Bar & Weinregal
+      B.box(1508.5, 0, 1047, 1510.4, 1.1, 1054, { col: rgb(0x2a1a10) });
+      for (let r = 0; r < 5; r++) for (let i = 0; i < 10; i++) B.addGeometry(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 6).rotateZ(Math.PI / 2), new THREE.Matrix4().makeTranslation(1510.8, 1.5 + r * 0.32, 1047.4 + i * 0.66), rgb([0x6d2e46, 0x3a5a40, 0xe9d8a6][(i + r) % 3]));
+      col(1508.5, 1047, 1510.4, 1054, 1.1);
+      // Kamin, Teppich, Säulen, Gemälde
+      B.box(1489.2, 0, 1047.5, 1489.9, 1.6, 1052.5, { col: rgb(0xd8d2c6) });
+      B.box(1489.85, 0.25, 1048.6, 1489.92, 1.15, 1051.4, { col: rgb(0x111111) });
+      B.box(1493.5, 0.005, 1045.5, 1500, 0.015, 1052.5, { col: rgb(0x7a1e1e) });
+      for (const [x, z] of [[1492, 1044], [1508, 1044], [1492, 1056], [1508, 1056]]) { B.addGeometry(new THREE.CylinderGeometry(0.28, 0.32, 4.2, 14), new THREE.Matrix4().makeTranslation(x, 2.1, z), rgb(0xf6f1e8)); col(x - 0.32, z - 0.32, x + 0.32, z + 0.32, 4.2); }
+      B.box(1497, 1.6, 1042.1, 1501, 3.4, 1042.15, { col: rgb(0x8a6a48) });
+      B.box(1497.15, 1.75, 1042.15, 1500.85, 3.25, 1042.2, { col: rgb(0x355070) });
+    });
+    // Panoramafenster mit Blick auf die Stadt
+    const view = canvasTex(1024, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#5fa8e8'); gr.addColorStop(0.7, '#cfe6f7'); gr.addColorStop(1, '#2f6f9a'); g.fillStyle = gr; g.fillRect(0, 0, w, h); for (let i = 0; i < 70; i++) { const bw = 6 + Math.random() * 16, bh = 20 + Math.random() * 90, x = 200 + Math.random() * 600; g.fillStyle = `rgb(${110 + Math.random() * 60},${130 + Math.random() * 50},${160 + Math.random() * 40})`; g.fillRect(x, h * 0.78 - bh, bw, bh); } g.fillStyle = '#4f7f34'; g.fillRect(0, h * 0.86, w, h * 0.14); });
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(14, 2.6), new THREE.MeshBasicMaterial({ map: view }));
+    win.position.set(1500, 2.0, 1042.05); R.g.add(win);
+    for (const x of [1496, 1504]) this.lamp(R, x, 3.4, 1049, [2.4, 2.0, 1.4], 0.4);
+    R.exit = new Marker(1500, 1057.6, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.markers = [R.exit];
+    R.resident = { id: 'aurelio', x: 1505.5, z: 1043.9, yaw: 0, look: () => ({ ...randomLook(), skin: C(0xe0ac69), shirt: C(0xf4f1de), sleeve: C(0xf4f1de), pants: C(0x2b2d42), legs: C(0x2b2d42), hair: C(0xcfcfcf), hat: null, bald: false, scale: 1.0 }) };
+    R.guests = [[1509, 1055.4, Math.PI, 'guard'], [1491, 1055.4, Math.PI, 'guard']];
+    for (const m of R.markers) m.group.visible = false;
+  }
+
+  // ------------------------------------------------------------ Hafenbüro
+  buildOffice() {
+    const R = this.room('office', 1500, 1200, 16, 12, 3.4, {
+      floor: new THREE.MeshStandardMaterial({ color: 0x5a6470, roughness: 0.8 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xdedede, emissive: 0x303030, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xc9d3dc, emissive: 0x161a1e, roughness: 0.9 }),
+    });
+    R.name = 'Hafenbüro'; R.spawn = { x: 1500, z: 1203.8, yaw: Math.PI };
+    R.lightCfg = [1500, 3.1, 1200, 0xeef4ff, 22];
+    this.furnish(R, (B, col) => {
+      for (const [x, z] of [[1496, 1196], [1504, 1196]]) {
+        B.box(x - 1.4, 0, z - 0.7, x + 1.4, 0.78, z + 0.7, { col: rgb(0x8a8f99) });
+        B.box(x - 0.4, 0.78, z - 0.5, x + 0.4, 1.25, z - 0.45, { col: rgb(0x111111) });
+        B.box(x - 1.2, 0.78, z + 0.1, x - 0.4, 0.8, z + 0.5, { col: rgb(0xf4f4f4) });
+        col(x - 1.4, z - 0.7, x + 1.4, z + 0.7, 0.8);
+      }
+      // Seekarte & Aktenschränke
+      B.box(1493, 1.2, 1194.05, 1499, 2.8, 1194.1, { col: rgb(0x7fb7d9) });
+      for (let i = 0; i < 6; i++) B.box(1493.3 + i, 1.4 + (i % 2) * 0.5, 1194.1, 1493.9 + i, 1.8 + (i % 2) * 0.5, 1194.12, { col: rgb(0xe9d8a6) });
+      for (let i = 0; i < 4; i++) { B.box(1506.5, 0, 1197 + i * 1.1, 1507.9, 1.6, 1197.9 + i * 1.1, { col: rgb(0x6b705c) }); }
+      col(1506.5, 1197, 1507.9, 1201.3, 1.6);
+      // Rettungsring, Kaffeeautomat
+      B.addGeometry(new THREE.TorusGeometry(0.4, 0.1, 8, 18), new THREE.Matrix4().makeTranslation(1502, 2.1, 1194.12), rgb(0xff5a3c));
+      B.box(1491.2, 0, 1201, 1492, 1.7, 1201.8, { col: rgb(0x2b2b2b) });
+    });
+    const view = canvasTex(512, 256, (g, w, h) => { g.fillStyle = '#8fc4e8'; g.fillRect(0, 0, w, h); g.fillStyle = '#1d3557'; g.fillRect(40, h * 0.5, 420, h * 0.3); g.fillStyle = '#f2b705'; for (let i = 0; i < 3; i++) g.fillRect(80 + i * 140, 20, 10, h * 0.5); g.fillStyle = '#2b6f9a'; g.fillRect(0, h * 0.8, w, h * 0.2); });
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.8), new THREE.MeshBasicMaterial({ map: view }));
+    win.position.set(1504, 1.9, 1194.05); R.g.add(win);
+    this.box(R, 1500, 3.35, 1198, 3, 0.05, 0.5, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 1.2, 1.25) }));
+    this.box(R, 1500, 3.35, 1202, 3, 0.05, 0.5, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 1.2, 1.25) }));
+    R.exit = new Marker(1500, 1205.6, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.markers = [R.exit];
+    R.resident = { id: 'brandt', x: 1504, z: 1194.9, yaw: 0, look: () => ({ ...randomLook(), skin: C(0xf1c27d), shirt: C(0x1d3557), sleeve: C(0x1d3557), pants: C(0x2b2d42), legs: C(0x2b2d42), hair: C(0xe6e6e6), hat: C(0x1d3557), bald: false, scale: 1.02 }) };
+    R.guests = [[1496, 1196.9, Math.PI, 'sit']];
+    for (const m of R.markers) m.group.visible = false;
   }
 
   // ---------------------------------------------------------- Raum-Grundgerüst
@@ -466,14 +661,20 @@ export class Interiors {
   }
 
   // ------------------------------------------------------------ Betreten / Verlassen
-  enter(kind) {
+  enter(kind, door = null) {
     const R = this.rooms[kind], P = G.player;
+    this.curDoor = door;
     G.hud.fadeIn();
     R.g.visible = true;
     for (const m of R.markers) m.group.visible = true;
     P.x = R.spawn.x; P.z = R.spawn.z; P.y = 0; P.yaw = R.spawn.yaw; P.vx = P.vz = P.vy = 0;
     G.cam.yaw = R.spawn.yaw; G.cam.pitch = -0.15; G.cam.snap();
-    G.interior = { kind, name: R.name, station: 3 };
+    G.interior = { kind, name: door && door.name && kind === 'shop' ? 'Samis 24/7' : R.name, station: 3 };
+    if (R.lightCfg) {
+      const [lx, ly, lz, lc, li] = R.lightCfg;
+      this.light.position.set(lx, ly, lz); this.light.color.setHex(lc); this.light.intensity = li;
+      this.spawnResidents(R);
+    }
     if (kind === 'club') {
       this.spawnClubPeds();
       this.light.position.set(1500, 5.5, -1);
@@ -500,7 +701,7 @@ export class Interiors {
       this.light.color.setHex(0xffffff);
       this.light.intensity = 260;
       if (!this.dealerHint) { this.dealerHint = true; G.hud.hint('Willkommen bei <b>Solera Motors</b>!<br>Geh zum pinken <b>A</b> vor dem Drehteller, um Autos anzusehen und zu kaufen.', 8); }
-    } else {
+    } else if (kind === 'bank') {
       this.spawnBankPeds();
       this.light.position.set(1500, 5, 150);
       this.light.color.setHex(0xfff2dc);
@@ -509,9 +710,25 @@ export class Interiors {
     }
     for (const m of R.markers) m.latch = true;
   }
+  spawnResidents(R) {
+    if (R.resident) {
+      const r = R.resident;
+      const p = G.peds.spawnAt(r.x, r.z, r.look(), 'mission');
+      p.persistent = true; p.yaw = r.yaw; p.r = 0.2;
+      this.peds.push(p); this.residents[r.id] = p;
+    }
+    for (const [x, z, yaw, kind] of R.guests || []) {
+      const p = G.peds.spawnAt(x, z, kind === 'guard' ? { ...randomLook(), shirt: C(0x111111), sleeve: C(0x111111), pants: C(0x111111), legs: C(0x111111), hat: null } : randomLook(), 'mission');
+      p.persistent = true; p.yaw = yaw; p.r = 0.2;
+      if (kind === 'sit') { p.anim.sit = true; p.seatLift = -0.45; }
+      if (kind === 'guard') p.anim.gun = false;
+      this.peds.push(p);
+    }
+  }
   exit() {
     const kind = G.interior.kind;
-    const d = this.doors.find((o) => o.kind === kind), P = G.player;
+    const d = this.curDoor || this.doors.find((o) => o.kind === kind), P = G.player;
+    this.curDoor = null;
     this.cleanup();
     if (kind === 'home') G.hud.toast('🛗 Aufzug · Erdgeschoss');
     if (kind === 'dealer' && this.delivery) {
@@ -519,14 +736,14 @@ export class Interiors {
       const v = G.vm.spawn(key, 162, 30.5, -Math.PI / 2, color);
       if (v) { v.parked = true; v.ownedByPlayer = true; v.missionCar = true; G.player.lastVehicle = v; setTimeout(() => { v.missionCar = false; }, 60000); G.hud.toast(`Dein neuer ${v.T.name} steht an der Straße vor dem Autohaus!`); }
     }
-    P.x = d.out.x; P.z = d.out.z; P.y = 0; P.yaw = d.out.yaw;
+    P.x = d.out.x; P.z = d.out.z; P.y = G.world.groundHeight(d.out.x, d.out.z); P.yaw = d.out.yaw;
     G.cam.yaw = d.out.yaw; G.cam.pitch = -0.2; G.cam.snap();
     d.latch = true;
     G.hud.fadeIn();
   }
   cleanup() {
     for (const p of this.peds) if (!p.removed) G.peds.remove(p);
-    this.peds = [];
+    this.peds = []; this.residents = {};
     for (const R of Object.values(this.rooms)) { R.g.visible = false; for (const m of R.markers) m.group.visible = false; }
     this.light.intensity = 0;
     G.player.anim.dance = false;
@@ -552,7 +769,7 @@ export class Interiors {
       if (P.state !== 'foot' || storyBusy) return;
       for (const d of this.doors) {
         const inside = dist2(P.x, P.z, d.m.x, d.m.z) < 1.4 * 1.4;
-        if (inside && !d.latch) { d.latch = true; this.enter(d.kind); return; }
+        if (inside && !d.latch) { d.latch = true; this.enter(d.kind, d); return; }
         if (!inside) d.latch = false;
       }
       return;
@@ -572,7 +789,22 @@ export class Interiors {
     else if (G.interior.kind === 'home') this.updateHome(dt, R, on);
     else if (G.interior.kind === 'shop') this.updateShop(dt, R, on);
     else if (G.interior.kind === 'dealer') this.updateDealer(dt, R, on);
-    else this.updateBank(dt, R, on);
+    else if (G.interior.kind === 'bank') this.updateBank(dt, R, on);
+    else if (G.interior.kind === 'cafe') { if (on(R.counter, 1.1)) this.cafeMenu(); }
+    else if (G.interior.kind === 'boutique') { if (on(R.rack, 1.2)) this.boutiqueMenu(); }
+  }
+  cafeMenu() {
+    const P = G.player;
+    G.openMenu('CAFÉ VIEJA', '<div style="opacity:.85">Frisch geröstet in der Altstadt.</div>', [
+      ['Café con leche – $6', () => { if (!this.pay(6)) return; P.health = Math.min(100, P.health + 15); P.boostT = Math.max(P.boostT || 0, 20); G.hud.toast('☕ Herrlich! +15 Gesundheit, kurz mehr Ausdauer'); }],
+      ['Churros mit Schokolade – $9', () => { if (!this.pay(9)) return; P.health = Math.min(100, P.health + 30); G.hud.toast('Süß und warm: +30 Gesundheit'); }],
+      ['Bocadillo – $12', () => { if (!this.pay(12)) return; P.health = 100; G.hud.toast('Satt und zufrieden: volle Gesundheit'); }],
+    ]);
+  }
+  boutiqueMenu() {
+    const P = G.player;
+    const items = OUTFITS.map((o, i) => [`${o.name}${P.outfit === i ? ' (trägst du)' : ''} – $150`, () => { if (P.outfit === i) return; if (!this.pay(150)) return; G.setOutfit(i); G.hud.toast(`👕 Neues Outfit: ${o.name}`); G.save.write(); }]);
+    G.openMenu('MODA SOLERA', '<div style="opacity:.85">Neue Saison, neue Looks. Jedes Outfit $150.</div>', items);
   }
 
   updateShop(dt, R, on) {
@@ -692,6 +924,7 @@ function samiIntro(I) {
         ['Sami', 'Hier, meine Nummer. Wenn ich was höre, melde ich mich.'],
       ], s, s);
       P.contacts.add('sami');
+      G.missions.updateGivers();
       G.hud.bigToast('NEUER KONTAKT', 'Sami (Kiosk) wurde in deinem Handy gespeichert');
       G.audio.pickup();
       G.save.write();

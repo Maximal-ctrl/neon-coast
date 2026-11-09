@@ -303,10 +303,10 @@ export class Environment {
     // Innenräume: eigenes, warmes Raumlicht statt Tageslicht
     if (G.interior) {
       const k = G.interior.kind;
-      const warm = { home: 0xffe6c8, shop: 0xf4f6ff, bank: 0xfff1dc, dealer: 0xffffff, club: 0xb48cff }[k] || 0xfff1dc;
+      const warm = { home: 0xffe6c8, shop: 0xf4f6ff, bank: 0xfff1dc, dealer: 0xffffff, club: 0xb48cff, cafe: 0xffd9b0, boutique: 0xfff6f2, villa: 0xfff0dc, office: 0xeef4ff }[k] || 0xfff1dc;
       this.hemi.color.setHex(warm);
       this.hemi.groundColor.setHex(k === 'club' ? 0x2a1438 : 0x6a5c4c);
-      this.hemi.intensity = { club: 0.9, home: 0.85, shop: 1.0 }[k] || 1.2;
+      this.hemi.intensity = { club: 0.9, home: 0.85, shop: 1.0, cafe: 0.85, villa: 1.0, boutique: 1.05, office: 1.0 }[k] || 1.2;
       this.sun.intensity = 0.25;
       this.sun.color.setHex(0xffffff);
       this.renderer.toneMappingExposure = k === 'home' ? 0.88 : 1.0;

@@ -221,6 +221,8 @@ export class Multiplayer {
       case 'mml': if (this.host && this.coop) this.hostClaim(m.i, conn.peer); break;
       case 'mmlt': if (!this.host && this.coop) this.onTaken(m.i, m.by); break;
       case 'mme': if (!this.host && this.coop) this.onEnd(m.result); break;
+      case 'mmk': if (this.host && this.coop) this.hostKill(); break;
+      case 'mmkt': if (!this.host && this.coop) this.coop.kills = m.n; break;
       case 'chat': {
         const id = m.from || conn.peer;
         if (this.host) this.broadcast({ ...m, from: id }, conn.peer);
@@ -383,6 +385,16 @@ export class Multiplayer {
       const dx = Math.sign(N1.x - S.x), dz = Math.sign(N1.z - S.z);
       m.grid = ids.map((id, k) => { const back = 24 - Math.floor(k / 2) * 9, lane = k % 2 ? 6 : 2; return [S.x + dx * back - dz * lane, S.z + dz * back + dx * lane, Math.atan2(dx, dz)]; });
       m.cps = route.slice(1).map((id) => [W.nodes[id].x, W.nodes[id].z]);
+    } else if (mode === 'hill') {
+      // Bergrennen: Start auf dem Damm, Ziel im Bergdorf Monte Solera
+      const R = W.hillRoad;
+      m.mode = 'race'; m.hill = true;
+      m.grid = ids.map((id, k) => [k % 2 ? 36.5 : 43.5, -398 - Math.floor(k / 2) * 9, Math.PI]);
+      m.cps = [];
+      for (let i = 10; i < R.pts.length - 1; i += 12) m.cps.push(R.pts[i]);
+      m.cps.push(R.pts[R.pts.length - 1]);
+    } else if (mode === 'defend') {
+      m.dur = 180; m.target = 8 + ids.length * 6;
     } else if (mode === 'hunt') {
       m.fugitive = rnd(ids); m.dur = 150;
     } else if (mode === 'loot') {
@@ -398,7 +410,7 @@ export class Multiplayer {
     return true;
   }
   onCoopStart(m) {
-    this.coop = { ...m, finished: [], taken: {}, pending: {}, ended: false, result: null, startT: G.time, caughtT: 0 };
+    this.coop = { ...m, finished: [], taken: {}, pending: {}, ended: false, result: null, startT: G.time, caughtT: 0, kills: 0, myKills: 0 };
     if (G.missions.active) G.missions.fail('');
     if (G.interiors && G.interior) G.interiors.cleanup();
     G.missions.start(coopDef(this, this.coop));
@@ -425,6 +437,13 @@ export class Multiplayer {
     G.hud.toast(`💰 ${by === this.myId ? 'Du hast' : this.nameOf(by) + ' hat'} einen Geldsack (${Object.keys(C.taken).length}/${C.bags.length})`);
     G.audio.cash();
   }
+  sendKill() { const C = this.coop; if (!C) return; C.myKills++; if (this.host) this.hostKill(); else this.broadcast({ t: 'mmk' }); }
+  hostKill() {
+    const C = this.coop; if (!C || C.ended) return;
+    C.kills++;
+    this.broadcast({ t: 'mmkt', n: C.kills });
+    if (C.kills >= C.target) this.endCoop({ ok: true, total: C.kills });
+  }
   endCoop(result) { const C = this.coop; if (!C || C.ended) return; this.broadcast({ t: 'mme', result }); this.onEnd(result); }
   onEnd(result) { const C = this.coop; if (!C) return; C.ended = true; C.result = result; }
   hostCoopCheck(dt) {
@@ -441,6 +460,8 @@ export class Multiplayer {
       else if (el > C.dur) this.endCoop({ winner: 'fugitive' });
     } else if (C.mode === 'loot') {
       if (el > C.dur) this.endCoop({ total: Object.keys(C.taken).length });
+    } else if (C.mode === 'defend') {
+      if (el > C.dur) this.endCoop({ ok: false, total: C.kills });
     }
   }
 
@@ -462,7 +483,7 @@ function coopDef(M, C) {
         if (car) { car.parked = false; P.x = x; P.z = z; P.enterVehicle(car); }
         G.cam.snap();
         m.freeze = true;
-        G.hud.bigToast('MULTIPLAYER-RENNEN', `${C.cps.length} Checkpoints · 1. Platz: $2.000`);
+        G.hud.bigToast(C.hill ? 'BERGRENNEN' : 'MULTIPLAYER-RENNEN', C.hill ? 'Vom Damm hinauf nach Monte Solera · 1. Platz: $2.000' : `${C.cps.length} Checkpoints · 1. Platz: $2.000`);
         for (const t of ['3', '2', '1']) { G.hud.countdown(t); G.audio.countdown(false); yield* m.wait(1); }
         G.hud.countdown('LOS!'); G.audio.countdown(true);
         m.freeze = false;
@@ -498,6 +519,30 @@ function coopDef(M, C) {
         const fugWon = C.result && C.result.winner === 'fugitive', iWon = fug ? fugWon : !fugWon;
         G.hud.banner(iWon ? 'GEWONNEN!' : 'VERLOREN', iWon ? '#ffd23f' : '#ff3b5c', (fugWon ? `${M.nameOf(C.fugitive)} ist entkommen` : `${M.nameOf(C.fugitive)} wurde gefasst`) + (iWon ? '  ·  +$1.500' : ''));
         if (iWon) { P.addMoney(1500); G.audio.jingle(); } else G.audio.fail();
+      } else if (C.mode === 'defend') {
+        // Jedes Gerät bekämpft seine eigenen Angreifer, die Abschüsse zählen fürs Team
+        G.hud.bigToast('HAFENVERTEIDIGUNG (KOOP)', `Haltet die Tiburones vom Frachter fern! Ziel: ${C.target} Abschüsse im Team`);
+        const goal = { x: -220, z: 371 };
+        P.giveWeapon('rifle', 150); P.armor = 100;
+        m.marker(goal.x, goal.z - 3, 0x19e6ff, { r: 4, h: 3, blipCol: '#19e6ff' });
+        G.police.locked = true;
+        const spots = [[-370, 366], [-60, 366], [-360, 300], [-40, 300], [-220, 284]];
+        let gang = [], nextT = 0;
+        while (!C.ended) {
+          const alive = m.aliveGang(gang);
+          for (const p of gang) if (!p.alive && !p.counted) { p.counted = true; M.sendKill(); }
+          nextT -= G.dt;
+          if (alive < 4 && nextT <= 0) { const [x, z] = spots[Math.floor(Math.random() * spots.length)]; gang = gang.filter((p) => p.alive || !p.counted).concat(m.gang(x, z, 2, { gun: true, hp: 50, goal, aggro: 32, col: 0x0b6e4f, slow: 1.3 })); nextT = 6; }
+          G.hud.timer(Math.max(0, C.dur - (G.time - C.startT)));
+          m.objective(`Team-Abschüsse: <b>${C.kills}/${C.target}</b> · Deine: <b>${C.myKills}</b>`);
+          yield;
+        }
+        G.hud.timer(null);
+        G.police.locked = false;
+        for (const p of gang) if (p.alive) G.peds.remove(p);
+        const ok = C.result && C.result.ok, pay = (ok ? 1500 : 0) + C.myKills * 150;
+        G.hud.banner(ok ? 'HAFEN GESICHERT!' : 'ZEIT ABGELAUFEN', ok ? '#7dffa0' : '#ff3b5c', `Team: ${C.kills} Abschüsse  ·  +$${pay}`);
+        if (pay) { P.addMoney(pay); G.audio.jingle(); } else G.audio.fail();
       } else if (C.mode === 'loot') {
         G.hud.bigToast('BEUTEJAGD (KOOP)', `Sammelt zusammen ${C.bags.length} Geldsäcke in 3 Minuten!`);
         C.marks = C.bags.map(([x, z], i) => (C.taken[i] === undefined ? m.marker(x, z, 0x7cff6b, { r: 1.6, h: 3, label: '$', blipCol: '#7cff6b' }) : null));

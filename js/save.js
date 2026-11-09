@@ -34,7 +34,7 @@ export const Save = {
       inventory: P.inventory || {}, garage: P.garage || [],
       money: P.money, health: P.health, armor: P.armor, ammo: { ...P.ammo, fists: 0 }, weapon: P.weapon,
       outfit: P.outfit || 0,
-      progress: M.progress, shells: [...M.shells], stunts: [...P.stuntsDone], taxi: M.taxiFares,
+      progress: M.done.size, done: [...M.done], rewards: [...M.rewards], shells: [...M.shells], stunts: [...P.stuntsDone], taxi: M.taxiFares,
       stats: G.stats, time: G.timeOfDay,
     };
     try { s.setItem(key(this.slot), JSON.stringify(data)); return true; } catch (e) { return false; }
@@ -48,7 +48,8 @@ export const Save = {
     P.money = d.money || 0; P.health = d.health || 100; P.armor = d.armor || 0;
     for (const k in d.ammo || {}) if (k !== 'fists') P.ammo[k] = d.ammo[k];
     P.weapon = P.ammo[d.weapon] > 0 ? d.weapon : 'fists';
-    M.progress = d.progress || 0;
+    M.done = new Set(d.done || []); M.rewards = new Set(d.rewards || []);
+    if (!d.done) M.progress = d.progress || 0;
     M.shells = new Set(d.shells || []);
     P.stuntsDone = new Set(d.stunts || []);
     M.taxiFares = d.taxi || 0;

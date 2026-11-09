@@ -37,7 +37,7 @@ import { CameraRig } from './camera.js';
 import { Input } from './input.js';
 import { AudioSys, STATIONS } from './audio.js';
 import { HUD } from './hud.js';
-import { Missions, shopItems } from './missions.js';
+import { Missions, shopItems, CONTACT_INFO } from './missions.js';
 import { Save } from './save.js';
 import { Interiors } from './interiors.js';
 import { Multiplayer } from './multiplayer.js';
@@ -166,15 +166,16 @@ function prepareWorld(d) {
   for (const v of [...G.vehicles]) v.remove();
   for (const p of [...G.peds.list]) G.peds.remove(p);
   P.contacts = new Set(); P.name = 'Leo'; P.inventory = {}; P.garage = [];
+  G.missions.done = new Set(); G.missions.rewards = new Set();
   if (d) Save.apply(d);
   else { P.money = 250; G.timeOfDay = 16.5; G.applyLook(DEFAULT_LOOK); }
   if (!d || !d.look) applyOutfit(P.outfit || 0, !d);
-  if (!G.missionsReady) { G.missions.init(); G.missionsReady = true; }
+  if (!G.missionsReady) { G.missions.init(); G.missionsReady = true; } else { G.missions.grantRewards(true); G.missions.updateGivers(true); }
   if (!G.interiors) G.interiors = new Interiors(G.scene);
   P.state = 'foot'; P.visible = true;
   G.traffic.initParked();
   const sc = G.world.pois.safehouseCar;
-  const car = G.vm.spawn(d && G.missions.progress >= 2 ? 'zephyra' : 'kiwi', sc.x, sc.z, sc.h, d && G.missions.progress >= 2 ? 0xe63946 : 0x4ecdc4);
+  const car = G.vm.spawn(d && G.missions.done.has('m2') ? 'zephyra' : 'kiwi', sc.x, sc.z, sc.h, d && G.missions.done.has('m2') ? 0xe63946 : 0x4ecdc4);
   if (car) { car.parked = true; car.ownedByPlayer = true; P.lastVehicle = car; }
   for (let i = 0; i < 10; i++) G.traffic.spawnCar(sc.x, sc.z, 60, 200);
   G.interiors.enter('home');
@@ -275,8 +276,8 @@ function openCreator() {
 function slotInfo(d) {
   if (!d) return '<span class="slot-empty">Leer</span>';
   const when = d.t ? new Date(d.t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-  const prog = Math.min(d.progress || 0, 7);
-  return `<b>${(d.name || 'Leo').replace(/[<>&]/g, '')}</b><span>${prog}/7 Aufträge · $${(d.money || 0).toLocaleString('de-DE')} · ${when}</span>`;
+  const prog = d.done ? d.done.length : Math.min(d.progress || 0, 7);
+  return `<b>${(d.name || 'Leo').replace(/[<>&]/g, '')}</b><span>${prog}/${G.missions ? G.missions.list.length : 17} Aufträge · $${(d.money || 0).toLocaleString('de-DE')} · ${when}</span>`;
 }
 function showSlots(mode) {
   const list = Save.list();
@@ -297,6 +298,7 @@ function refreshTitle() {
   if (n) $('continue-info').innerHTML = slotInfo(Save.read(n));
 }
 
+G.setOutfit = (i) => applyOutfit(i);
 function applyOutfit(i, keep = false) {
   const P = G.player, o = OUTFITS[i % OUTFITS.length];
   P.outfit = i % OUTFITS.length;
@@ -399,7 +401,7 @@ function statsHTML() {
   const S = G.stats, M = G.missions, P = G.player;
   const km = (m) => (m / 1000).toFixed(1) + ' km';
   return `<div class="kv">
-  <span>Story-Fortschritt</span><b>${Math.min(M.progress, M.story.length)}/${M.story.length} Aufträge</b>
+  <span>Aufträge</span><b>${M.done.size}/${M.list.length} erledigt</b>
   <span>Neon-Muscheln</span><b>${M.shells.size}/${M.shellPos ? M.shellPos.length : 20}</b>
   <span>Stuntsprünge</span><b>${P.stuntsDone.size}/${G.world.ramps.length}</b>
   <span>Taxi-Fahrten</span><b>${M.taxiFares}</b>
@@ -425,6 +427,7 @@ G.openMenu = function (title, html, items) {
 
 let phoneOpen = false;
 const ICON = {
+  jobs: '<svg viewBox="0 0 24 24"><path d="M6 3h4v4H6zM14 3h4v4h-4zM10 15h4v4h-4zM7 7v3h10V7h-2v1H9V7zM11 10h2v5h-2z"/></svg>',
   contacts: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/></svg>',
   messages: '<svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>',
   map: '<svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>',
@@ -437,7 +440,7 @@ const ICON = {
   inv: '<svg viewBox="0 0 24 24"><path d="M9 4h6a2 2 0 0 1 2 2v1h1a3 3 0 0 1 3 3v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a3 3 0 0 1 3-3h1V6a2 2 0 0 1 2-2zm0 3h6V6H9zm-1 6v2h8v-2z"/></svg>',
   save: '<svg viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 2v5h9V5zm5 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
 };
-const APPS = [['contacts', 'Kontakte', '#34c759,#0a8f3c'], ['messages', 'Nachrichten', '#19e6ff,#1567d3'], ['map', 'Karte', '#ff9f1c,#e8590c'], ['radio', 'Radio', '#ff2e88,#a01458'],
+const APPS = [['jobs', 'Aufträge', '#ffd23f,#ff7b00'], ['contacts', 'Kontakte', '#34c759,#0a8f3c'], ['messages', 'Nachrichten', '#19e6ff,#1567d3'], ['map', 'Karte', '#ff9f1c,#e8590c'], ['radio', 'Radio', '#ff2e88,#a01458'],
   ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3'], ['garage', 'Garage', '#ff7b00,#b5179e'], ['inv', 'Inventar', '#06d6a0,#118ab2']];
 
 function openPhone() {
@@ -476,15 +479,20 @@ function phoneHome() {
 function nextHint() {
   const M = G.missions;
   if (M.active && !M.active.side) return 'Aktueller Auftrag: ' + ($('objective').innerText || M.active.title);
-  const def = M.story[M.progress];
-  if (def) return `Auftrag bei ${G.world.pois[def.giver].name} (gelbes ${def.label} auf der Karte)`;
-  return 'Geschichte erledigt – such Neon-Muscheln, Stuntsprünge oder probier die Bank.';
+  const av = M.givers.map((g) => g.def);
+  if (av.length === 1) return `${av[0].title} bei ${CONTACT_INFO[av[0].contact].name} (gelbes ${av[0].label} auf der Karte)`;
+  if (av.length) return `${av.length} Aufträge verfügbar – siehe App „Aufträge“`;
+  if (M.done.size < M.list.length) return 'Neue Aufträge werden bald freigeschaltet – schau in die App „Aufträge“.';
+  return 'Alle Aufträge erledigt – such Neon-Muscheln, Stuntsprünge oder probier die Bank.';
 }
 const CONTACTS = [
   { id: 'rosa', name: 'Tante Rosa', role: "Rosa's Diner", col: '#ff8fab', lines: ['Hast du heute schon was Richtiges gegessen?', 'Pass auf dich auf, mijo.', 'Im Diner gibt\'s heute Fischtacos!'] },
   { id: 'sami', need: 'sami', name: 'Sami', role: 'Kiosk nebenan', col: '#ffd23f', lines: ['Na, Nachbar? Der Kiosk hat immer offen.', 'Ich hab da was läuten hören … ich melde mich, wenn es konkret wird.', 'Frische Zeitung ist da, komm vorbei!'] },
   { id: 'dex', name: 'Dex', role: 'Werkstatt', col: '#ffb703', lines: ['Na, wieder was kaputt gemacht?', 'Ich hab immer einen Wagen für dich.'] },
   { id: 'val', name: 'Val', role: 'Club Velvet', col: '#b26bff', lines: ['Ruf mich nur an, wenn es wichtig ist.', 'Die Bank in Downtown hat erstaunlich wenig Wachpersonal …'] },
+  { id: 'ines', need: 'ines', name: 'Inés', role: 'Café Vieja · Altstadt', col: '#ffb35c', lines: ['¡Hola Leo! Der Kaffee geht heute aufs Haus.', 'Die Altstadt ist ruhiger, seit du da bist.'] },
+  { id: 'brandt', need: 'brandt', name: 'Kapitän Brandt', role: 'Hafenbüro', col: '#19e6ff', lines: ['Brandt hier. Hafen ist ruhig. Noch.', 'Wenn die Tiburones wieder auftauchen, ruf ich dich.'] },
+  { id: 'aurelio', need: 'aurelio', name: 'Don Aurelio', role: 'Villa · Monte Solera', col: '#e9d8a6', lines: ['Leo. Die Aussicht hier oben ist heute besonders klar.', 'Ein guter Wein braucht Zeit. Gute Freunde auch.'] },
   { id: 'anwalt', name: 'Kessler', role: 'Anwalt', col: '#8e9aaf', lines: ['Kessler & Partner. Wir lösen Probleme mit der Polizei.'] },
   { id: 'club', name: 'Club Velvet', role: 'Nachtclub', col: '#ff2e88', lines: ['Heute Nacht: DJ-Set & Show! Eingang am Club Velvet, Midtown-Ost.'] },
 ];
@@ -508,7 +516,7 @@ function phoneContact(c) {
   $('ph-screen').querySelectorAll('[data-call]').forEach((b) => b.onclick = () => {
     $('ph-convo').innerHTML = '';
     talk(c.lines[Math.floor(Math.random() * c.lines.length)]);
-    if (['rosa', 'val', 'dex', 'sami'].includes(c.id)) setTimeout(() => talk(nextHint() + '.'), 450);
+    if (CONTACT_INFO[c.id]) { const av = G.missions.givers.find((g) => g.def.contact === c.id); setTimeout(() => talk(av ? `Ich hätte da einen Auftrag für dich: „${av.def.title}“. Komm vorbei!` : 'Im Moment habe ich nichts für dich. Ich melde mich.'), 450); }
     if (G.audio.ready) G.audio.click();
   });
   $('ph-screen').querySelectorAll('[data-act]').forEach((b) => b.onclick = () => phoneAction(b.dataset.act));
@@ -524,7 +532,7 @@ function phoneAction(a) {
     const o = G.world.nodes[n.nbr[Math.floor(Math.random() * n.nbr.length)]];
     const dx = Math.sign(o.x - n.x), dz = Math.sign(o.z - n.z);
     const x = n.x + dx * 22 - dz * 6, z = n.z + dz * 22 + dx * 6;
-    const key = G.missions.progress >= 5 ? 'vortex' : G.missions.progress >= 2 ? 'zephyra' : 'brutus';
+    const key = G.missions.done.has('m5') ? 'vortex' : G.missions.done.has('m2') ? 'zephyra' : 'brutus';
     const v = G.vm.spawn(key, x, z, Math.atan2(dx, dz));
     if (v) {
       v.parked = true; v.ownedByPlayer = true; v.missionCar = true; P.lastVehicle = v;
@@ -545,16 +553,54 @@ function phoneAction(a) {
   }
 }
 function phoneMessages() {
-  const p = G.missions.progress, P = G.player;
+  const D = G.missions.done, P = G.player, has = (id) => D.has(id);
   const msgs = [['rosa', `Willkommen zurück, ${P.name}! Komm im Diner vorbei.`]];
   if (P.contacts && P.contacts.has('sami')) msgs.push(['sami', 'Schön, dass du jetzt nebenan wohnst. Wenn ich was höre, melde ich mich!']);
-  if (p >= 1) msgs.push(['dex', 'Hab gehört, du kannst fahren. Komm in die Werkstatt.']);
-  if (p >= 3) msgs.push(['val', 'Dex sagt, du bist zuverlässig. Wir sollten reden. Club Velvet.']);
-  if (p >= 4) msgs.push(['club', 'Du stehst ab sofort auf der Gästeliste. 🪩']);
-  if (p >= 6) msgs.push(['val', 'Bereite dich vor. Das große Ding steht an.']);
-  if (p >= 7) msgs.push(['val', 'Die Bank hat schon wieder aufgefüllt … nur so als Info. 😉']);
+  if (has('m1')) msgs.push(['dex', 'Hab gehört, du kannst fahren. Komm in die Werkstatt.']);
+  if (has('m2')) msgs.push(['val', 'Dex sagt, du bist zuverlässig. Wir sollten reden. Club Velvet.']);
+  if (has('m2')) msgs.push(['brandt', 'Brandt, Hafenbüro. Dex sagt, du fährst gut. Ich hätte Arbeit.']);
+  if (has('m3')) msgs.push(['rosa', 'Leo, kannst du vorbeikommen? Es geht um meine Cousine Inés.']);
+  if (has('r3')) msgs.push(['ines', 'Gracias, Leo! Komm mal ins Café, ich hätte da was für dich.']);
+  if (has('s1')) msgs.push(['sami', 'Du hast meine Kasse gerettet! Komm vorbei, ich hab eine Neuigkeit.']);
+  if (has('m4')) msgs.push(['club', 'Du stehst ab sofort auf der Gästeliste.']);
+  if (has('d4')) msgs.push(['aurelio', 'Beeindruckende Fahrt. Besuch mich in meiner Villa auf dem Monte Solera.']);
+  if (has('h2')) msgs.push(['val', 'Die Tiburones sind erledigt. Jetzt steht uns nichts mehr im Weg. Komm in den Club.']);
+  if (has('m7')) msgs.push(['val', 'Die Bank hat schon wieder aufgefüllt … nur so als Info.']);
   const byId = Object.fromEntries(CONTACTS.map((c) => [c.id, c]));
   phoneScreen('Nachrichten', msgs.reverse().map(([id, t]) => { const c = byId[id]; return `<div class="ph-msg">${avatar(c)}<div><b>${c.name}</b><span>${t}</span></div></div>`; }).join(''));
+}
+// Auftrags-Stammbaum: Kontakte als Äste, Aufträge schalten sich gegenseitig frei
+function phoneJobs() {
+  const M = G.missions, all = M.list;
+  const byId = Object.fromEntries(all.map((d) => [d.id, d]));
+  const order = ['rosa', 'dex', 'sami', 'val', 'ines', 'brandt', 'aurelio'];
+  let html = `<div class="jb-sum"><b>${M.done.size}/${all.length}</b><span>Aufträge erledigt</span><i style="--p:${(M.done.size / all.length) * 100}%"></i></div>`;
+  let hidden = 0;
+  for (const cid of order) {
+    const ci = CONTACT_INFO[cid];
+    const list = all.filter((d) => d.contact === cid);
+    const vis = list.filter((d) => M.isTeased(d));
+    if (!vis.length) { hidden++; continue; }
+    html += `<div class="jb-br"><div class="jb-head">${avatar({ name: ci.name, col: ci.col })}<div><b>${ci.name}</b><span>${ci.role}</span></div><em>${list.filter((d) => M.done.has(d.id)).length}/${list.length}</em></div>`;
+    for (const d of list) {
+      if (!M.isTeased(d)) { html += '<div class="jb-node lock dim"><i>?</i><div><b>· · ·</b></div></div>'; continue; }
+      const done = M.done.has(d.id), av = M.isAvailable(d);
+      const need = d.req.filter((r) => !M.done.has(r)).map((r) => (byId[r] ? `${M.isTeased(byId[r]) ? byId[r].title : '???'} (${CONTACT_INFO[byId[r].contact].name})` : r));
+      if (d.needContact && !(G.player.contacts && G.player.contacts.has(d.needContact))) need.push(`${CONTACT_INFO[d.needContact].name} kennenlernen`);
+      const reward = `$${d.reward.toLocaleString('de-DE')}${d.rewardCar ? ' + 🚗 ' + CAR_TYPES[d.rewardCar[0]].name : ''}`;
+      html += `<div class="jb-node ${done ? 'done' : av ? 'av' : 'lock'}"><i>${done ? '✓' : av ? '★' : '🔒'}</i><div><b>${done || av ? d.title : '???'}</b>`
+        + `<span>${done || av ? d.desc || '' : 'Erfordert: ' + need.join(' + ')}</span>${done || av ? `<small>${reward}</small>` : ''}</div>`
+        + (av && !M.active ? `<button class="ph-btn2 small" data-nav="${d.id}">📍</button>` : '') + '</div>';
+    }
+    html += '</div>';
+  }
+  if (hidden) html += `<div class="ph-note">🔒 ${hidden} weitere${hidden > 1 ? '' : 'r'} Kontakt${hidden > 1 ? 'e' : ''} – werden durch Aufträge freigeschaltet.</div>`;
+  phoneScreen('Aufträge', html);
+  $('ph-screen').querySelectorAll('[data-nav]').forEach((b) => b.onclick = () => {
+    const d = byId[b.dataset.nav], p = M.giverMapPos(d.contact);
+    if (p) { M.waypoint = { x: p.x, z: p.z }; G.hud.toast(`📍 Navigation zu ${CONTACT_INFO[d.contact].name}: „${d.title}“`); }
+    closePhone();
+  });
 }
 function phoneRadio() {
   const A = G.audio;
@@ -630,6 +676,7 @@ function setupPhone() {
     else if (app === 'mp') { closePhone(); openMultiplayer(); }
     else if (app === 'inv') { closePhone(); G.ui.inventory(); }
     else if (app === 'garage') phoneGarage();
+    else if (app === 'jobs') phoneJobs();
     else if (app === 'save') {
       if (G.missions.active && !G.missions.active.side) G.hud.toast('Während eines Auftrags kann nicht gespeichert werden.');
       else { Save.write(); G.hud.toast(`Gespeichert in Speicherplatz ${Save.slot}`); }
@@ -666,7 +713,9 @@ function openMultiplayer() {
         <div class="mp-modes">${M.host ? `<b>GEMEINSAME AUFTRÄGE</b>
           <button class="mp-mode" data-mode="race"><span>🏁</span><div><b>Straßenrennen</b><small>Alle starten nebeneinander · Sieger $2.000</small></div></button>
           <button class="mp-mode" data-mode="hunt"><span>🚨</span><div><b>Verfolgungsjagd</b><small>Einer flieht, alle anderen jagen</small></div></button>
-          <button class="mp-mode" data-mode="loot"><span>💰</span><div><b>Beutejagd (Koop)</b><small>12 Geldsäcke · 3 Minuten · Team teilt</small></div></button>` : '<small class="mp-small">Der Host kann gemeinsame Aufträge starten (Rennen, Verfolgungsjagd, Beutejagd).</small>'}</div>
+          <button class="mp-mode" data-mode="loot"><span>💰</span><div><b>Beutejagd (Koop)</b><small>12 Geldsäcke · 3 Minuten · Team teilt</small></div></button>
+          <button class="mp-mode" data-mode="hill"><span>⛰️</span><div><b>Bergrennen</b><small>Serpentinen hinauf nach Monte Solera · Sieger $2.000</small></div></button>
+          <button class="mp-mode" data-mode="defend"><span>⚓</span><div><b>Hafenverteidigung (Koop)</b><small>Gemeinsam den Frachter gegen die Tiburones schützen</small></div></button>` : '<small class="mp-small">Der Host kann gemeinsame Aufträge starten (Rennen, Bergrennen, Verfolgungsjagd, Beutejagd, Hafenverteidigung).</small>'}</div>
         <div class="mp-join"><input id="mp-msg" maxlength="80" placeholder="Nachricht an alle …" autocomplete="off"><button class="mbtn" id="mp-send">Senden</button></div>`;
     }
     const btns = M.status === 'online' ? [['Multiplayer verlassen', () => { M.leave(); }], ['Schließen', close, 'primary']] : [['Schließen', close]];
@@ -919,7 +968,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '1.08';
+export const GAME_VERSION = '1.09';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));

@@ -5,7 +5,7 @@ import * as C from './config.js';
 import * as TX from './textures.js';
 import { AIDriver } from './traffic.js';
 import { WEAPONS } from './combat.js';
-import { randomLook, OUTFITS } from './models.js';
+import { randomLook, OUTFITS, CAR_TYPES } from './models.js';
 import { clamp, rand, dist2, pick, chance } from './utils.js';
 
 const N = (i, j) => C.nodeId(i, j);
@@ -112,6 +112,14 @@ export class Missions {
     this.taxi = null;
     this.uiOpen = false;
     this.taxiFares = 0;
+    this.done = new Set();
+    this.rewards = new Set();
+    this.givers = [];
+  }
+  get progress() { return this.done.size; }
+  set progress(n) { // Altstände (lineare Geschichte) übernehmen
+    const old = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'];
+    for (let i = 0; i < Math.min(n, old.length); i++) this.done.add(old[i]);
   }
 
   init() {
@@ -133,7 +141,8 @@ export class Missions {
     // Neon-Muscheln
     this.shellPos = [[420, -340], [445, -120], [640, 70], [415, 300], [12, -252], [-320, 110], [-240, 340], [-378, 0], [100, 378], [-80, 175], [250, 235], [-228, 12], [172, 172], [-320, -350], [300, -378], [376, 0], [-50, -50], [520, 40], [-200, 378], [630, 15]];
     this.shellPos.forEach(([x, z], i) => { if (!this.shells.has(i)) this.addPickup(x, z, 'shell', { i }, 0); });
-    this.updateGiver();
+    this.grantRewards(true);
+    this.updateGivers(true);
   }
 
   addPickup(x, z, type, data = {}, respawn = 120) {
@@ -195,26 +204,75 @@ export class Missions {
     else { G.scene.remove(p.g); this.pickups.splice(i, 1); }
   }
 
-  // ------------------------------------------------------------ Story
-  get story() { return STORY; }
-  updateGiver() {
-    if (this.giverMarker) { this.giverMarker.remove(); this.giverMarker = null; }
-    const def = STORY[this.progress];
-    if (!def) return;
-    const poi = G.world.pois[def.giver];
-    this.giverMarker = new Marker(poi.x, poi.z, 0xffd23f, { label: def.label, r: 1.5 });
-    this.giverDef = def;
+  // ------------------------------------------------------------ Auftrags-Stammbaum
+  get story() { return MISSIONS; }
+  get list() { return MISSIONS; }
+  isDone(id) { return this.done.has(id); }
+  isAvailable(def) {
+    if (this.done.has(def.id)) return false;
+    if (!def.req.every((r) => this.done.has(r))) return false;
+    if (def.needContact && !(G.player.contacts && G.player.contacts.has(def.needContact))) return false;
+    return true;
+  }
+  // sichtbar im Stammbaum: erledigt, verfügbar oder direkt angrenzend (als „???“)
+  isTeased(def) { return this.done.has(def.id) || this.isAvailable(def) || def.req.length === 0 || def.req.some((r) => this.done.has(r)); }
+  giverPos(contact) {
+    const C = CONTACT_INFO[contact];
+    if (C.inside) return { x: C.inside[0], z: C.inside[1], door: C.door };
+    const p = G.world.pois[C.poi];
+    return p ? { x: p.x, z: p.z } : null;
+  }
+  // Position für Karte & GPS (bei Innenräumen: die Eingangstür)
+  giverMapPos(contact) {
+    const g = this.giverPos(contact);
+    if (g && g.door && G.interiors) { const d = G.interiors.doorPos(g.door); if (d) return d; }
+    return g;
+  }
+  updateGivers(silent = false) {
+    for (const g of this.givers) g.m.remove();
+    this.givers = [];
+    const seen = new Set(), P = G.player;
+    for (const def of MISSIONS) {
+      if (seen.has(def.contact) || !this.isAvailable(def)) continue;
+      seen.add(def.contact);
+      const pos = this.giverPos(def.contact);
+      if (!pos) continue;
+      const m = new Marker(pos.x, pos.z, 0xffd23f, { label: def.label, r: 1.3 });
+      this.givers.push({ m, def, pos });
+      // neue Kontakte durch freigeschaltete Aufträge
+      const ci = CONTACT_INFO[def.contact];
+      if (ci.auto && P.contacts && !P.contacts.has(def.contact)) {
+        P.contacts.add(def.contact);
+        if (!silent) setTimeout(() => G.hud.bigToast('NEUER KONTAKT', `${ci.name} (${ci.role}) wurde in deinem Handy gespeichert`), 2600);
+      }
+    }
+    this.giverMarker = this.givers[0] ? this.givers[0].m : null;
+    this.giverDef = this.givers[0] ? this.givers[0].def : null;
+  }
+  updateGiver() { this.updateGivers(); }
+  // Belohnungsautos in die Garage (auch für ältere Spielstände)
+  grantRewards(silent = false) {
+    const P = G.player;
+    for (const def of MISSIONS) {
+      if (!def.rewardCar || !this.done.has(def.id) || this.rewards.has(def.id)) continue;
+      this.rewards.add(def.id);
+      const [key, color] = def.rewardCar;
+      P.garage.push({ key, color, id: Date.now() + Math.floor(Math.random() * 1000) });
+      if (!silent) setTimeout(() => G.hud.bigToast('NEUES AUTO IN DER GARAGE', `${CAR_TYPES[key].name} – im Handy unter „Garage“ abrufbar`), 4200);
+    }
   }
 
   mapBlips(full = false) {
     const out = [];
     const poi = G.world.pois;
-    if (!this.active && this.giverMarker) out.push({ x: this.giverMarker.x, z: this.giverMarker.z, col: '#ffd23f', label: this.giverDef.label, edge: true, r: 0.05 });
+    if (!this.active) for (const g of this.givers) { const p = this.giverMapPos(g.def.contact); if (p) out.push({ x: p.x, z: p.z, col: '#ffd23f', label: g.def.label, edge: true, r: 0.05, name: `${CONTACT_INFO[g.def.contact].name}: ${g.def.title}` }); }
     out.push({ x: poi.safehouse.x, z: poi.safehouse.z, col: '#7cff6b', label: 'H', r: 0.04 });
     out.push({ x: poi.gunshop.x, z: poi.gunshop.z, col: '#ff7b39', label: 'W', r: 0.04 });
     out.push({ x: 234, z: 106.5, col: '#ff2e88', label: 'C', r: 0.04, name: 'Club Velvet' });
     if (poi.dealer) out.push({ x: poi.dealer.x, z: poi.dealer.z, col: '#ff4fd8', label: 'A', r: 0.04, name: 'Solera Motors' });
-    if (poi.shop) out.push({ x: poi.shop.x, z: poi.shop.z, col: '#ffd23f', label: '24', r: 0.04, name: 'Samis 24/7' });
+    for (const id of ['shop', 'shop2', 'shop3']) if (poi[id]) out.push({ x: poi[id].x, z: poi[id].z, col: '#ffd23f', label: '24', r: 0.035, name: 'Samis 24/7' });
+    if (poi.cafe) out.push({ x: poi.cafe.x, z: poi.cafe.z, col: '#ffb35c', label: '☕', r: 0.035, name: 'Café Vieja' });
+    if (poi.boutique) out.push({ x: poi.boutique.x, z: poi.boutique.z, col: '#ff6fb0', label: 'M', r: 0.035, name: 'Moda Solera' });
     out.push({ x: 10, z: 26.8, col: '#19e6ff', label: 'B', r: 0.04, name: 'Solera Bank' });
     if (full) {
       out.push({ x: poi.hospital.x, z: poi.hospital.z, col: '#ff4d6d', label: '+' });
@@ -228,14 +286,18 @@ export class Missions {
   update(dt) {
     this.updatePickups(dt);
     for (const s of this.serviceMarkers) s.m.update(dt);
-    if (this.giverMarker) { this.giverMarker.update(dt); this.giverMarker.group.visible = !this.active; }
+    for (const g of this.givers) { g.m.update(dt); g.m.group.visible = !this.active; }
     for (const m of this.markers) m.update(dt);
     const P = G.player;
     // GPS
     this.gpsTarget = null;
     const obj = this.markers.find((m) => m.blip);
     if (obj) this.gpsTarget = { x: obj.x, z: obj.z };
-    else if (!this.active && this.giverMarker && !this.waypoint) this.gpsTarget = { x: this.giverMarker.x, z: this.giverMarker.z };
+    else if (!this.active && this.givers.length && !this.waypoint && !G.interior) {
+      let best = null, bd = 1e12;
+      for (const g of this.givers) { const p = this.giverMapPos(g.def.contact); if (!p) continue; const d = dist2(p.x, p.z, P.x, P.z); if (d < bd) { bd = d; best = p; } }
+      if (best) this.gpsTarget = { x: best.x, z: best.z };
+    }
     if (this.waypoint && dist2(this.waypoint.x, this.waypoint.z, P.x, P.z) < 15 * 15) this.waypoint = null;
 
     if (this.active) {
@@ -252,9 +314,8 @@ export class Missions {
       return;
     }
     // Missionsbeginn
-    if (P.state === 'foot' && this.giverMarker && G.police.level === 0 && dist2(P.x, P.z, this.giverMarker.x, this.giverMarker.z) < 2.2 * 2.2) {
-      this.start(this.giverDef);
-      return;
+    if (P.state === 'foot' && G.police.level === 0) {
+      for (const g of this.givers) if (dist2(P.x, P.z, g.m.x, g.m.z) < 1.8 * 1.8) { this.start(g.def); return; }
     }
     // Dienste
     if (P.state === 'foot' && !this.uiOpen) {
@@ -313,8 +374,17 @@ export class Missions {
       G.hud.banner('AUFTRAG ERFÜLLT', '#ffd23f', `${title}  ·  +$${reward}`);
       G.audio.jingle();
       if (reward) G.player.addMoney(reward);
-      if (STORY[this.progress] === def) this.progress++;
-      this.updateGiver();
+      const before = new Set(MISSIONS.filter((d) => this.isAvailable(d)).map((d) => d.id));
+      this.done.add(def.id);
+      if (def.unlockContact && G.player.contacts && !G.player.contacts.has(def.unlockContact)) {
+        G.player.contacts.add(def.unlockContact);
+        const ci = CONTACT_INFO[def.unlockContact];
+        setTimeout(() => G.hud.bigToast('NEUER KONTAKT', `${ci.name} (${ci.role}) wurde in deinem Handy gespeichert`), 2600);
+      }
+      this.grantRewards();
+      this.updateGivers();
+      const fresh = MISSIONS.filter((d) => this.isAvailable(d) && !before.has(d.id));
+      if (fresh.length) setTimeout(() => G.hud.toast(`📱 Neu freigeschaltet: ${fresh.map((d) => `<b>${d.title}</b> (${CONTACT_INFO[d.contact].name})`).join(', ')}`), 6500);
       G.save.write();
       if (def.after) def.after(this);
     }
@@ -385,14 +455,15 @@ export class Missions {
     const P = G.player;
     const fx = focus.x, fz = focus.z, fy = focus.y || G.world.groundHeight(fx, fz);
     const ang = Math.atan2(P.x - fx, P.z - fz) + 1.1;
-    const from = new THREE.Vector3(fx + Math.sin(ang) * 6, fy + 2.4, fz + Math.cos(ang) * 6);
+    const cd = G.interior ? 3.3 : 6;
+    const from = new THREE.Vector3(fx + Math.sin(ang) * cd, fy + (G.interior ? 1.9 : 2.4), fz + Math.cos(ang) * cd);
     const tx = other ? (fx + other.x) / 2 : fx, tz = other ? (fz + other.z) / 2 : fz;
     this.cineOn(from, new THREE.Vector3(tx, fy + 1.5, tz));
     const prevState = P.state;
     if (P.state === 'foot') { P.state = 'cutscene'; P.vx = P.vz = 0; if (other) P.yaw = Math.atan2(other.x - P.x, other.z - P.z); }
     if (other) other.yaw = Math.atan2(P.x - other.x, P.z - other.z);
     for (let [who, text] of lines) {
-      const col = { Leo: '#7cff6b', Rosa: '#ff8fab', Dex: '#ffd23f', Val: '#b26bff', Marco: '#ff9f1c', Sami: '#ffd23f' }[who] || '#19e6ff';
+      const col = { Leo: '#7cff6b', Rosa: '#ff8fab', Dex: '#ffd23f', Val: '#b26bff', Marco: '#ff9f1c', Sami: '#ffd23f', 'Inés': '#ffb35c', Brandt: '#19e6ff', Aurelio: '#e9d8a6', Schläger: '#ff3b5c' }[who] || '#19e6ff';
       const nm = G.player.name || 'Leo';
       text = text.replace(/\bLeo\b/g, nm);
       G.hud.subtitle(who === 'Leo' ? nm : who, text, col);
@@ -420,6 +491,29 @@ export class Missions {
     this.removeMarker(m);
     this.objective('');
   }
+  // Feindliche Gang (Fußvolk). opts: gun, hp, goal{x,z}, aggro, col
+  gang(x, z, n, opts = {}) {
+    const list = [];
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2;
+      const p = this.npc(x + Math.cos(a) * (1 + k * 0.4), z + Math.sin(a) * (1 + k * 0.4), LOOKS.gang(opts.col));
+      p.state = 'gang'; p.isGang = true; p.hostile = true; p.gangGun = opts.gun !== false;
+      p.health = opts.hp || 60; p.speed = 4.6; p.aggroR = opts.aggro || 45; p.slow = opts.slow || 1;
+      if (opts.goal) p.goal = opts.goal;
+      if (opts.mark !== false) p.mk = this.marker(0, 0, 0xff3b5c, { follow: p, arrow: true, blipCol: '#ff3b5c' });
+      list.push(p);
+    }
+    return list;
+  }
+  // entfernt Marker toter Gangmitglieder, gibt Anzahl Lebender zurück
+  aliveGang(list) {
+    let n = 0;
+    for (const p of list) {
+      if (p.alive && !p.removed) n++;
+      else if (p.mk) { this.removeMarker(p.mk); p.mk = null; }
+    }
+    return n;
+  }
   *getInCar(text = 'Steig in ein <b>Fahrzeug</b>.') {
     const P = G.player;
     if (P.inCar) return;
@@ -439,15 +533,23 @@ const LOOKS = {
   val: () => ({ ...base(0xf1c27d), shirt: c(0x5a189a), sleeve: c(0x5a189a), pants: c(0x240046), legs: c(0x240046), hair: c(0x1b1b1b), scale: 0.94 }),
   marco: () => ({ ...base(0xe0ac69), shirt: c(0xffd166), sleeve: c(0xe0ac69), pants: c(0xf4f1de), legs: c(0xe0ac69), hair: c(0x3b2716), scale: 0.98 }),
   crew: () => ({ ...base(0xe0ac69), shirt: c(0x111111), sleeve: c(0x111111), pants: c(0x222222), legs: c(0x222222), hair: c(0x111111), hat: c(0x111111), scale: 1.0 }),
+  gang: (col) => { const l = randomLook(); return { ...l, shirt: c(col || 0xb5121b), sleeve: Math.random() < 0.5 ? l.skin : c(col || 0xb5121b), pants: c(0x1b1b1f), legs: c(0x1b1b1f), hat: Math.random() < 0.6 ? c(0x111111) : null, scale: 0.95 + Math.random() * 0.08 }; },
+  ines: () => ({ ...base(0xd9a066), shirt: c(0x7a2e1e), sleeve: c(0xd9a066), pants: c(0x2b2b2b), legs: c(0x2b2b2b), hair: c(0x2b1a10), scale: 0.9 }),
+  brandt: () => ({ ...base(0xf1c27d), shirt: c(0x1d3557), sleeve: c(0x1d3557), pants: c(0x2b2d42), legs: c(0x2b2d42), hair: c(0xe6e6e6), hat: c(0x1d3557), scale: 1.02 }),
+  aurelio: () => ({ ...base(0xe0ac69), shirt: c(0xf4f1de), sleeve: c(0xf4f1de), pants: c(0x2b2d42), legs: c(0x2b2d42), hair: c(0xcfcfcf), scale: 1.0 }),
+  sami: () => ({ ...base(0xc68642), shirt: c(0x2b6f77), sleeve: c(0x2b6f77), pants: c(0x3a3a3a), legs: c(0x3a3a3a), hair: c(0x9e9e9e), scale: 0.95 }),
 };
 function c(h) { return new THREE.Color(h); }
 function base(skin) { const s = c(skin); return { skin: s, shoes: c(0x222222), hat: null, bald: false }; }
 
 function* standAt(m, def) {
-  // Auftraggeber-NPC am Marker
-  const poi = G.world.pois[def.giver];
+  // Auftraggeber-NPC am Marker (in Innenräumen: der Bewohner selbst)
   const P = G.player;
-  const p = m.npc(poi.x + Math.sin(P.yaw) * 1.8, poi.z + Math.cos(P.yaw) * 1.8, LOOKS[def.npc](), 0);
+  const res = G.interiors && G.interiors.residents && G.interiors.residents[def.contact];
+  if (res && !res.removed) { res.yaw = Math.atan2(P.x - res.x, P.z - res.z); return res; }
+  if (def.contact === 'sami' && G.interiors && G.interiors.sami && !G.interiors.sami.removed) return G.interiors.sami;
+  const pos = m.giverPos(def.contact);
+  const p = m.npc(pos.x + Math.sin(P.yaw) * 1.8, pos.z + Math.cos(P.yaw) * 1.8, LOOKS[def.npc](), 0);
   p.yaw = Math.atan2(P.x - p.x, P.z - p.z);
   return p;
 }
@@ -475,11 +577,388 @@ function* checkpoints(m, pts, opts = {}) {
 }
 
 // ======================================================================
+//  Kontakte & neue Aufträge (Stammbaum)
+// ======================================================================
+export const CONTACT_INFO = {
+  rosa: { name: 'Tante Rosa', role: "Rosa's Diner", poi: 'diner', col: '#ff8fab' },
+  dex: { name: 'Dex', role: 'Werkstatt', poi: 'garage', col: '#ffb703' },
+  val: { name: 'Val', role: 'Club Velvet', poi: 'club', col: '#b26bff' },
+  sami: { name: 'Sami', role: 'Samis 24/7', inside: [1502.6, 598.4], door: 'shop', col: '#ffd23f' },
+  ines: { name: 'Inés', role: 'Café Vieja · Altstadt', inside: [1502.2, 747.6], door: 'cafe', col: '#ffb35c' },
+  brandt: { name: 'Kapitän Brandt', role: 'Hafenbüro', inside: [1504, 1198], door: 'harbor', col: '#19e6ff', auto: true },
+  aurelio: { name: 'Don Aurelio', role: 'Villa · Monte Solera', inside: [1505.5, 1047.4], door: 'villa', col: '#e9d8a6', auto: true },
+};
+
+// Ped läuft eine Route ab (Schleife)
+function runRoute(p, pts, speed, k = 0) {
+  p.state = 'goto'; p.gotoSpeed = speed;
+  p.tx = pts[k % pts.length][0]; p.tz = pts[k % pts.length][1];
+  p.onArrive = (q) => runRoute(q, pts, speed, k + 1);
+}
+// Fluchtwagen mit KI (wie bei Marco)
+function fleeCar(m, key, x, z, h, color, fromXZ, toXZ, cruise = 20) {
+  const car = m.spawnCar(key, x, z, h, color, { missionTarget: true });
+  car.parked = false;
+  car.driver = { isPed: true, look: LOOKS.gang(), persistent: true, onEject: (p) => { p.missionTarget = false; p.persistent = true; m.track(p); p.state = 'flee'; p.timer = 30; } };
+  const ai = new AIDriver(car, 'flee');
+  ai.startEdge(NP(...fromXZ), NP(...toXZ), 6);
+  ai.cruise = cruise; ai.keepFlee = true;
+  car.ai = ai;
+  return car;
+}
+const HILL_CPS = () => { const R = G.world.hillRoad; const out = []; for (let i = 10; i < R.pts.length - 1; i += 12) out.push(R.pts[i]); out.push(R.pts[R.pts.length - 1]); return out; };
+
+const NEW_MISSIONS = [
+  // ---------------------------------------------------------------- Rosa
+  {
+    id: 'r3', title: 'Familienbande', sub: 'Tante Rosa', contact: 'rosa', req: ['m3'], label: 'R', npc: 'rosa', reward: 1200, unlockContact: 'ines',
+    desc: 'Rosas Cousine Inés wird in der Altstadt erpresst.',
+    *run(m) {
+      const rosa = yield* standAt(m, this);
+      yield* m.talk([
+        ['Rosa', 'Leo, ich brauche deine Hilfe. Meine Cousine Inés hat ein kleines Café in der Altstadt.'],
+        ['Rosa', 'Seit Wochen kommen Schläger vorbei und verlangen Schutzgeld. Sie traut sich nicht zur Polizei.'],
+        ['Leo', 'Ich kümmere mich darum.'],
+        ['Rosa', 'Aber pass auf dich auf, mijo. Und … nicht zu viel Ärger, ja?'],
+      ], rosa, rosa);
+      const c = G.world.pois.cafe;
+      yield* m.goTo(c.x - 3, c.z, 'Fahr zum <b>Café Vieja</b> in der Altstadt.', { r: 6 });
+      G.police.locked = true;
+      const thugs = m.gang(c.x - 6, c.z + 3, 3, { gun: false, hp: 70, col: 0x3a0ca3 });
+      yield* m.talk([['Schläger', 'Hey! Das hier ist unser Revier. Verschwinde, bevor es weh tut!'], ['Leo', 'Falsche Antwort.']], { x: c.x - 5, z: c.z + 2 }, thugs[0]);
+      m.objective('Vertreibe die <b>Schläger</b> vom Café.');
+      yield* m.until(() => m.aliveGang(thugs) === 0 || thugs.every((p) => !p.alive || p.health < 25));
+      for (const p of thugs) if (p.alive) { p.isGang = false; p.state = 'flee'; p.fleeFrom = G.player; p.timer = 20; if (p.mk) { m.removeMarker(p.mk); p.mk = null; } }
+      G.police.locked = false;
+      yield* m.wait(1.2);
+      const ines = m.npc(c.x - 1.6, c.z + 1.5, LOOKS.ines());
+      yield* m.talk([
+        ['Inés', '¡Dios mío! Du musst Leo sein – Rosa hat so viel von dir erzählt.'],
+        ['Inés', 'Die kommen bestimmt wieder … aber heute hast du ihnen Angst gemacht. Danke!'],
+        ['Inés', 'Komm rein, wann immer du willst. Und wenn ich Hilfe brauche, melde ich mich.'],
+      ], { x: G.player.x, z: G.player.z }, ines);
+    },
+  },
+  // ---------------------------------------------------------------- Inés
+  {
+    id: 'i1', title: 'Altstadt-Kurier', sub: 'Inés', contact: 'ines', req: ['r3'], label: 'I', npc: 'ines', reward: 900,
+    desc: 'Kaffee und Churros durch die engen Gassen ausliefern.',
+    *run(m) {
+      const ines = yield* standAt(m, this);
+      yield* m.talk([
+        ['Inés', 'Leo! Seit du die Schläger verjagt hast, kommen wieder Kunden. Zu viele sogar!'],
+        ['Inés', 'Vier Bestellungen müssen raus. Draußen steht mein kleiner Kiwi. Der Kaffee darf nicht kalt werden!'],
+      ], ines, ines);
+      const c = G.world.pois.cafe;
+      const car = m.spawnCar('kiwi', c.x - 9, c.z + 14, Math.PI, 0xffb35c, { missionCar: true });
+      m.failIf(() => !car.alive || car.sinking, 'Der Kiwi wurde zerstört.');
+      yield* m.goTo(c.x, c.z, 'Geh nach <b>draußen</b>.', { r: 2.5, foot: true });
+      m.objective('Steig in Inés\' <b>Kiwi</b>.');
+      const mk = m.marker(car.x, car.z, 0x19e6ff, { arrow: true, follow: car, blipCol: '#19e6ff' });
+      yield* m.until(() => G.player.vehicle === car);
+      m.removeMarker(mk); car.missionCar = false;
+      const stops = [[-510, 80, 'Calle del Mar'], [-590, -80, 'zur Uferpromenade'], [-530, 160, 'Plaza San Telmo'], [-480, 210, 'zur Bäckerei Ortega']];
+      for (let i = 0; i < stops.length; i++) {
+        const [x, z, name] = stops[i];
+        m.timerLeft = Math.round(Math.hypot(x - car.x, z - car.z) / 12 + 18);
+        yield* m.goTo(x, z, `Bestellung ${i + 1}/4: <b>${name}</b>`, { r: 4.5, vehicle: car, stop: true, color: 0xffb35c });
+        const tip = 40 + Math.round(m.timerLeft * 5);
+        G.player.addMoney(tip, `Kaffee geliefert ${i + 1}/4 · Trinkgeld +$${tip}`);
+        G.audio.checkpoint();
+        m.timerLeft = null; G.hud.timer(null);
+      }
+      car.persistent = false;
+    },
+  },
+  {
+    id: 'i2', title: 'Der Kirchenschatz', sub: 'Inés', contact: 'ines', req: ['i1'], label: 'I', npc: 'ines', reward: 2500, rewardCar: ['marina', 0x6d2e46],
+    desc: 'Das silberne Kreuz von San Telmo zurückholen.',
+    *run(m) {
+      const ines = yield* standAt(m, this);
+      yield* m.talk([
+        ['Inés', 'Leo, etwas Schreckliches ist passiert! Das silberne Kreuz aus der Kirche San Telmo wurde gestohlen.'],
+        ['Inés', 'Dieselbe Bande wie vorher. Sie fahren gerade mit einem schwarzen Atlas durch die Altstadt!'],
+        ['Leo', 'Wie viel ist das Kreuz wert?'],
+        ['Inés', 'Für die Leute hier? Alles. Bring es zurück – Padre Tomás schenkt dir dafür seinen alten Wagen.'],
+      ], ines, ines);
+      const c = G.world.pois.cafe;
+      yield* m.goTo(c.x, c.z, 'Geh nach <b>draußen</b>.', { r: 2.5, foot: true });
+      yield* m.getInCar();
+      const car = fleeCar(m, 'atlas', -517, -80, 0, 0x111111, [-520, -120], [-520, -40], 19);
+      car.health = car.maxHealth = 700;
+      car.ai.stopped = true;
+      m.objective('Stoppe den <b>schwarzen Atlas</b> mit dem Kreuz.');
+      const mk = m.marker(car.x, car.z, 0xff3b5c, { arrow: true, follow: car, blipCol: '#ff3b5c' });
+      m.failIf(() => G.player.state !== 'dead' && dist2(car.x, car.z, G.player.x, G.player.z) > 520 * 520, 'Die Diebe sind entkommen.');
+      yield* m.until(() => {
+        if (car.ai.stopped && dist2(car.x, car.z, G.player.x, G.player.z) < 80 * 80) { car.ai.stopped = false; G.hud.toast('Die Diebe haben dich entdeckt!'); }
+        if (car.alive && car.health < car.maxHealth * 0.3 && car.driver && car.driver.isPed) G.peds.ejectDriver(car);
+        return !car.alive || car.onFire || car.sinking || (car.driver && !car.driver.isPed);
+      });
+      m.removeMarker(mk); m.fails = [];
+      if (car.driver && car.driver.isPed) G.peds.ejectDriver(car);
+      car.ai = null;
+      const rx = car.x + 3, rz = car.z;
+      const relic = m.marker(rx, rz, 0xe9d8a6, { r: 1.2, label: '✝', blipCol: '#e9d8a6' });
+      m.objective('Heb das <b>silberne Kreuz</b> auf.');
+      yield* m.until(() => G.player.state === 'foot' && dist2(G.player.x, G.player.z, rx, rz) < 2.2 * 2.2);
+      m.removeMarker(relic); G.audio.pickup();
+      G.hud.toast('✝ Silbernes Kreuz gesichert');
+      yield* m.goTo(c.x, c.z, 'Bring das Kreuz zurück zum <b>Café Vieja</b>.', { r: 3, foot: true });
+      const ines2 = m.npc(c.x - 1.6, c.z + 1.4, LOOKS.ines());
+      yield* m.talk([
+        ['Inés', 'Du hast es wirklich geschafft! Padre Tomás wird weinen vor Freude.'],
+        ['Inés', 'Seine alte Marina gehört jetzt dir – sie steht in deiner Garage. Ruf sie über dein Handy.'],
+      ], { x: G.player.x, z: G.player.z }, ines2);
+    },
+  },
+  // ---------------------------------------------------------------- Sami
+  {
+    id: 's1', title: 'Ladendieb', sub: 'Sami', contact: 'sami', needContact: 'sami', req: [], label: 'S', npc: 'sami', reward: 400,
+    desc: 'Einen Dieb schnappen, der Samis Kasse geplündert hat.',
+    *run(m) {
+      const sami = yield* standAt(m, this);
+      yield* m.talk([
+        ['Sami', 'Leo! Gerade eben – ein Typ hat sich die Tageskasse geschnappt und ist raus!'],
+        ['Sami', 'Rote Kapuze, rennt Richtung Osten. Bitte, das ist mein ganzer Umsatz von heute!'],
+      ], sami, sami);
+      if (G.interior) G.interiors.exit();
+      const P = G.player;
+      let route;
+      if (C.districtAt(P.x, P.z) === 'village' && G.world.villageLoops) route = [...pick(G.world.villageLoops), ...pick(G.world.villageLoops)];
+      else {
+        const [bi, bj] = C.blockOf(P.x, P.z), cb = (v, a, b) => clamp(v, a, b);
+        const b0 = cb(bi, C.I0, C.NB - 1), b1 = cb(bj, 0, C.NB - 1);
+        route = [...G.peds.sidewalkLoop(b0, b1, 0.5), ...G.peds.sidewalkLoop(cb(b0 + 1, C.I0, C.NB - 1), b1, 0.5)];
+      }
+      const thief = m.npc(P.x + 8, P.z + 3, { ...LOOKS.gang(0xd62828), hat: c(0xd62828) });
+      runRoute(thief, route, 5.4);
+      thief.health = 60;
+      const mk = m.marker(0, 0, 0xff3b5c, { arrow: true, follow: thief, blipCol: '#ff3b5c' });
+      m.objective('Schnapp den <b>Dieb</b>!');
+      m.failIf(() => thief.alive && dist2(thief.x, thief.z, G.player.x, G.player.z) > 220 * 220, 'Der Dieb ist entkommen.');
+      yield* m.until(() => !thief.alive || thief.health < 60 || thief.state === 'knock');
+      m.removeMarker(mk); m.fails = [];
+      const bx = thief.x, bz = thief.z + 1;
+      if (thief.alive) { thief.state = 'flee'; thief.fleeFrom = G.player; thief.timer = 20; }
+      const bag = m.marker(bx, bz, 0x7cff6b, { r: 1.1, label: '$', blipCol: '#7cff6b' });
+      m.objective('Hol dir die <b>Tageskasse</b>.');
+      yield* m.until(() => dist2(G.player.x, G.player.z, bx, bz) < 2.5 * 2.5);
+      m.removeMarker(bag); G.audio.cash();
+      G.hud.toast('💰 Tageskasse zurückgeholt – Sami schreibt dir: „Du bist der Beste!“');
+    },
+  },
+  {
+    id: 's2', title: 'Nachschub', sub: 'Sami', contact: 'sami', needContact: 'sami', req: ['s1'], label: 'S', npc: 'sami', reward: 1200, rewardCar: ['hauler', 0xffd23f],
+    desc: 'Ware vom Hafen holen und die neue Filiale beliefern.',
+    *run(m) {
+      const sami = yield* standAt(m, this);
+      yield* m.talk([
+        ['Sami', 'Große Neuigkeiten: Ich habe eine Filiale in der Altstadt eröffnet! Aber die Regale sind leer.'],
+        ['Sami', 'Hol die Lieferung am Hafen ab und bring sie rüber. Den Transporter darfst du danach behalten – ich hab mir einen neuen gekauft.'],
+      ], sami, sami);
+      if (G.interior) G.interiors.exit();
+      const van = m.spawnCar('hauler', G.player.x + 5, G.player.z + 3, Math.PI / 2, 0xffd23f, { missionCar: true });
+      m.failIf(() => !van.alive || van.sinking, 'Der Transporter wurde zerstört.');
+      m.objective('Steig in den <b>Transporter</b>.');
+      const mk = m.marker(van.x, van.z, 0x19e6ff, { arrow: true, follow: van, blipCol: '#19e6ff' });
+      yield* m.until(() => G.player.vehicle === van);
+      m.removeMarker(mk); van.missionCar = false;
+      yield* m.goTo(-130, 356, 'Fahr zum <b>Lagerhaus am Hafen</b>.', { r: 5, vehicle: van, stop: true });
+      G.hud.toast('📦 Die Arbeiter laden die Ware ein …');
+      yield* m.wait(2.5);
+      const s2 = G.world.pois.shop2;
+      m.timerLeft = 75;
+      m.failIf(() => van.health < van.maxHealth * 0.3, 'Die Ware ist kaputt – zu viele Unfälle.');
+      yield* m.goTo(s2.x + 6, s2.z, 'Liefere die Ware zu <b>Samis 24/7 Altstadt</b>!', { r: 5, vehicle: van, stop: true });
+      m.timerLeft = null; G.hud.timer(null);
+      van.persistent = false;
+      G.hud.toast('Sami: „Die Filiale ist eröffnet! Der Transporter steht jetzt in deiner Garage.“');
+    },
+  },
+  // ---------------------------------------------------------------- Dex
+  {
+    id: 'd4', title: 'Bergkönig', sub: 'Dex', contact: 'dex', req: ['m6'], label: 'D', npc: 'dex', reward: 3500, rewardCar: ['atlas', 0x3a5a40],
+    desc: 'Bergrennen über die Serpentinen nach Monte Solera.',
+    *run(m) {
+      const dex = yield* standAt(m, this);
+      yield* m.talk([
+        ['Dex', 'Auf dem Monte Solera wohnt ein gewisser Don Aurelio. Reich, alt, und verrückt nach Autos.'],
+        ['Dex', 'Er hat eine Wette laufen: Wer es in Rekordzeit vom Damm bis ins Dorf schafft, bekommt seinen SUV.'],
+        ['Dex', 'Ich hab dir einen Zephyra an den Damm gestellt. Zeig ihm, was du kannst.'],
+      ], dex, dex);
+      yield* m.getInCar();
+      yield* m.goTo(40, -396, 'Fahr zum <b>Start am Damm</b> (Norden der Stadt).', { r: 6, car: true, stop: true });
+      const P = G.player;
+      const car = m.spawnCar('zephyra', 40, -410, Math.PI, 0xffb703, { keep: true });
+      if (P.inCar) P.exitVehicle(true);
+      P.enterVehicle(car); G.cam.snap();
+      m.failIf(() => !car.alive || car.sinking, 'Der Zephyra wurde zerstört.');
+      m.freeze = true;
+      for (const t of ['3', '2', '1']) { G.hud.countdown(t); G.audio.countdown(false); yield* m.wait(1); }
+      G.hud.countdown('LOS!'); G.audio.countdown(true); m.freeze = false;
+      m.timerLeft = 58;
+      m.objective('Rase die <b>Serpentinen</b> hinauf!');
+      yield* checkpoints(m, HILL_CPS(), { r: 9, vehicle: car, bonus: 2 });
+      m.timerLeft = null; G.hud.timer(null);
+      car.persistent = false;
+      G.hud.toast('🏁 Neuer Rekord! Don Aurelio hat zugeschaut …');
+    },
+  },
+  // ---------------------------------------------------------------- Brandt (Hafen)
+  {
+    id: 'h1', title: 'Schichtwechsel', sub: 'Kapitän Brandt', contact: 'brandt', req: ['m2'], label: 'K', npc: 'brandt', reward: 1500,
+    desc: 'Container-Pendelfahrten im Hafen unter Zeitdruck.',
+    *run(m) {
+      const b = yield* standAt(m, this);
+      yield* m.talk([
+        ['Brandt', 'Du bist der Fahrer, von dem Dex erzählt? Gut. Die „Solera Star“ legt heute Nacht ab.'],
+        ['Brandt', 'Meine Leute streiken, und die Ladung muss an Bord. Drei Fuhren vom Containerhof an die Kaimauer.'],
+        ['Leo', 'Und wenn ich zu langsam bin?'],
+        ['Brandt', 'Dann legt sie ohne die Ladung ab – und wir beide haben ein Problem.'],
+      ], b, b);
+      if (G.interior) G.interiors.exit();
+      const van = m.spawnCar('coyote', -54, 352, -Math.PI / 2, 0x8d99ae, { missionCar: true });
+      m.failIf(() => !van.alive || van.sinking, 'Der Pick-up wurde zerstört.');
+      m.objective('Steig in den <b>Hafen-Pick-up</b>.');
+      const mk = m.marker(van.x, van.z, 0x19e6ff, { arrow: true, follow: van, blipCol: '#19e6ff' });
+      yield* m.until(() => G.player.vehicle === van);
+      m.removeMarker(mk); van.missionCar = false;
+      const runs = [[[-252, 284], [-300, 364]], [[-196, 320], [-220, 364]], [[-228, 284], [-140, 364]]];
+      for (let i = 0; i < runs.length; i++) {
+        const [[ax, az], [bx, bz]] = runs[i];
+        m.timerLeft = 32;
+        yield* m.goTo(ax, az, `Fuhre ${i + 1}/3: Lade am <b>Containerhof</b>.`, { r: 5, vehicle: van, stop: true, color: 0xff9f1c });
+        G.hud.toast('🏗️ Container verladen'); G.audio.checkpoint();
+        m.timerLeft += 22;
+        yield* m.goTo(bx, bz, `Fuhre ${i + 1}/3: Bring sie zur <b>Kaimauer</b>.`, { r: 5, vehicle: van, stop: true });
+        G.audio.checkpoint();
+        m.timerLeft = null; G.hud.timer(null);
+      }
+      van.persistent = false;
+      G.hud.toast('Brandt: „Die Solera Star ist beladen. Gute Arbeit, Junge.“');
+    },
+  },
+  {
+    id: 'h2', title: 'Frachtschiff in Gefahr', sub: 'Kapitän Brandt', contact: 'brandt', req: ['h1', 'm4'], label: 'K', npc: 'brandt', reward: 5000,
+    desc: 'Die „Solera Star“ gegen die Tiburones-Gang verteidigen.',
+    *run(m) {
+      const b = yield* standAt(m, this);
+      yield* m.talk([
+        ['Brandt', 'Ärger, Leo. Die Tiburones – die Hafengang – wollen die Solera Star sabotieren.'],
+        ['Brandt', 'Sie wollen Sprengsätze an der Gangway anbringen. Die Polizei? Gekauft.'],
+        ['Brandt', 'Nimm die Kiste da – ein Gewehr und Munition. Halt sie vom Schiff fern, bis die Küstenwache da ist.'],
+      ], b, b);
+      const P = G.player;
+      P.giveWeapon('rifle', 120); P.armor = 100;
+      G.hud.toast('🔫 Sturmgewehr +120 Schuss · Schutzweste angelegt');
+      if (G.interior) G.interiors.exit();
+      const goal = { x: -220, z: 371 };
+      yield* m.goTo(goal.x, goal.z - 4, 'Geh zur <b>Gangway der Solera Star</b>.', { r: 6 });
+      G.police.locked = true;
+      let ship = 100;
+      const bar = () => G.hud.racePos(`SCHIFF  ${'█'.repeat(Math.ceil(ship / 10))}${'░'.repeat(10 - Math.ceil(ship / 10))}  ${Math.ceil(ship)}%`);
+      m.failIf(() => ship <= 0, 'Die Tiburones haben die Solera Star gesprengt.');
+      const waves = [[4, [[-370, 366], [-60, 366]]], [5, [[-360, 300], [-40, 300]]], [6, [[-360, 330], [-40, 330], [-220, 284]]]];
+      for (let w = 0; w < waves.length; w++) {
+        const [n, spots] = waves[w];
+        G.hud.bigToast(`WELLE ${w + 1}/3`, 'Die Tiburones greifen an!');
+        G.audio.wantedUp();
+        let all = [];
+        spots.forEach(([x, z], i) => { all = all.concat(m.gang(x, z, Math.ceil(n / spots.length), { gun: true, hp: 55, goal, aggro: 30, col: 0x0b6e4f, slow: 1.2 })); });
+        while (m.aliveGang(all) > 0) {
+          for (const p of all) if (p.alive && dist2(p.x, p.z, goal.x, goal.z) < 8 * 8) ship -= G.dt * 3.2;
+          m.objective(`Verteidige das Schiff! Tiburones übrig: <b>${m.aliveGang(all)}</b>`);
+          bar();
+          yield;
+        }
+        if (w < waves.length - 1) { m.objective('Kurze Pause – die nächste Welle kommt …'); yield* m.wait(5); }
+      }
+      G.hud.racePos('');
+      G.police.locked = false;
+      G.hud.toast('🚤 Die Küstenwache ist da. Die Solera Star ist gerettet!');
+      yield* m.wait(1.5);
+    },
+  },
+  // ---------------------------------------------------------------- Aurelio (Monte Solera)
+  {
+    id: 'a1', title: 'Weinlese', sub: 'Don Aurelio', contact: 'aurelio', req: ['d4'], label: 'A', npc: 'aurelio', reward: 2200,
+    desc: 'Edlen Wein vom Berg unbeschädigt zu Rosa bringen.',
+    *run(m) {
+      const a = yield* standAt(m, this);
+      yield* m.talk([
+        ['Aurelio', 'Der junge Mann, der meinen Bergrekord gebrochen hat. Setz dich. Wein?'],
+        ['Leo', 'Ich fahre noch.'],
+        ['Aurelio', 'Klug. Dann fahr für mich: Zwanzig Kisten meines besten Jahrgangs gehen an ein Diner in der Stadt.'],
+        ['Aurelio', 'Rosa\'s Diner. Und Leo – jede zerbrochene Flasche ist ein Stück meines Herzens.'],
+      ], a, a);
+      if (G.interior) G.interiors.exit();
+      const V = G.world.pois.villa;
+      const car = m.spawnCar('coyote', V.x + 8, V.z + 3.4, Math.PI / 2, 0x6d2e46, { missionCar: true });
+      m.failIf(() => !car.alive || car.sinking, 'Der Pick-up wurde zerstört.');
+      m.failIf(() => car.health < car.maxHealth * 0.45, 'Zu viele Weinflaschen sind zerbrochen.');
+      m.objective('Steig in den <b>Pick-up</b> mit den Weinkisten.');
+      const mk = m.marker(car.x, car.z, 0x19e6ff, { arrow: true, follow: car, blipCol: '#19e6ff' });
+      yield* m.until(() => G.player.vehicle === car);
+      m.removeMarker(mk); car.missionCar = false;
+      G.hud.hint('Fahr vorsichtig – Unfälle zerbrechen die Flaschen!', 6);
+      const d = G.world.pois.diner;
+      yield* m.goTo(d.x, d.z + 6, 'Bring den Wein vorsichtig zu <b>Rosa\'s Diner</b>.', { r: 5, vehicle: car, stop: true });
+      const pct = car.health / car.maxHealth;
+      const bonus = Math.round(pct * 1500);
+      G.player.addMoney(bonus, `Unversehrte Flaschen · Bonus +$${bonus}`);
+      car.persistent = false;
+      const rosa = m.npc(d.x + 2, d.z + 4, LOOKS.rosa());
+      yield* m.talk([['Rosa', 'Wein von Don Aurelio? Leo … mit wem gibst du dich da oben ab?'], ['Leo', 'Mit einem Weinbauern, Tante Rosa. Nur einem Weinbauern.']], { x: G.player.x, z: G.player.z }, rosa);
+    },
+  },
+  {
+    id: 'a2', title: 'Der gestohlene Vortex', sub: 'Don Aurelio', contact: 'aurelio', req: ['a1'], label: 'A', npc: 'aurelio', reward: 4000, rewardCar: ['vortex', 0x111111],
+    desc: 'Aurelios Supersportwagen aus dem Containerhof zurückholen.',
+    *run(m) {
+      const a = yield* standAt(m, this);
+      yield* m.talk([
+        ['Aurelio', 'Jemand war so dumm, mir meinen Vortex zu stehlen. Aus meiner eigenen Einfahrt.'],
+        ['Aurelio', 'Meine Leute sagen, er steht im Containerhof am Hafen. Bewacht von der Tiburones-Gang.'],
+        ['Aurelio', 'Hol ihn zurück. Wenn du das schaffst, behalte ihn. Ich kaufe mir einen neuen.'],
+      ], a, a);
+      if (G.interior) G.interiors.exit();
+      yield* m.getInCar();
+      const cx = -240, cz = 356;
+      yield* m.goTo(cx + 40, cz, 'Fahr zum <b>Containerhof</b> im Hafen.', { r: 10, car: true });
+      G.police.locked = true;
+      const car = m.spawnCar('vortex', cx, cz, Math.PI / 2, 0x111111, { missionCar: true });
+      m.failIf(() => !car.alive || car.sinking, 'Der Vortex wurde zerstört.');
+      const guards = m.gang(cx - 6, cz - 4, 5, { gun: true, hp: 60, aggro: 40, col: 0x0b6e4f });
+      m.objective('Schalte die <b>Tiburones</b> aus.');
+      yield* m.until(() => m.aliveGang(guards) === 0 || G.player.vehicle === car);
+      G.police.locked = false;
+      if (G.player.vehicle !== car) {
+        m.objective('Steig in den <b>Vortex</b>.');
+        const mk = m.marker(car.x, car.z, 0x19e6ff, { arrow: true, follow: car, blipCol: '#19e6ff' });
+        yield* m.until(() => G.player.vehicle === car);
+        m.removeMarker(mk);
+      }
+      car.missionCar = false;
+      const V = G.world.pois.villa;
+      yield* m.goTo(V.x + 6, V.z + 3.4, 'Bring den Vortex zurück zur <b>Villa Aurelio</b>.', { r: 6, vehicle: car, stop: true });
+      car.persistent = false;
+      G.player.exitVehicle(true);
+      const a2 = m.npc(V.x + 2, V.z + 1, LOOKS.aurelio());
+      yield* m.talk([
+        ['Aurelio', 'Kein Kratzer? … Fast kein Kratzer. Du hast Stil, Leo.'],
+        ['Aurelio', 'Behalte ihn. Er steht ab jetzt in deiner Garage. Und wenn du je Freunde auf dem Berg brauchst …'],
+      ], { x: G.player.x, z: G.player.z }, a2);
+    },
+  },
+];
+
+// ======================================================================
 //  Missionen
 // ======================================================================
-const STORY = [
+const MISSIONS = [
   {
-    id: 'm1', title: 'Neuanfang', sub: 'Tante Rosa', giver: 'diner', label: 'R', npc: 'rosa', reward: 500,
+    id: 'm1', title: 'Neuanfang', sub: 'Tante Rosa', contact: 'rosa', req: [], label: 'R', npc: 'rosa', reward: 500, desc: 'Tante Rosa begrüßen und Dex kennenlernen.',
     *run(m) {
       const rosa = yield* standAt(m, this);
       yield* m.talk([
@@ -504,7 +983,7 @@ const STORY = [
     },
   },
   {
-    id: 'm2', title: 'Probefahrt', sub: 'Dex', giver: 'garage', label: 'D', npc: 'dex', reward: 1000,
+    id: 'm2', title: 'Probefahrt', sub: 'Dex', contact: 'dex', req: ['m1'], label: 'D', npc: 'dex', reward: 1000, rewardCar: ['zephyra', 0xe63946], desc: 'Zeitfahren im Zephyra GT – der Wagen gehört danach dir.',
     *run(m) {
       const dex = yield* standAt(m, this);
       yield* m.talk([
@@ -525,7 +1004,7 @@ const STORY = [
     },
   },
   {
-    id: 'm3', title: 'Lieferservice', sub: 'Tante Rosa', giver: 'diner', label: 'R', npc: 'rosa', reward: 800,
+    id: 'm3', title: 'Lieferservice', sub: 'Tante Rosa', contact: 'rosa', req: ['m1'], label: 'R', npc: 'rosa', reward: 800, desc: 'Drei heiße Bestellungen mit Rosas Lieferwagen.',
     *run(m) {
       const rosa = yield* standAt(m, this);
       yield* m.talk([
@@ -555,7 +1034,7 @@ const STORY = [
     },
   },
   {
-    id: 'm4', title: 'Kleine Gefälligkeit', sub: 'Val', giver: 'club', label: 'V', npc: 'val', reward: 1500,
+    id: 'm4', title: 'Kleine Gefälligkeit', sub: 'Val', contact: 'val', req: ['m2'], label: 'V', npc: 'val', reward: 1500, desc: 'Marcos Brutus zu Schrott fahren.',
     *run(m) {
       const val = yield* standAt(m, this);
       yield* m.talk([
@@ -591,7 +1070,7 @@ const STORY = [
     },
   },
   {
-    id: 'm5', title: 'Heiße Ware', sub: 'Dex', giver: 'garage', label: 'D', npc: 'dex', reward: 0,
+    id: 'm5', title: 'Heiße Ware', sub: 'Dex', contact: 'dex', req: ['m2'], label: 'D', npc: 'dex', reward: 0, desc: 'Einen Vortex aus Coral Heights „besorgen“.',
     *run(m) {
       const dex = yield* standAt(m, this);
       yield* m.talk([
@@ -622,7 +1101,7 @@ const STORY = [
     },
   },
   {
-    id: 'm6', title: 'Straßenrennen', sub: 'Dex', giver: 'garage', label: 'D', npc: 'dex', reward: 3000,
+    id: 'm6', title: 'Straßenrennen', sub: 'Dex', contact: 'dex', req: ['m5'], label: 'D', npc: 'dex', reward: 3000, rewardCar: ['brutus', 0x111111], desc: 'Rennen quer durch Port Solera – nur der Sieg zählt.',
     *run(m) {
       const dex = yield* standAt(m, this);
       yield* m.talk([
@@ -684,7 +1163,7 @@ const STORY = [
     },
   },
   {
-    id: 'm7', title: 'Der große Coup', sub: 'Val', giver: 'club', label: 'V', npc: 'val', reward: 25000,
+    id: 'm7', title: 'Der große Coup', sub: 'Val', contact: 'val', req: ['m4', 'm6', 'h2'], label: 'V', npc: 'val', reward: 25000, desc: 'Der Überfall auf die Solera Bank.',
     *run(m) {
       const val = yield* standAt(m, this);
       yield* m.talk([
@@ -732,10 +1211,11 @@ const STORY = [
         ['Val', 'Jetzt gehört Port Solera uns. Das war erst der Anfang.'],
       ], { x: P.x, z: P.z }, val2);
     },
-    after() {
-      setTimeout(() => G.hud.bigToast('ENDE DER GESCHICHTE', 'Freies Spiel: Finde alle Neon-Muscheln, Stuntsprünge und fahre Taxi!'), 4500);
+    after(m) {
+      if (m.done.size >= MISSIONS.length) setTimeout(() => G.hud.bigToast('ALLE AUFTRÄGE ERLEDIGT', 'Port Solera gehört dir!'), 9000);
     },
   },
+  ...NEW_MISSIONS,
 ];
 
 // Taxi-Nebenjob

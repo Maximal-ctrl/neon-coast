@@ -322,6 +322,7 @@ export class World {
     this.genRamps();
     await tick(0.62, 'Berge werden geformt …');
     this.genHills();
+    this.genEntrances();
     await tick(0.7, 'Geometrie wird zusammengeführt …');
     this.finalizeMeshes();
     this.buildInstanced();
@@ -1030,6 +1031,7 @@ export class World {
       Pr.box(cx - 0.1, 14, 425, cx + 0.1, 32, 425.2, { col: dk });
       Pr.box(cx - 1, 13, 424, cx + 1, 14, 426, { col: dk });
     }
+    this.genHarborOffice();
     // Frachtschiff
     const sx0 = -330, sx1 = -110, sz0 = 398, sz1 = 426;
     const hull = rgb(0x1d3557), red = rgb(0x8d1b1b);
@@ -1142,6 +1144,7 @@ export class World {
       if (i % 2 === 0) P.box(p0[0] - 0.08, ya, p0[1] - 0.08, p0[0] + 0.08, ya + 0.8, p0[1] + 0.08, { col: rgb(0x77797d) });
     }
     this.villageRoads = [R.pts];
+    this.hillRoad = R;
   }
 
   // Alles in fn wird auf Höhe dy angehoben (Geometrie & Kollision)
@@ -1185,6 +1188,7 @@ export class World {
         const z0 = cz + edges[b] + (b === 0 ? 0 : hwB0 + 2), z1 = cz + edges[b + 1] - (b === 3 ? 0 : hwB1 + 2);
         this.villageLoops.push([[x0 - 1.2, z0 - 1.2], [x1 + 1.2, z0 - 1.2], [x1 + 1.2, z1 + 1.2], [x0 - 1.2, z1 + 1.2]]);
         if (a === 1 && b === 1) { this.villageChurch(x0, z0, x1, z1, rnd); continue; }
+        if (a === 1 && b === 2) { this.villa(x0, z0, x1, z1, rnd); continue; }
         if (a === 2 && b === 1) { this.villagePlaza(x0, z0, x1, z1, rnd); continue; }
         if (!outerA && !outerB) {
           // Ortskern: Häuserzeile mit Läden
@@ -1208,6 +1212,22 @@ export class World {
       for (let k = 0; k < 6; k++) this.parkingSpots.push([cx - 70 + k * 28, cz + 2.6, Math.PI / 2]);
     });
     this.pois.village = { x: cx, z: cz, name: 'Monte Solera' };
+  }
+
+  villa(x0, z0, x1, z1, rnd) {
+    // Villa Aurelio: zweistöckig, Flachdach mit Pergola, Pool im Garten
+    const P = this.B.props, cx = (x0 + x1) / 2;
+    this.B.grass.box(x0, 0.03, z0, x1, 0.06, z1, { sides: false, topScale: 6 });
+    this.facadeBox('house', cx - 14, z1 - 15, cx + 14, z1 - 2, 0, 7.4, { rnd, tint: 0xfaf6ee, roof: false });
+    this.roofTop(cx - 14, z1 - 15, cx + 14, z1 - 2, 7.4, true);
+    P.box(cx - 15, 7.3, z1 - 16, cx + 15, 7.6, z1 - 1, { col: rgb(0xe8e2d6) });
+    for (const sx of [-12, -4, 4, 12]) P.box(cx + sx - 0.2, 0, z1 - 1.4, cx + sx + 0.2, 3.6, z1 - 1, { col: rgb(0xf4efe6) });
+    P.box(cx - 13, 3.5, z1 - 1.6, cx + 13, 3.75, z1 + 0.3, { col: rgb(0x8a6a48) });
+    this.collider(cx - 14, z1 - 15, cx + 14, z1 - 2, 9);
+    this.B.concrete.box(cx - 10, 0, z0 + 2, cx + 10, 0.15, z0 + 12, { col: rgb(0xece6da), topScale: 2, uw: 2, vh: 2 });
+    this.B.poolw.box(cx - 8.5, 0.15, z0 + 3.5, cx + 8.5, 0.17, z0 + 10.5, { sides: false });
+    for (let k = 0; k < 4; k++) this.addPalm(x0 + 2 + k * (x1 - x0 - 4) / 3, z0 + 14 + (k % 2) * 2, rnd);
+    for (let k = 0; k < 3; k++) this.parkingSpots.push([cx - 8 + k * 8, z1 + 3.4, Math.PI / 2]);
   }
 
   villageChurch(x0, z0, x1, z1, rnd) {
@@ -1244,6 +1264,58 @@ export class World {
     this.addBox(bx - 12, bz - 7, bx + 12, bz + 7, by - 5, by + 16, 'bld');
     this.footprints.push([bx - 12, bz - 7, bx + 12, bz + 7]);
     this.pois.observatory = { x: bx, z: bz, name: 'Sternwarte' };
+  }
+
+  // Leuchtschild mit Text (eigenes Mesh)
+  textSign(text, x, y, z, ry, col = '#ffd23f', w = 4.2, bg = 'rgba(12,10,20,0.92)') {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = bg; g.fillRect(0, 0, 512, 128);
+    g.strokeStyle = col; g.lineWidth = 6; g.strokeRect(6, 6, 500, 116);
+    g.fillStyle = col; g.font = 'bold 64px "Russo One", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.shadowColor = col; g.shadowBlur = 18; g.fillText(text, 256, 68);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: t }));
+    m.material.color.setScalar(0.85);
+    m.position.set(x, y, z); m.rotation.y = ry;
+    this.scene.add(m);
+    return m;
+  }
+  // Markise + Schild über einem Eingang. nx/nz = Blickrichtung nach außen
+  storefront(x, z, nx, nz, name, col, awning, y0 = 0) {
+    const P = this.B.props, rx = Math.abs(nz), rz = Math.abs(nx);
+    const ax0 = x - rx * 3 + Math.min(0, nx * 1.6), ax1 = x + rx * 3 + Math.max(0, nx * 1.6);
+    const az0 = z - rz * 3 + Math.min(0, nz * 1.6), az1 = z + rz * 3 + Math.max(0, nz * 1.6);
+    P.box(ax0, y0 + 3.0, az0, ax1, y0 + 3.25, az1, { col: rgb(awning) });
+    this.B.accent.box(ax0, y0 + 2.95, az0, ax1, y0 + 3.0, az1, { col: rgb(new THREE.Color(col).getHex(), 1.4) });
+    // Tür (dunkel, leicht vor der Fassade)
+    P.box(x - rx * 0.9 + nx * 0.02, y0, z - rz * 0.9 + nz * 0.02, x + rx * 0.9 + nx * 0.08, y0 + 2.4, z + rz * 0.9 + nz * 0.08, { col: rgb(0x2a1d14) });
+    this.textSign(name, x + nx * 0.12, y0 + 4.7, z + nz * 0.12, Math.atan2(nx, nz), col, 4.6);
+  }
+
+  genEntrances() {
+    const E = this.entrances = [];
+    const add = (id, kind, name, x, z, nx, nz, col, awning, y0 = 0, label = '') => {
+      this.storefront(x - nx * 1.6, z - nz * 1.6, nx, nz, name, col, awning, y0);
+      E.push({ id, kind, name, x, z, out: { x: x + nx * 1.8, z: z + nz * 1.8, yaw: Math.atan2(nx, nz) }, col, label });
+      this.pois[id] = { x, z, name };
+    };
+    // Altstadt
+    add('cafe', 'cafe', 'CAFÉ VIEJA', -427.6, 0, -1, 0, '#ffb35c', 0x7a2e1e, 0, 'C');
+    add('boutique', 'boutique', 'MODA SOLERA', -427.6, -80, -1, 0, '#ff6fb0', 0x2b2d42, 0, 'M');
+    add('shop2', 'shop', '24/7 ALTSTADT', -532.4, 80, 1, 0, '#ffd23f', 0x1d6f6a, 0, '24');
+    // Monte Solera
+    const V = VILLAGE;
+    add('shop3', 'shop', '24/7 MONTE SOLERA', V.x + 23, V.z + 41, 0, 1, '#ffd23f', 0x1d6f6a, V.y, '24');
+    add('villa', 'villa', 'VILLA AURELIO', V.x - 22.95, V.z + 39, 0, 1, '#e9d8a6', 0x3a5a40, V.y, 'A');
+    // Hafen
+    add('harbor', 'office', 'HAFENBÜRO', -30, 371.4, 0, -1, '#19e6ff', 0x1d3557, 0, 'K');
+  }
+
+  genHarborOffice() {
+    this.facadeBox('office', -44, 373.2, -16, 383, 0, 7.4, { tint: 0xdfe6ee });
+    this.B.props.box(-44.3, 3.5, 372.9, -15.7, 3.7, 383.3, { col: rgb(0x1d3557) });
+    this.collider(-44, 373.2, -16, 383, 8);
   }
 
   genQuay() {
