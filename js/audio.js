@@ -232,6 +232,8 @@ export class AudioSys {
     const ambOn = playing ? 1 : 0.3;
     this.amb.g.gain.setTargetAtTime(0.06 * (1 - beach) * ambOn, t, 0.5);
     this.waves.g.gain.setTargetAtTime((0.05 + 0.05 * Math.sin(t * 0.5)) * beach * ambOn, t, 0.3);
+    if (!this.rainLoop) this.rainLoop = this.loopNoise('bandpass', 2400, 0.35);
+    this.rainLoop.g.gain.setTargetAtTime(playing && G.world.env && !G.interior ? G.world.env.rain * 0.11 : (G.interior && G.world.env ? G.world.env.rain * 0.02 : 0), t, 0.5);
     this.sirenG.gain.setTargetAtTime(playing ? this.sirenV * 0.12 : 0, t, 0.1);
     this.heliMod.gain.setTargetAtTime(playing ? this.heliV * 0.3 : 0, t, 0.2);
     this.heli.g.gain.setTargetAtTime(playing ? this.heliV * 0.25 : 0, t, 0.2);

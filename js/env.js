@@ -27,7 +27,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
     float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
     float hzF = exp( - max( vFogY, 0.0 ) * 0.011 );
     float haze = ( 1.0 - exp( - vFogDepth * ( 1.1 / fogFar ) ) ) * mix( 0.3, 0.8, hzF );
-    fogFactor = max( fogFactor, haze );
+    fogFactor = min( max( fogFactor, haze ), 0.9 );
   #endif
   gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
 #endif`;
@@ -50,7 +50,7 @@ vec3 photo(sampler2D t, vec3 d, float rot) {
   float v = clamp((0.5 - e / 3.14159265) / 0.53, 0.0, 0.999);
   return texture2D(t, vec2(u, 1.0 - v)).rgb;
 }
-uniform float night; uniform float time; uniform float clouds;
+uniform float night; uniform float time; uniform float clouds; uniform float overcast;
 varying vec3 vDir;
 float h21(vec2 p){ p = fract(p*vec2(123.34, 456.21)); p += dot(p, p+45.32); return fract(p.x*p.y); }
 float h31(vec3 p){ p = fract(p*0.3183099 + .1); p *= 17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
@@ -74,8 +74,15 @@ void main(){
   } else {
     col = mix(horizon, groundColor, clamp(-h * 6.0, 0.0, 1.0));
   }
+  if (overcast > 0.001) {
+    // Regenwetter: geschlossene graue Wolkendecke
+    float ol = dot(col, vec3(0.299, 0.587, 0.114));
+    float oh = dot(horizon, vec3(0.299, 0.587, 0.114));
+    vec3 oc = mix(vec3(oh) * 1.15, vec3(ol), 0.35) * vec3(0.93, 0.97, 1.06);
+    col = mix(col, oc, overcast * 0.92);
+  }
   float sd = max(dot(d, sunDir), 0.0);
-  float sunVis = smoothstep(-0.12, 0.02, sunDir.y);
+  float sunVis = smoothstep(-0.12, 0.02, sunDir.y) * (1.0 - overcast);
   col += sunColor * (pow(sd, 900.0) * 30.0 + pow(sd, 10.0) * 0.35 + pow(sd, 3.0) * 0.12 * (1.0 - clamp(h*2.0,0.0,1.0))) * sunVis;
   // Mond
   vec3 md = normalize(vec3(-sunDir.x, max(0.25, -sunDir.y), -sunDir.z + 0.3));
@@ -204,7 +211,7 @@ export class Environment {
     const u = {
       zenith: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
       sunColor: { value: new THREE.Color() }, sunDir: { value: this.sunDir },
-      groundColor: { value: new THREE.Color() }, night: { value: 0 }, time: { value: 0 }, clouds: { value: 0.35 },
+      groundColor: { value: new THREE.Color() }, night: { value: 0 }, time: { value: 0 }, clouds: { value: 0.35 }, overcast: { value: 0 },
       tDay: { value: null }, tDusk: { value: null }, tNight: { value: null }, wSky: { value: new THREE.Vector3(1, 0, 0) }, rotSky: { value: new THREE.Vector3() }, useImg: { value: 0 }, skyGain: { value: 1 },
     };
     this.skyUniforms = u;
@@ -246,6 +253,69 @@ export class Environment {
     const envSky = new THREE.Mesh(new THREE.SphereGeometry(100, 24, 12), this.skyMat);
     this.envScene.add(envSky);
     this.envRT = null;
+    // Echte Umgebungsspiegelung: Würfelkamera am Spieler, pro Durchlauf eine Seite
+    this.cubeOn = quality !== 'low';
+    if (this.cubeOn) {
+      this.cubeRT = new THREE.WebGLCubeRenderTarget(quality === 'high' ? 256 : 128, { type: THREE.HalfFloatType });
+      this.cubeCam = new THREE.CubeCamera(0.6, 520, this.cubeRT);
+      scene.add(this.cubeCam);
+      this.cubeFace = -1; this.cubeTick = 0; this.cubeEnv = null;
+      this.cubeEvery = quality === 'high' ? 2 : 5;
+    }
+    // Wetter
+    this.rain = 0; this.wet = 0; this.raining = false; this.weatherT = 240 + Math.random() * 300;
+    const RN = this.rainN = quality === 'low' ? 500 : 1100;
+    this.rainPos = new Float32Array(RN * 6); this.rainSeed = new Float32Array(RN * 3);
+    for (let i = 0; i < RN * 3; i++) this.rainSeed[i] = Math.random();
+    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(this.rainPos, 3));
+    this.rainMat = new THREE.LineBasicMaterial({ color: 0xbcd4ee, transparent: true, opacity: 0, depthWrite: false, fog: false });
+    this.rainMesh = new THREE.LineSegments(rg, this.rainMat);
+    this.rainMesh.frustumCulled = false; this.rainMesh.visible = false; this.rainMesh.layers.set(1);
+    scene.add(this.rainMesh);
+  }
+  // Objekte, die in der Spiegelung fehlen dürfen (spart Rechenzeit)
+  noReflect(obj) { obj.traverse((o) => o.layers.set(1)); }
+  setRain(on, dur = 150) { this.raining = on; this.weatherT = dur; }
+  updateWeather(dt) {
+    this.weatherT -= dt;
+    if (this.weatherT <= 0) { this.raining = !this.raining && Math.random() < 0.6; this.weatherT = this.raining ? 90 + Math.random() * 110 : 300 + Math.random() * 420; }
+    this.rain += ((this.raining ? 1 : 0) - this.rain) * Math.min(1, dt * 0.35);
+    if (this.rain > 0.25) this.wet = Math.min(1, this.wet + dt * 0.12); else this.wet = Math.max(0, this.wet - dt / 140);
+    const show = this.rain > 0.02 && !G.interior;
+    this.rainMesh.visible = show;
+    if (!show) return;
+    this.rainMat.opacity = 0.34 * this.rain;
+    const c = G.camera.position, P = this.rainPos, S = this.rainSeed, t = this.skyUniforms.time.value;
+    for (let i = 0; i < this.rainN; i++) {
+      const fall = (S[i * 3 + 1] + t * (0.9 + S[i * 3] * 0.4)) % 1;
+      const x = c.x + (((S[i * 3] * 46 - c.x) % 46) + 46) % 46 - 23, z = c.z + (((S[i * 3 + 2] * 46 - c.z) % 46) + 46) % 46 - 23, y = c.y + 14 - fall * 26;
+      const k = i * 6;
+      P[k] = x; P[k + 1] = y; P[k + 2] = z; P[k + 3] = x + 0.12; P[k + 4] = y - 0.9; P[k + 5] = z + 0.05;
+    }
+    this.rainMesh.geometry.attributes.position.needsUpdate = true;
+  }
+  updateCube(focus) {
+    if (!this.cubeOn) return;
+    const r = this.renderer, cam = this.cubeCam;
+    if (this.cubeFace < 0) { cam.position.set(focus.x, (focus.y || 0) + 2.4, focus.z); cam.update(r, this.scene); this.cubeFace = 6; }
+    else {
+      if (++this.cubeTick % this.cubeEvery) return;
+      if (this.cubeFace === 0) { cam.position.set(focus.x, (focus.y || 0) + 2.4, focus.z); cam.updateMatrixWorld(true); }
+      const prev = r.getRenderTarget(), sa = r.shadowMap.autoUpdate;
+      r.shadowMap.autoUpdate = false;
+      r.setRenderTarget(this.cubeRT, this.cubeFace);
+      r.render(this.scene, cam.children[this.cubeFace]);
+      r.setRenderTarget(prev);
+      r.shadowMap.autoUpdate = sa;
+      this.cubeFace++;
+    }
+    if (this.cubeFace >= 6) {
+      this.cubeFace = 0;
+      const old = this.cubeEnv;
+      this.cubeEnv = this.pmrem.fromCubemap(this.cubeRT.texture);
+      this.scene.environment = this.cubeEnv.texture;
+      if (old) old.dispose();
+    }
   }
 
   // Echte Himmelsfotos (CC0, Poly Haven) für Tag, Dämmerung und Nacht
@@ -315,12 +385,16 @@ export class Environment {
       const phiSun = Math.atan2(this.sunDir.z, this.sunDir.x), phiMoon = Math.atan2(-this.sunDir.z + 0.3, -this.sunDir.x);
       u.rotSky.value.set((S.day.sunU - 0.5) * Math.PI * 2 - phiSun, (S.dusk.sunU - 0.5) * Math.PI * 2 - phiSun, (S.night.sunU - 0.5) * Math.PI * 2 - phiMoon);
       const gain = 1.35 * wd + 1.05 * wk + 0.11 * wn;
-      u.skyGain.value = gain;
+      u.skyGain.value = gain * (1 - 0.5 * this.rain);
       const hc = new THREE.Color(0, 0, 0), zc = new THREE.Color(0, 0, 0);
       [wd, wk, wn].forEach((w, i) => { hc.add(S.hor[i].clone().multiplyScalar(w * gain)); zc.add(S.zen[i].clone().multiplyScalar(w * gain)); });
       if (wk > 0.05) hc.lerp(u.sunColor.value.clone().multiplyScalar(0.8), wk * 0.25);
+      hc.multiplyScalar(1 - 0.45 * this.rain); zc.multiplyScalar(1 - 0.5 * this.rain);
       u.horizon.value.copy(hc); u.zenith.value.copy(zc);
     }
+    // bedeckter Himmel: Farben entsättigen
+    u.overcast.value = this.rain;
+    if (this.rain > 0.01) for (const c of [u.horizon.value, u.zenith.value]) { const l = c.r * 0.3 + c.g * 0.59 + c.b * 0.11; c.lerp(new THREE.Color(l * 0.95, l, l * 1.07), this.rain * 0.85); }
 
     // Sonne oder Mond als gerichtetes Licht
     const sunUp = e > -3;
@@ -328,7 +402,7 @@ export class Environment {
     this.sun.color.copy(u.sunColor.value);
     if (!sunUp) this.sun.color.setHex(0x8fa6ff);
     const sunI = sunUp ? lerp(0.6, 3.7, smoothstep(-3, 25, e)) : 0.7;
-    this.sun.intensity = sunI;
+    this.sun.intensity = sunI * (1 - 0.65 * this.rain);
     this.hemi.intensity = lerp(0.85, 1.25, this.night);
     // Schattenkamera folgt dem Fokus (mit Texel-Snapping)
     const fx = focus.x, fz = focus.z;
@@ -360,7 +434,9 @@ export class Environment {
 
     this.sky.position.copy(G.camera.position);
 
-    // Reflexions-Umgebung periodisch erneuern
+    this.updateWeather(dt);
+    if (this.cubeOn && G.state !== 'loading') { this.updateCube(focus); return; }
+    // Reflexions-Umgebung periodisch erneuern (einfache Variante: nur Himmel)
     if (Math.abs(hour - this.lastEnvHour) > 0.35 && Math.abs(hour - this.lastEnvHour) < 23.6 || !this.envRT) {
       this.lastEnvHour = hour;
       if (this.envRT) this.envRT.dispose();

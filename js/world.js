@@ -6,7 +6,7 @@ import * as TX from './textures.js';
 import { GeoBuilder, rgb } from './geo.js';
 import { mulberry32, lerp, clamp, smoothstep } from './utils.js';
 import { rayBox as rayBoxW } from './physics.js';
-import { TEX, applyDetail } from './realism.js';
+import { TEX, applyDetail, WET } from './realism.js';
 
 const { CELL, NB, HALF, WALK_HW, roadPos, I0 } = C;
 
@@ -346,17 +346,17 @@ export class World {
     // Fotorealistische Detailschicht (echte PBR-Texturen)
     if (TEX.asphalt) {
       const M = this.M;
-      applyDetail(M.road, { a: 'asphalt', b: 'pavement', mode: 'xz', scale: 3.2, scaleB: 2.6, split: 'lum', col: 0.95, nrm: 0.9 });
+      applyDetail(M.road, { a: 'asphalt', b: 'pavement', mode: 'xz', scale: 3.2, scaleB: 2.6, split: 'lum', col: 0.95, nrm: 0.9, wet: true });
       for (const k of ['apt', 'deco', 'house']) applyDetail(M[k], { a: 'plaster', mode: 'box', scale: 3, col: 0.6, nrm: 0.75, mask: 'metal' });
       for (const k of ['office', 'warehouse']) applyDetail(M[k], { a: 'concrete', mode: 'box', scale: 7, col: 0.25, nrm: 0.5, mask: 'metal' });
       applyDetail(M.roof, { a: 'concrete', mode: 'xz', scale: 4, col: 0.6 });
       applyDetail(M.tile, { a: 'rooftile', mode: 'uv', scale: 3.5, col: 0.9, nrm: 1 });
       applyDetail(M.grass, { a: 'grass', mode: 'xz', scale: 2.5, col: 0.9 });
       applyDetail(M.sand, { a: 'sand', mode: 'xz', scale: 4, col: 0.8 });
-      applyDetail(M.concrete, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.7 });
+      applyDetail(M.concrete, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.7, wet: true });
       applyDetail(M.land, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.6 });
-      applyDetail(M.asph, { a: 'asphalt', mode: 'xz', scale: 3.2, col: 0.95, nrm: 0.9 });
-      applyDetail(M.walk, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.8 });
+      applyDetail(M.asph, { a: 'asphalt', mode: 'xz', scale: 3.2, col: 0.95, nrm: 0.9, wet: true });
+      applyDetail(M.walk, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.8, wet: true });
     }
     this.M.accent.color.setScalar(0.3);
   }
@@ -2107,6 +2107,12 @@ export class World {
       for (const c of this.vegChunks) c.im.visible = Math.hypot(c.x - cp.x, c.z - cp.z) < far + 290;
     }
     const night = G.world.env ? G.world.env.night : 0;
+    // Nässe: Regen oder leichter Glanz bei Nacht -> Straßen spiegeln
+    if (this.env) {
+      WET.value = G.interior ? 0 : Math.max(this.env.wet, night * 0.22);
+      const em = 0.35 + WET.value * 0.85;
+      for (const k of ['road', 'asph', 'walk', 'concrete']) this.M[k].envMapIntensity = em;
+    }
     // Nachtbeleuchtung
     const n = night;
     for (const k of ['glass', 'office', 'apt', 'deco', 'warehouse', 'house', 'store']) this.M[k].emissiveIntensity = n * (k === 'store' ? 0.85 : 0.7);

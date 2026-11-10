@@ -101,7 +101,10 @@ async function boot() {
   env.setFogRange(q === 'low' ? 140 : 180, q === 'low' ? 520 : q === 'medium' ? 820 : 1050);
   await world.build(setLoad);
 
+  camera.layers.enable(1);
   G.crowd = new CrowdRenderer(scene, 180);
+  for (const k in G.crowd.im) env.noReflect(G.crowd.im[k]);
+  if (q !== 'high') for (const c of world.vegChunks || []) env.noReflect(c.im);
   G.crowd.setShadows(q === 'high');
   G.effects = new Effects(scene);
   G.vm = new VehicleManager(scene);
@@ -1003,7 +1006,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '2.1.0 Beta';
+export const GAME_VERSION = '2.2.0 Beta';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

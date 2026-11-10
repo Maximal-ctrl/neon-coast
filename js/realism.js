@@ -2,6 +2,8 @@
 // als Detailschicht über die prozeduralen Materialien gelegt (Farbe, Normalen, Rauheit, AO).
 import * as THREE from 'three';
 
+// Nässe (0..1): wird vom Wetter gesetzt und von allen Straßenmaterialien gelesen
+export const WET = { value: 0 };
 const SETS = ['asphalt', 'pavement', 'plaster', 'concrete', 'grass', 'rock', 'sand', 'rooftile'];
 export const TEX = {};
 
@@ -31,6 +33,7 @@ export function applyDetail(mat, cfg) {
   if (B) defs.push('#define DT_B');
   if (cfg.mask === 'metal') defs.push('#define DT_MASK_METAL');
   if (cfg.split === 'lum') defs.push('#define DT_SPLIT_LUM');
+  if (cfg.wet) defs.push('#define DT_WET');
   const prevCompile = mat.onBeforeCompile;
   mat.onBeforeCompile = (sh, r) => {
     if (prevCompile) prevCompile(sh, r);
@@ -38,6 +41,7 @@ export function applyDetail(mat, cfg) {
     if (B) { sh.uniforms.dtBd = { value: B.d }; sh.uniforms.dtBn = { value: B.n }; sh.uniforms.dtBa = { value: B.a }; }
     sh.uniforms.dtScale = { value: cfg.scale || 4 }; sh.uniforms.dtScaleB = { value: cfg.scaleB || cfg.scale || 4 };
     sh.uniforms.dtCol = { value: cfg.col ?? 0.75 }; sh.uniforms.dtNrm = { value: cfg.nrm ?? 0.8 };
+    sh.uniforms.dtWet = WET;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vDtW; varying vec3 vDtN; varying vec2 vDtUv;')
       .replace('#include <project_vertex>', `#include <project_vertex>
@@ -57,7 +61,7 @@ export function applyDetail(mat, cfg) {
         #ifdef DT_B
           uniform sampler2D dtBd, dtBn, dtBa;
         #endif
-        uniform float dtScale, dtScaleB, dtCol, dtNrm;
+        uniform float dtScale, dtScaleB, dtCol, dtNrm, dtWet;
         // dominante Achse -> UV & Tangentenbasis (Welt)
         void dtPlane(vec3 p, vec3 n, out vec2 uv, out vec3 T, out vec3 Bt, out vec3 N) {
           vec3 a = abs(n);
@@ -107,6 +111,14 @@ export function applyDetail(mat, cfg) {
           diffuseColor.rgb *= mix(vec3(1.0), clamp(cA, 0.0, 2.2), dtCol * k);
           diffuseColor.rgb *= mix(1.0, rA.r, 0.6 * k);
           roughnessFactor = mix(roughnessFactor, clamp(rA.g * 1.05, 0.05, 1.0), 0.75 * k);
+          #ifdef DT_WET
+            // nasse Fahrbahn: dunkler, glatter, mit Pfützen
+            float pud = smoothstep(0.5, 0.68, texture2D(dtAa, duv * 0.023).g * 0.7 + texture2D(dtAn, duv * 0.0061).r * 0.6 - 0.12);
+            float wv = dtWet * (0.42 + 0.58 * pud);
+            diffuseColor.rgb *= mix(1.0, 0.5, wv);
+            roughnessFactor = mix(roughnessFactor, mix(0.34, 0.05, pud), wv);
+            nA = normalize(mix(nA, vec3(0.0, 0.0, 1.0), wv * (0.35 + 0.65 * pud)));
+          #endif
           vec3 nw = normalize(dT * nA.x * dtNrm + dB * nA.y * dtNrm + dN * max(nA.z, 0.2));
           if (dot(nw, gN) < 0.0) nw = gN;
           normal = normalize(mix(normal, normalize((viewMatrix * vec4(nw, 0.0)).xyz), k));
