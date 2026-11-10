@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Waffen, Treffer, Explosionsschaden
 import { G } from './state.js';
 import { rayBox, rayVeh, rayChar } from './physics.js';
@@ -14,6 +15,10 @@ export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun', 'rifle'];
 
 const _b = [];
 const hit = { t: 0, type: null, obj: null, x: 0, y: 0, z: 0 };
+
+const SHELL_GEO = new THREE.SphereGeometry(0.18, 8, 6);
+const SHELL_MAT = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2, 1) });
+const _qb = [], _qc = [];
 
 export class Combat {
   // Strahltest gegen Welt, Fahrzeuge, Figuren
@@ -56,6 +61,16 @@ export class Combat {
       const t = rayChar(ox, oy, oz, dx, dy, dz, p.x, p.y, p.z, lying ? 0.6 : 0.42, lying ? 0.4 : 1.85, best);
       if (t >= 0 && t < best) { best = t; type = 'ped'; obj = p; }
     }
+    // Polizeihubschrauber (Kugel um den Rumpf)
+    const PL = G.police;
+    if (PL && PL.heliActive && !PL.heliDown) {
+      const c = PL.heliPos, ex = c.x - ox, ey = c.y - oy, ez = c.z - oz;
+      const tc = ex * dx + ey * dy + ez * dz;
+      if (tc > 0 && tc < best) {
+        const d2 = ex * ex + ey * ey + ez * ez - tc * tc, r = 2.8;
+        if (d2 < r * r) { const t = tc - Math.sqrt(r * r - d2); if (t > 0 && t < best) { best = t; type = 'heli'; obj = PL; } }
+      }
+    }
     if (includePlayer) {
       const P = G.player;
       if (P.state === 'foot' || P.state === 'knock' || P.state === 'swim') {
@@ -66,6 +81,55 @@ export class Combat {
     hit.t = best; hit.type = type; hit.obj = obj;
     hit.x = ox + dx * best; hit.y = oy + dy * best; hit.z = oz + dz * best;
     return hit;
+  }
+
+  // Panzergranate abfeuern
+  fireShell(v) {
+    if (!this.shells) this.shells = [];
+    const b = v.parts.barrel;
+    v.group.updateMatrixWorld(true);
+    const tip = new THREE.Vector3(0, 0, 4.6).applyMatrix4(b.matrixWorld);
+    const dir = new THREE.Vector3(0, 0, 1).transformDirection(b.matrixWorld).normalize();
+    const mesh = new THREE.Mesh(SHELL_GEO, SHELL_MAT);
+    mesh.position.copy(tip); G.scene.add(mesh);
+    this.shells.push({ p: tip.clone(), v: dir.multiplyScalar(95), t: 0, mesh, src: v.driver === 'player' ? 'player' : 'npc', veh: v });
+    G.effects.muzzle(tip.x, tip.y, tip.z); G.effects.smoke(tip.x, tip.y, tip.z, 6, 0.5);
+    G.effects.light(tip.x, tip.y, tip.z, 6, 0.15);
+    G.audio.explosion(tip.x, tip.z);
+    if (v.driver === 'player') { G.cam.shake(0.6); G.police.crime('shoot'); }
+    v.vx -= Math.sin(v.h) * 0.6; v.vz -= Math.cos(v.h) * 0.6;
+  }
+  updateShells(dt) {
+    if (!this.shells || !this.shells.length) return;
+    const W = G.world;
+    for (let i = this.shells.length - 1; i >= 0; i--) {
+      const s = this.shells[i];
+      s.t += dt;
+      const steps = 3;
+      let hit = false;
+      for (let k = 0; k < steps && !hit; k++) {
+        const h = dt / steps;
+        s.v.y -= 9.8 * 0.35 * h;
+        s.p.addScaledVector(s.v, h);
+        if (s.p.y <= W.groundHeight(s.p.x, s.p.z) + 0.1 || s.t > 4) hit = true;
+        W.query(s.p.x, s.p.z, 1, _qb, _qc);
+        for (const b of _qb) if (s.p.x > b.x0 && s.p.x < b.x1 && s.p.z > b.z0 && s.p.z < b.z1 && s.p.y < b.y1 && s.p.y > b.y0) hit = true;
+        _qb.length = 0; _qc.length = 0;
+        for (const v of G.vehicles) if (v !== s.veh && Math.abs(v.x - s.p.x) < v.hl + 0.6 && Math.abs(v.z - s.p.z) < v.hl + 0.6 && s.p.y < v.y + v.height + 0.5 && s.p.y > v.y - 0.5) hit = true;
+        for (const p of G.peds.list) if (p.alive && (p.x - s.p.x) ** 2 + (p.z - s.p.z) ** 2 < 1.2 && s.p.y < p.y + 2 && s.p.y > p.y - 0.2) hit = true;
+        const PL = G.police;
+        if (PL.heliActive && !PL.heliDown && PL.heliPos.distanceTo(s.p) < 4) hit = true;
+      }
+      s.mesh.position.copy(s.p);
+      if (Math.random() < 0.7) G.effects.smoke(s.p.x, s.p.y, s.p.z, 1, 0.3);
+      if (hit) {
+        G.scene.remove(s.mesh);
+        this.shells.splice(i, 1);
+        G.effects.explosion(s.p.x, s.p.y, s.p.z, 1.6);
+        this.explosionDamage(s.p.x, s.p.y, s.p.z, 9, 420, s.src, null);
+        if (s.src === 'player') { G.police.crime('explode'); const d = G.camera.position.distanceTo(s.p); G.cam.shake(Math.max(0, 1 - d / 60)); }
+      }
+    }
   }
 
   // Spieler schießt von (ox,oy,oz) in Richtung (dx,dy,dz)
@@ -107,6 +171,10 @@ export class Combat {
       h.obj.damage(dmg * 0.9, src);
       G.effects.impact(h.x, h.y, h.z, 'metal');
       if (src === 'player') { G.hud.hitMarker(false); if (h.obj.ai && h.obj.driver && h.obj.driver.isPed && h.obj.ai.mode === 'traffic') { h.obj.ai.mode = 'flee'; h.obj.ai.scared = 10; h.obj.ai.cruise = 22; } }
+    } else if (h.type === 'heli') {
+      G.police.heliDamage(dmg, src);
+      G.effects.impact(h.x, h.y, h.z, 'metal');
+      if (src === 'player') G.hud.hitMarker(G.police.heliDown);
     } else if (h.type === 'player') {
       G.player.damage(dmg, src);
     } else if (h.type) {
@@ -125,7 +193,7 @@ export class Combat {
     const miss = Math.random() > acc;
     const spread = miss ? 0.08 + Math.random() * 0.08 : 0.01;
     dx = dx / d + rand(-spread, spread); dy = dy / d + rand(-spread, spread) * 0.5; dz = dz / d + rand(-spread, spread);
-    const h = this.raycast(ox, oy, oz, dx, dy, dz, 80, null, true);
+    const h = this.raycast(ox, oy, oz, dx, dy, dz, 80, p.vehIgnore || null, true);
     G.effects.tracer(ox, oy, oz, h.x, h.y, h.z, [1, 0.6, 0.4]);
     G.effects.muzzle(ox, oy, oz);
     G.audio.gun('pistol', ox, oz, false);
@@ -180,6 +248,8 @@ export class Combat {
   }
 
   explosionDamage(x, y, z, r, maxDmg, source, except) {
+    const PL = G.police;
+    if (PL && PL.heliActive && !PL.heliDown) { const d = PL.heliPos.distanceTo({ x, y, z }); if (d < r * 1.6) PL.heliDamage(maxDmg * (1 - d / (r * 1.6)) * 2, source); }
     for (const p of G.peds.list) {
       const d = Math.hypot(p.x - x, p.z - z);
       if (d > r) continue;

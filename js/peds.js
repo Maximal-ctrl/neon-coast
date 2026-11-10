@@ -424,6 +424,7 @@ export class PedManager {
 
   copThink(p, dt) {
     const P = G.player;
+    if (p.chaseTarget) { const t = p.chaseTarget; p.tx = t.x; p.tz = t.z; p.moveSpeed = 6.6; p.anim.gun = false; return; }
     const wanted = G.police.level;
     p.anim.gun = true;
     if (wanted === 0) {

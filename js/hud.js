@@ -228,9 +228,7 @@ export class HUD {
     const tgt = this.getRouteTarget();
     if (tgt && this.routeT <= 0) {
       this.routeT = 0.6;
-      const a = W.nearestNode(px, pz), b = W.nearestNode(tgt.x, tgt.z);
-      this.route = W.route(a.id, b.id).map((id) => [W.nodes[id].x, W.nodes[id].z]);
-      this.route.push([tgt.x, tgt.z]);
+      this.route = W.gpsPath(px, pz, tgt.x, tgt.z);
     }
     if (tgt && this.route) {
       g.lineWidth = Math.max(3, S * 0.025);
@@ -240,6 +238,14 @@ export class HUD {
       const [sx0, sy0] = toS(px, pz); g.moveTo(sx0, sy0);
       for (const [x, z] of this.route) { const [sx, sy] = toS(x, z); g.lineTo(sx, sy); }
       g.stroke();
+    }
+    // Suchgebiet der Polizei (letzte bekannte Position)
+    const PL = G.police;
+    if (PL.level > 0 && PL.searching && PL.lastPos) {
+      const [cx, cy] = toS(PL.lastPos.x, PL.lastPos.z), rr = (60 + PL.level * 12) * k;
+      const fl = Math.floor(G.time * 2) % 2 === 0;
+      g.fillStyle = fl ? 'rgba(255,40,40,0.18)' : 'rgba(40,90,255,0.18)'; g.strokeStyle = fl ? 'rgba(255,60,60,0.7)' : 'rgba(60,110,255,0.7)';
+      g.lineWidth = Math.max(1.5, S * 0.008); g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fill(); g.stroke();
     }
     // Blips
     const blip = (x, z, col, r = 0.035, shape = 'dot', label = null, edge = false) => {
@@ -377,7 +383,7 @@ export class HUD {
     // Bezirksnamen
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.font = `600 ${Math.round(13 * u)}px Oswald, sans-serif`;
-    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['SOLERA HILLS', 200, -900], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860]];
+    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['SOLERA HILLS', 200, -900], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860], ['ANWESEN', 530, -990]];
     for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.lineWidth = 3 * u; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.strokeText(t, sx, sy); g.fillStyle = 'rgba(40,44,52,0.9)'; g.fillText(t, sx, sy); }
     // Route
     const tgt = this.getRouteTarget();

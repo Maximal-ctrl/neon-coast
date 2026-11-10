@@ -10,6 +10,18 @@ import * as CFG from './config.js';
 const PREFIX = 'neoncoast-v1-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_PLAYERS = 4;
+// STUN/TURN-Server: damit Geräte in verschiedenen Netzen (WLAN, Mobilfunk, Tablet ↔ PC) sich erreichen
+const PEER_OPTS = {
+  debug: 0,
+  config: {
+    iceServers: [
+      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
+      { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+      { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+    ],
+    sdpSemantics: 'unified-plan',
+  },
+};
 const SEND_HZ = 12;
 
 let peerLib = null;
@@ -68,7 +80,7 @@ export class Multiplayer {
     return new Promise((res, rej) => {
       const tryOpen = (attempt) => {
         this.code = code5();
-        const peer = new Peer(PREFIX + this.code, { debug: 0 });
+        const peer = new Peer(PREFIX + this.code, PEER_OPTS);
         this.peer = peer;
         peer.on('open', (id) => { this.myId = id; this.status = 'online'; this.changed(); res(this.code); });
         peer.on('connection', (conn) => this.acceptGuest(conn));
@@ -82,30 +94,42 @@ export class Multiplayer {
     });
   }
 
-  async joinGame(code) {
+  async joinGame(code, retry = true) {
+    try { return await this.joinOnce(code); } catch (e) {
+      if (!retry || /voll|5 Zeichen/.test(e.message || '')) throw e;
+      G.hud.toast('Verbindung dauert … zweiter Versuch über Relay-Server');
+      return this.joinOnce(code);
+    }
+  }
+  async joinOnce(code) {
     await this.leave(true);
     code = (code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length !== 5) throw new Error('Der Code hat 5 Zeichen.');
     const Peer = await loadPeer();
     this.status = 'connecting'; this.host = false; this.code = code; this.changed();
     return new Promise((res, rej) => {
-      const peer = new Peer({ debug: 0 });
+      const peer = new Peer(PEER_OPTS);
       this.peer = peer;
       let done = false;
-      const to = setTimeout(() => { if (!done) { done = true; const e = new Error('Zeitüberschreitung – Raum nicht erreichbar.'); this.fail(e); rej(e); } }, 15000);
+      const to = setTimeout(() => { if (!done) { done = true; const e = new Error('Zeitüberschreitung – Raum nicht erreichbar.'); this.fail(e); rej(e); } }, 25000);
       peer.on('open', (id) => {
         this.myId = id;
         const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' });
         conn.on('open', () => {
           this.conns.set(conn.peer, conn);
-          conn.send({ t: 'hello', name: G.player.name, look: this.myLook() });
+          conn.send({ t: 'hello', name: G.player.name, look: this.myLook(), v: G.version });
         });
         conn.on('data', (m) => {
-          if (m.t === 'welcome' && !done) { done = true; clearTimeout(to); this.status = 'online'; this.changed(); res(m); }
+          if (m.t === 'welcome' && !done) { done = true; clearTimeout(to); this.status = 'online'; this.changed(); res(m); if (m.v && m.v !== G.version) G.hud.toast(`⚠️ Der Host spielt Version ${m.v}, du ${G.version}. Bitte beide Geräte neu laden!`); }
           if (m.t === 'full' && !done) { done = true; clearTimeout(to); const e = new Error('Der Raum ist voll.'); this.fail(e); rej(e); return; }
           this.onData(conn, m);
         });
-        conn.on('close', () => { if (this.peer === peer) { G.hud.toast('Verbindung zum Host getrennt.'); this.leave(); } });
+        conn.on('close', () => {
+          if (this.peer !== peer) return;
+          // kurz weg (App-Wechsel, Funkloch): automatisch neu verbinden
+          if (this.status === 'online' && (this.rejoins || 0) < 3) { this.rejoins = (this.rejoins || 0) + 1; G.hud.toast('Verbindung unterbrochen – verbinde neu …'); const c = this.code; setTimeout(() => this.joinGame(c, false).then(() => { this.rejoins = 0; G.hud.toast('Wieder verbunden!'); }).catch(() => this.leave()), 1500); return; }
+          G.hud.toast('Verbindung zum Host getrennt.'); this.leave();
+        });
       });
       peer.on('error', (e) => { if (!done) { done = true; clearTimeout(to); this.fail(e); rej(e); } else this.fail(e); });
     });
@@ -170,7 +194,8 @@ export class Multiplayer {
         const P = G.player;
         const list = [{ id: this.myId, name: P.name, look: this.myLook() }];
         for (const r of this.players.values()) if (r.id !== id) list.push({ id: r.id, name: r.name, look: r.look });
-        this.send(conn, { t: 'welcome', you: id, players: list, time: G.timeOfDay, x: P.x, z: P.z, int: !!G.interior });
+        this.send(conn, { t: 'welcome', you: id, players: list, time: G.timeOfDay, x: P.x, z: P.z, int: !!G.interior, v: G.version });
+        if (m.v && m.v !== G.version) G.hud.toast(`⚠️ ${String(m.name || 'Gast').slice(0, 14)} spielt Version ${m.v}, du ${G.version}. Bitte beide Geräte neu laden!`);
         this.broadcast({ t: 'join', id, name: m.name, look: m.look }, id);
         G.hud.toast(`${m.name} ist deinem Spiel beigetreten!`);
         G.audio.pickup();

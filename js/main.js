@@ -40,6 +40,8 @@ import { Input } from './input.js';
 import { AudioSys, STATIONS } from './audio.js';
 import { HUD, ICONS } from './hud.js';
 import { WeaponWheel } from './wheel.js';
+import { RandomEvents } from './events.js';
+import { Dealer } from './dealer.js';
 import { Missions, shopItems, CONTACT_INFO } from './missions.js';
 import { Save } from './save.js';
 import { Interiors } from './interiors.js';
@@ -116,6 +118,8 @@ async function boot() {
   G.audio = new AudioSys();
   G.hud = new HUD();
   G.wheel = new WeaponWheel(ICONS);
+  G.events = new RandomEvents();
+  G.dealer = new Dealer();
   G.missions = new Missions();
 
   // Nachbearbeitung (Leuchteffekte)
@@ -136,7 +140,8 @@ async function boot() {
     bloom = new UnrealBloomPass(res, 0.4, 0.35, 0.9);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
-    composer.addPass(new ShaderPass(GRADE_SHADER));
+    G.gradePass = new ShaderPass(GRADE_SHADER);
+    composer.addPass(G.gradePass);
   }
   G.player.x = 40; G.player.z = 0;
   G.timeOfDay = 18.2;
@@ -908,6 +913,9 @@ function update(now, step, I) {
     else if (I.pressed('inv')) { G.ui.inventory(); }
     else if (I.pressed('map')) { showMap(); }
     G.wheel.update(I);
+    if (G.combat.updateShells) G.combat.updateShells(step);
+    try { G.events.update(step); G.dealer.update(step); } catch (e) { reportError(e); }
+    if (G.gradePass) { const hk = Math.min(1, Math.max(0, (G.highT || 0) / 10)); if (G.highT > 0) G.highT -= step; const u = G.gradePass.uniforms; u.sat.value = 1.1 + hk * 0.7 + Math.sin(G.time * 1.3) * 0.15 * hk; u.vig.value = 0.85 + hk * 0.8; }
     G.time += step;
     G.stats.playTime += step;
     { const h = G.timeOfDay, day = h > 5.5 && h < 20.5; G.timeOfDay = (h + step / (day ? 80 : 30)) % 24; }
@@ -995,8 +1003,9 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '2.02 Beta';
+export const GAME_VERSION = '2.1.0 Beta';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
+G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => {}));
   // Neue Version installiert -> auf dem Titelbildschirm sofort neu laden

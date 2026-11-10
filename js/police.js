@@ -57,11 +57,13 @@ export class Police {
 
   clear() {
     this.level = 0; this.heat = 0; this.arrestT = 0;
-    for (const v of G.vehicles) if (v.police && v.ai && !v.persistent) { v.ai.mode = 'traffic'; v.siren = false; v.ai.cruise = 13; v.ai.route = []; v.ai.pts = []; const n = G.world.nearestNode(v.x, v.z); v.ai.startEdge(n.id, n.nbr[0]); }
+    for (const b of this.blocks || []) for (const v of b.cars) if (!v.removed && v !== G.player.vehicle && !G.peds.inView(v.x, v.z)) v.remove(); else v.persistent = false;
+    this.blocks = [];
+    for (const v of G.vehicles) if (v.police && v.ai && !v.persistent) { v.ai.mode = 'traffic'; v.siren = false; v.ai.cruise = 13; v.ai.route = []; v.ai.pts = []; if (G.world.inHills(v.x, v.z)) { const l = G.world.hillLocate(v.x, v.z); v.ai.startHill(l.line, l.idx, -1); } else { const n = G.world.nearestNode(v.x, v.z); v.ai.startEdge(n.id, n.nbr[0]); } }
     for (const p of G.peds.list) if (p.isCop && p.state === 'cop') { p.state = 'walk'; p.path = null; p.anim.gun = false; }
   }
 
-  spotted() { this.lastSeen = G.time; }
+  spotted() { this.lastSeen = G.time; const P = G.player; this.lastPos = { x: P.inCar ? P.vehicle.x : P.x, z: P.inCar ? P.vehicle.z : P.z }; }
   get searching() { return this.level > 0 && G.time - this.lastSeen > 2.5; }
   evadeTime() { return 8 + this.level * 4; }
   unitRemoved(v) {}
@@ -86,7 +88,7 @@ export class Police {
     this.spawnT -= dt;
     if (cars.length < want && this.spawnT <= 0) {
       this.spawnT = 2.5;
-      const v = G.traffic.spawnCar(px, pz, 70, 150, 'police', 'police');
+      const v = G.world.inHills(px, pz) && pz < -400 ? G.traffic.spawnHillCar(px, pz, 'police', 'police', 60, 160) : G.traffic.spawnCar(px, pz, 70, 150, 'police', 'police');
       if (v) { v.siren = true; v.ai.cruise = 26; v.persistent = false; }
     }
     // Streifenpolizisten steigen aus
@@ -103,6 +105,17 @@ export class Police {
       }
       if (v.copsOut && d2 > 60 * 60) { v.copsOut = false; }
     }
+    // Schüsse aus Streifenwagen ab 3 Sternen
+    if (this.level >= 3) for (const v of cars) {
+      if (!v.driver || v.copsOut) continue;
+      const d2 = dist2(v.x, v.z, px, pz);
+      v.shootT = (v.shootT ?? rand(1, 2)) - dt;
+      if (d2 < 30 * 30 && v.shootT <= 0) {
+        v.shootT = rand(0.5, 1.1) / (1 + (this.level - 3) * 0.4);
+        if (G.world.lineOfSight(v.x, v.y + 1.4, v.z, px, (P.inCar ? P.vehicle.y : P.y) + 1, pz)) G.combat.npcShoot({ x: v.x, y: v.y + 0.2, z: v.z, yaw: Math.atan2(px - v.x, pz - v.z), vehIgnore: v }, px, (P.inCar ? P.vehicle.y + 1 : P.y + 1.2), pz);
+      }
+    }
+    if (this.level >= 3) this.updateRoadblocks(dt, px, pz);
     // Hubschrauber
     this.updateHeli(dt, this.level >= 3);
     // Festnahme
@@ -113,6 +126,43 @@ export class Police {
       if (this.arrestT > (P.inCar ? 2.2 : 1.4)) { this.arrestT = 0; P.bust(); }
     } else this.arrestT = Math.max(0, this.arrestT - dt * 2);
     this.siren();
+  }
+
+  // Straßensperre vor dem Spieler (2 Streifenwagen quer + Polizisten)
+  updateRoadblocks(dt, px, pz) {
+    this.blocks = (this.blocks || []).filter((b) => {
+      if (dist2(b.x, b.z, px, pz) < 260 * 260) return true;
+      for (const v of b.cars) if (!v.removed && v !== G.player.vehicle) v.remove();
+      return false;
+    });
+    this.blockT = (this.blockT ?? 12) - dt;
+    const P = G.player;
+    if (this.blockT > 0 || this.blocks.length >= 1 || !P.inCar || P.vehicle.speed < 12 || G.world.inHills(px, pz)) return;
+    this.blockT = 30 - this.level * 3;
+    const v0 = P.vehicle, W = G.world;
+    // Knoten in Fahrtrichtung, 90–200 m voraus
+    let best = null, bs = -1;
+    const fx = Math.sin(v0.h), fz = Math.cos(v0.h);
+    for (const n of W.nodes) {
+      const dx = n.x - px, dz = n.z - pz, d = Math.hypot(dx, dz);
+      if (d < 90 || d > 200) continue;
+      const a = (dx * fx + dz * fz) / d;
+      if (a > 0.85 && a > bs && !G.peds.inView(n.x, n.z)) { bs = a; best = n; }
+    }
+    if (!best) return;
+    // Sperre auf der Zufahrt (vom Spieler aus kommend), quer zur Straße
+    const ax = Math.abs(fx) > Math.abs(fz), sgn = ax ? Math.sign(fx) : Math.sign(fz);
+    const bx = best.x - (ax ? sgn * 18 : 0), bz = best.z - (ax ? 0 : sgn * 18);
+    const cars = [];
+    for (const o of [-4, 4]) {
+      const x = bx + (ax ? 0 : o), z = bz + (ax ? o : 0);
+      const v = G.vm.spawn('police', x, z, ax ? 0 : Math.PI / 2);
+      if (!v) continue;
+      v.parked = true; v.persistent = true; v.siren = true; v.police = true;
+      cars.push(v);
+      G.peds.spawnCop(x + (ax ? sgn * -3 : 0), z + (ax ? 0 : sgn * -3));
+    }
+    if (cars.length) { this.blocks.push({ x: bx, z: bz, cars }); G.hud.toast('🚧 Polizeifunk: Straßensperre errichtet!'); }
   }
 
   siren() {
@@ -161,11 +211,47 @@ export class Police {
     this.heliPos = new THREE.Vector3(0, 80, 0);
     this.heliVel = new THREE.Vector3();
     this.heliAng = 0; this.heliActive = false; this.heliShootT = 2;
+    this.heliHP = 320; this.heliDown = false; this.heliCool = 0;
+  }
+  heliDamage(dmg, src) {
+    if (!this.heliActive || this.heliDown) return;
+    this.heliHP -= dmg;
+    if (this.heliHP <= 0) {
+      this.heliDown = true; this.heliSpin = 0;
+      G.hud.toast('🚁 Polizeihubschrauber getroffen – er stürzt ab!');
+      if (src === 'player') { this.heat += 10; this.setLevel(Math.min(5, this.level + 1)); G.stats.helisDown = (G.stats.helisDown || 0) + 1; }
+    }
+  }
+  // Absturz: trudelnd, rauchend, Explosion am Boden
+  updateHeliCrash(dt) {
+    const g = this.heliG;
+    this.heliVel.y -= 14 * dt;
+    this.heliVel.x *= 0.99; this.heliVel.z *= 0.99;
+    this.heliPos.addScaledVector(this.heliVel, dt);
+    this.heliSpin += dt * 5;
+    g.position.copy(this.heliPos);
+    g.rotation.y += dt * this.heliSpin; g.rotation.z = Math.sin(G.time * 3) * 0.4;
+    this.rotor.rotation.y += dt * 12; this.beam.visible = false; this.spot.visible = false;
+    G.effects.smoke(this.heliPos.x, this.heliPos.y + 1, this.heliPos.z, 2, 0.8);
+    G.effects.fire(this.heliPos.x, this.heliPos.y + 0.5, this.heliPos.z, 1);
+    const gy = G.world.groundHeight(this.heliPos.x, this.heliPos.z);
+    if (this.heliPos.y < Math.max(gy, -0.5) + 1.2) {
+      const { x, y, z } = this.heliPos;
+      G.effects.explosion(x, y, z, 2.2);
+      G.combat.explosionDamage(x, y, z, 12, 260, 'heli', null);
+      G.cam.shake(1.2);
+      this.heliActive = false; this.heliDown = false; this.heliHP = 320; this.heliCool = 45;
+      g.visible = false;
+    }
+    G.audio.setHeli(0.4);
   }
 
   updateHeli(dt, want) {
+    want = !!want;
     const g = this.heliG, P = G.player;
     const px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
+    if (this.heliDown) { this.updateHeliCrash(dt); return; }
+    if (this.heliCool > 0) { this.heliCool -= dt; want = false; }
     if (want && !this.heliActive) {
       this.heliActive = true;
       const a = rand(0, Math.PI * 2);

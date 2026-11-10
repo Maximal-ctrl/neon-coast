@@ -294,6 +294,8 @@ export const CAR_TYPES = {
   coyote: { name: 'Coyote', profile: 'pickup', L: 5.2, W: 2.0, wheelR: 0.42, maxSpeed: 45, accel: 10, brake: 22, grip: 8.5, steer: 0.5, mass: 2200, hp: 1300, colors: [0xbc6c25, 0x283618, 0xdda15e, 0x8d99ae, 0xae2012] },
   hauler: { name: 'Hauler', profile: 'van', L: 5.3, W: 2.05, wheelR: 0.38, maxSpeed: 38, accel: 7, brake: 20, grip: 8, steer: 0.5, mass: 2600, hp: 1500, colors: [0xf8f9fa, 0xdee2e6, 0x4895ef, 0xffd60a] },
   taxi: { name: 'Taxi', profile: 'sedan', L: 4.7, W: 1.86, wheelR: 0.34, maxSpeed: 48, accel: 10.5, brake: 24, grip: 9.6, steer: 0.56, mass: 1400, hp: 950, colors: [0xf6c90e], taxi: true },
+  brecher: { name: 'Brecher 4x4', profile: 'suv', L: 5.0, W: 2.35, wheelR: 0.72, maxSpeed: 44, accel: 11, brake: 22, grip: 8.6, steer: 0.5, mass: 3200, hp: 2400, colors: [0xff5a1f, 0x111111, 0x2a9d8f, 0xffd60a, 0x7b2cbf] },
+  tank: { name: 'Titan (Panzer)', profile: 'tank', tank: true, L: 7.2, W: 3.5, wheelR: 0.36, maxSpeed: 17, accel: 5.5, brake: 14, grip: 14, steer: 0.75, mass: 28000, hp: 7000, colors: [0x4b5320, 0x6b6b4f, 0x8a7f5a] },
   police: { name: 'Streifenwagen', profile: 'sedan', L: 4.8, W: 1.9, wheelR: 0.35, maxSpeed: 58, accel: 14, brake: 28, grip: 10.5, steer: 0.56, mass: 1600, hp: 1300, colors: [0xf2f2f2], police: true },
 };
 // Häufigkeit im Verkehr
@@ -306,6 +308,8 @@ export const CAR_SHOP = {
   brutus: { price: 38000, cls: 'Muscle-Car', desc: 'Lauter V8, lange Motorhaube, pure Kraft.' },
   zephyra: { price: 72000, cls: 'Sportwagen', desc: 'Präzise Lenkung, starke Beschleunigung.' },
   vortex: { price: 160000, cls: 'Supersportwagen', desc: 'Das Schnellste, was Port Solera zu bieten hat.' },
+  brecher: { price: 55000, cls: 'Monster-Truck', desc: 'Riesige Räder, Hubraum ohne Ende. Rollt über alles.' },
+  tank: { price: 450000, cls: 'Militär', desc: 'Ausgemusterter Kampfpanzer mit funktionierender Kanone. Fragen Sie nicht.' },
 };
 export const TRAFFIC_MIX = ['kiwi', 'kiwi', 'kiwi', 'marina', 'marina', 'marina', 'marina', 'taxi', 'taxi', 'atlas', 'atlas', 'coyote', 'hauler', 'brutus', 'zephyra', 'vortex'];
 
@@ -576,8 +580,53 @@ export function paintMat(hex) {
   return m;
 }
 
+// Panzer: eigenes Modell (Wanne, Ketten, drehbarer Turm mit Kanone)
+function buildTank(key, color) {
+  const T = CAR_TYPES[key];
+  const grp = new THREE.Group(); grp.rotation.order = 'YXZ';
+  const paint = paintMat(color ?? pick(T.colors));
+  paint.metalness = 0.3; paint.roughness = 0.65; paint.clearcoat = 0.1;
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1c1c1a, roughness: 0.85, metalness: 0.3 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x5a5d5f, roughness: 0.5, metalness: 0.7 });
+  const add = (geo, mat, x, y, z, parent = grp, cast = true) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = cast; parent.add(m); return m; };
+  // Wanne mit abgeschrägtem Bug
+  const hull = roundedBox(3.0, 0.95, 6.6, 0.12, 2, (v) => { if (v.z > 2.2 && v.y > -0.1) v.y -= (v.z - 2.2) * 0.35; if (v.z < -2.8 && v.y > 0.1) v.z += 0.2; });
+  const body = add(hull, paint, 0, 1.05, 0);
+  add(roundedBox(3.4, 0.12, 6.8, 0.04, 1), paint, 0, 1.5, -0.05);
+  // Ketten & Laufrollen
+  for (const s of [-1, 1]) {
+    add(roundedBox(0.62, 1.05, 7.2, 0.45, 3), dark, s * 1.55, 0.55, 0);
+    for (let k = 0; k < 6; k++) add(new THREE.CylinderGeometry(0.36, 0.36, 0.2, 14).rotateZ(Math.PI / 2), steel, s * 1.88, 0.42, -2.6 + k * 1.04);
+    add(new THREE.BoxGeometry(0.7, 0.08, 7.0), paint, s * 1.55, 1.12, 0);
+  }
+  // Turm
+  const turret = new THREE.Group(); turret.position.set(0, 1.55, -0.4); grp.add(turret);
+  add(roundedBox(2.5, 0.85, 3.1, 0.25, 2, (v) => { if (v.z > 0.6) { v.x *= 1 - (v.z - 0.6) * 0.25; v.y *= 1 - (v.z - 0.6) * 0.15; } }), paint, 0, 0.42, 0, turret);
+  add(new THREE.CylinderGeometry(0.42, 0.45, 0.35, 16), paint, 0.6, 0.95, -0.4, turret);
+  add(new THREE.BoxGeometry(0.06, 1.2, 0.06), steel, -0.9, 1.4, -1.2, turret);
+  const barrel = new THREE.Group(); barrel.position.set(0, 0.45, 1.45); turret.add(barrel);
+  add(new THREE.CylinderGeometry(0.11, 0.13, 4.4, 14).rotateX(Math.PI / 2), steel, 0, 0, 2.2, barrel);
+  add(new THREE.CylinderGeometry(0.2, 0.2, 0.45, 14).rotateX(Math.PI / 2), dark, 0, 0, 4.35, barrel);
+  add(new THREE.CylinderGeometry(0.3, 0.3, 0.6, 14).rotateX(Math.PI / 2), paint, 0, 0, 0.2, barrel);
+  // Rücklichter
+  const R = new GeoBuilder(false);
+  for (const s of [-1, 1]) R.box(s * 1.2 - 0.18, 1.1, -3.32, s * 1.2 + 0.18, 1.24, -3.28, {});
+  const tail = add(R.build(), CAR_MATS.tailOff, 0, 0, 0, grp, false);
+  const H = new GeoBuilder(false);
+  for (const s of [-1, 1]) H.box(s * 1.1 - 0.15, 1.1, 3.25, s * 1.1 + 0.15, 1.25, 3.3, {});
+  add(H.build(), CAR_MATS.head, 0, 0, 0, grp, false);
+  const driver = new THREE.Group(); driver.visible = false; grp.add(driver);
+  const geo = {
+    wheels: [[1.2, 0.35, 2.3, 1], [-1.2, 0.35, 2.3, 1], [1.2, 0.35, -2.3, 0], [-1.2, 0.35, -2.3, 0]],
+    height: 2.6, headY: 1.2, wheelbase: 4.6, hinge: [1.9, 1.2], doorLen: 1.1, seat: [0.9, 0.5], belt: 1.5, plateY: [0.5, 0.5], L: T.L,
+  };
+  const dTm = new THREE.MeshStandardMaterial(), dHm = new THREE.MeshStandardMaterial();
+  return { group: grp, parts: { body, tail, driver, dTm, dHm, turret, barrel }, geo };
+}
+
 export function buildCar(key, color) {
   const T = CAR_TYPES[key];
+  if (T.tank) return buildTank(key, color);
   const g = carGeos(key);
   const grp = new THREE.Group();
   grp.rotation.order = 'YXZ';
@@ -642,7 +691,7 @@ function plateMat() {
 // Räder für statische Modelle (Autohaus)
 let _wheelGeo = null, _wheelMat = null;
 export function addWheels(group, key) {
-  const T = CAR_TYPES[key], g = carGeos(key);
+  const T = CAR_TYPES[key]; if (T.tank) return; const g = carGeos(key);
   _wheelGeo = _wheelGeo || wheelGeometry();
   _wheelMat = _wheelMat || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.35 });
   for (const [x, y, z, front] of g.wheels) {

@@ -16,6 +16,11 @@ export const ITEMS = {
   water: { name: 'Mineralwasser', icon: '💧', price: 2, desc: 'Erfrischend. +6 Gesundheit.', anim: 'drink', dur: 2, heal: 6, prop: 0x9fd6ff },
   coffee: { name: 'Kaffee to go', icon: '☕', price: 3, desc: 'Heiß und stark. +8 Gesundheit.', anim: 'drink', dur: 2.8, heal: 8, prop: 0x6b4423 },
   cig: { name: 'Zigaretten', icon: '🚬', price: 9, pack: 10, desc: 'Schachtel mit 10 Stück. Entspannt kurz – gesund ist es nicht.', anim: 'smoke', dur: 7.5, prop: 0xf5f5f5 },
+  beer: { name: 'Dosenbier', icon: '🍺', price: 4, desc: 'Kühles Bier. +5 Gesundheit, die Welt schwankt ein wenig.', anim: 'drink', dur: 2.6, heal: 5, drunk: 14, prop: 0xd9a520 },
+  whiskey: { name: 'Whiskey (Flachmann)', icon: '🥃', price: 12, desc: 'Hochprozentig. Ordentlich Schwindel für eine Weile.', anim: 'drink', dur: 2.4, heal: 3, drunk: 32, prop: 0x8a4b2a },
+  joint: { name: 'Joint', icon: '🌿', price: 15, desc: 'Entspannt, +25 Gesundheit, Farben werden weicher.', anim: 'smoke', dur: 7, heal: 25, high: 40, prop: 0x9fcf6f },
+  pills: { name: 'Party-Pillen', icon: '💊', price: 40, desc: '60 Sekunden schneller sprinten, Farben knallen.', anim: 'eat', dur: 1.6, boost: 60, high: 60, prop: 0xff6fb0 },
+  cigd: { name: 'Zigaretten (lose)', icon: '🚬', price: 5, pack: 10, desc: '10 Stück, billiger als im Laden. Frag nicht, woher.', anim: 'smoke', dur: 7.5, prop: 0xf5f5f5 },
   scratch: { name: 'Glücksregen', icon: '🎟️', price: 5, desc: 'Rubbellos: 3 gleiche Beträge gewinnen. Bis zu $500.', use: 'scratch', tier: 1 },
   scratchgold: { name: 'Goldrausch', icon: '🎫', price: 20, desc: 'Premium-Rubbellos: bessere Chancen, bis zu $5.000.', use: 'scratch', tier: 2 },
 };
@@ -129,6 +134,23 @@ function kiosk() {
   });
 }
 
+// ------------------------------------------------------------ Straßendealer
+function street() {
+  const it = (id) => ({ id, ...ITEMS[id], multi: true });
+  store({
+    title: 'STRASSENHÄNDLER', subtitle: 'Keine Fragen · nur Bargeld', accent: '#b26bff', logo: '🧥',
+    categories: [
+      { name: 'Ware', icon: '🌿', items: [it('joint'), it('pills')] },
+      { name: 'Alkohol', icon: '🍺', items: [it('beer'), it('whiskey')] },
+      { name: 'Tabak', icon: '🚬', items: [it('cigd')] },
+    ],
+    owned: (i) => (Inventory.count(i.id) ? `Im Inventar: ${Inventory.count(i.id)}` : ''),
+    onBuy: (i, n) => { if (!pay(i.price * n)) return false; Inventory.add(i.id, n * (i.pack || 1)); G.hud.toast(`${i.icon} ${n}× ${i.name} → Inventar`); if (G.dealer) G.dealer.sold(); return true; },
+    extra: (i) => (ITEMS[i.id].anim && Inventory.count(i.id) ? '<button class="st-sec" data-act="use">Sofort benutzen</button>' : ''),
+    action: (a, i) => { if (a === 'use') Inventory.use(i.id); },
+  });
+}
+
 // ------------------------------------------------------------ Waffenladen
 function gunshop() {
   const P = G.player;
@@ -182,8 +204,10 @@ function inventory() {
   let idx = 0, cat = null;
   const P = G.player;
   const cats = [
-    ['food', 'Essen & Trinken', (it) => it.anim === 'eat' || it.anim === 'drink'],
-    ['smoke', 'Rauchwaren', (it) => it.anim === 'smoke'],
+    ['food', 'Essen & Trinken', (it) => (it.anim === 'eat' || it.anim === 'drink') && !it.high && !it.drunk],
+    ['booze', 'Alkohol', (it) => !!it.drunk],
+    ['street', 'Straßenware', (it) => !!it.high],
+    ['smoke', 'Rauchwaren', (it) => it.anim === 'smoke' && !it.high],
     ['lotto', 'Lose', (it) => it.use === 'scratch'],
   ];
   const rows = () => {
@@ -405,7 +429,7 @@ const PAINTS = [0xe63946, 0xffb703, 0x00b4d8, 0x111111, 0xf8f9fa, 0xf72585, 0x7c
 function dealer() {
   const I = G.interiors;
   const keys = Object.keys(CAR_SHOP);
-  const cats = [['Alle', () => true], ['Sport', (k) => ['zephyra', 'vortex', 'brutus'].includes(k)], ['Alltag', (k) => ['kiwi', 'marina', 'atlas'].includes(k)], ['Nutz', (k) => ['coyote', 'hauler'].includes(k)]];
+  const cats = [['Alle', () => true], ['Sport', (k) => ['zephyra', 'vortex', 'brutus'].includes(k)], ['Alltag', (k) => ['kiwi', 'marina', 'atlas'].includes(k)], ['Nutz', (k) => ['coyote', 'hauler'].includes(k)], ['Extrem', (k) => ['brecher', 'tank'].includes(k)]];
   let cat = 0, sel = I.previewKey && CAR_SHOP[I.previewKey] ? I.previewKey : 'zephyra', col = I.previewCol || PAINTS[0], first = true;
   const stat = (v, max) => Math.max(6, Math.min(100, (v / max) * 100));
   const render = () => {
@@ -468,4 +492,4 @@ function dealer() {
   };
 }
 
-export const UI = { store, kiosk, gunshop, bar, inventory, slots, scratch, dealer, close, isOpen: false };
+export const UI = { store, kiosk, street, gunshop, bar, inventory, slots, scratch, dealer, close, isOpen: false };

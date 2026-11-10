@@ -272,6 +272,7 @@ export class Missions {
     if (poi.dealer) out.push({ x: poi.dealer.x, z: poi.dealer.z, col: '#ff4fd8', label: 'A', r: 0.04, name: 'Solera Motors' });
     for (const id of ['shop', 'shop2', 'shop3']) if (poi[id]) out.push({ x: poi[id].x, z: poi[id].z, col: '#ffd23f', label: '24', r: 0.035, name: 'Samis 24/7' });
     if (poi.cafe) out.push({ x: poi.cafe.x, z: poi.cafe.z, col: '#ffb35c', label: '☕', r: 0.035, name: 'Café Vieja' });
+    if (G.dealer && G.dealer.blip()) { const d = G.dealer.blip(); out.push({ x: d.x, z: d.z, col: '#b26bff', label: '$', r: 0.035, edge: true, name: 'Straßenhändler' }); }
     if (poi.boutique) out.push({ x: poi.boutique.x, z: poi.boutique.z, col: '#ff6fb0', label: 'M', r: 0.035, name: 'Moda Solera' });
     out.push({ x: 10, z: 26.8, col: '#19e6ff', label: 'B', r: 0.04, name: 'Solera Bank' });
     if (full) {
@@ -950,6 +951,67 @@ const NEW_MISSIONS = [
         ['Aurelio', 'Behalte ihn. Er steht ab jetzt in deiner Garage. Und wenn du je Freunde auf dem Berg brauchst …'],
       ], { x: G.player.x, z: G.player.z }, a2);
     },
+  },
+  // ---------------------------------------------------------------- Finale
+  {
+    id: 'f1', title: 'Das Anwesen', sub: 'Val', contact: 'val', req: ['m7', 'a2'], label: 'V', npc: 'val', reward: 100000, rewardCar: ['tank', 0x4b5320],
+    desc: 'Finale: Das Anwesen der Familie Valcourt auf dem Gipfel stürmen.',
+    *run(m) {
+      const val = yield* standAt(m, this);
+      yield* m.talk([
+        ['Val', 'Leo. Ich weiß jetzt, wer die Tiburones bezahlt hat. Und wer die Polizei in der Tasche hat.'],
+        ['Val', 'Die Familie Valcourt. Ihr Anwesen liegt ganz oben auf dem Gipfel hinter Monte Solera.'],
+        ['Val', 'Silvio Valcourt hält sich für unantastbar. Bewaffnete Wachen, hohe Mauern, eigener Hubschrauberlandeplatz.'],
+        ['Leo', 'Dann wird es Zeit, dass jemand anklopft.'],
+        ['Val', 'Bring es zu Ende. Danach gehört Port Solera uns.'],
+      ], val, val);
+      const P = G.player;
+      P.giveWeapon('rifle', 150); P.giveWeapon('shotgun', 24); P.armor = 100;
+      G.hud.toast('🔫 Val gibt dir Sturmgewehr, Schrotflinte und eine Schutzweste.');
+      yield* m.getInCar();
+      const gate = G.world.pois.mansionGate, home = G.world.pois.mansion;
+      const cx = home.x, cz = home.z - 30;
+      yield* m.goTo(gate.x, gate.z + 6, 'Fahr hinauf zum <b>Anwesen Valcourt</b> auf dem Gipfel.', { r: 8 });
+      G.police.locked = true;
+      m.failIf(() => G.player.state === 'dead', 'Silvio Valcourt hat gewonnen.');
+      const suit = 0x16161a;
+      // Torwachen
+      let all = m.gang(gate.x, gate.z - 8, 4, { gun: true, hp: 80, aggro: 42, col: suit });
+      G.hud.bigToast('DAS ANWESEN', 'Kämpf dich zu Silvio Valcourt durch!');
+      G.audio.wantedUp();
+      m.objective('Durchbrich das <b>Tor</b>!');
+      yield* m.until(() => m.aliveGang(all) <= 1);
+      // Hof & Haus
+      all = all.concat(m.gang(cx - 14, cz + 18, 4, { gun: true, hp: 85, aggro: 45, col: suit }), m.gang(cx + 16, cz + 16, 4, { gun: true, hp: 85, aggro: 45, col: suit }));
+      G.hud.toast('📻 Wachen: „Eindringling am Tor! Alle zum Vorhof!“');
+      m.objective('Säubere den <b>Vorhof</b>.');
+      yield* m.until(() => m.aliveGang(all) <= 2);
+      // Boss auf der Poolterrasse
+      const boss = m.gang(cx, cz - 32, 1, { gun: true, hp: 260, aggro: 50, col: 0xf4f1de, mark: false })[0];
+      boss.look.hat = null; boss.slow = 0.6; boss.missionTarget = true;
+      const bodyguards = m.gang(cx, cz - 30, 4, { gun: true, hp: 95, aggro: 50, col: suit });
+      all = all.concat(bodyguards);
+      const bm = m.marker(0, 0, 0xff3b5c, { follow: boss, arrow: true, blipCol: '#ff3b5c' });
+      G.hud.subtitle('Silvio Valcourt', 'Du bist also dieser Leo. Weißt du, wem diese Stadt gehört?', '#f4f1de');
+      yield* m.wait(3);
+      G.hud.subtitle('Leo', 'Ab heute? Nicht mehr dir.', '#7cff6b');
+      yield* m.wait(2);
+      G.hud.subtitle();
+      m.objective('Schalte <b>Silvio Valcourt</b> auf der Poolterrasse aus!');
+      yield* m.until(() => !boss.alive);
+      m.removeMarker(bm);
+      for (const p of all) if (p.alive) { p.isGang = false; p.state = 'flee'; p.fleeFrom = P; p.timer = 30; if (p.mk) { m.removeMarker(p.mk); p.mk = null; } }
+      G.police.locked = false;
+      yield* m.wait(1.5);
+      const val2 = m.npc(P.x + 2.5, P.z + 1.5, LOOKS.val());
+      yield* m.talk([
+        ['Val', 'Es ist vorbei. Die Valcourts sind Geschichte.'],
+        ['Val', 'Und schau mal in die Garage. Silvio hatte ein … ungewöhnliches Spielzeug. Es gehört jetzt dir.'],
+        ['Leo', 'Ein Panzer? Natürlich hatte er einen Panzer.'],
+        ['Val', 'Willkommen an der Spitze, Leo.'],
+      ], { x: P.x, z: P.z }, val2);
+    },
+    after() { setTimeout(() => G.hud.bigToast('PORT SOLERA GEHÖRT DIR', 'Finale geschafft! Der Panzer steht in deiner Garage.'), 4500); },
   },
 ];
 

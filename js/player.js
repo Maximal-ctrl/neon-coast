@@ -8,6 +8,8 @@ import { clamp, damp, dampAngle, angleDiff, dist2, rand, lerp } from './utils.js
 
 const _b = [], _c = [];
 
+const dampAngleT = (a, b, k, dt) => { let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * (1 - Math.exp(-k * dt)); };
+
 export class Player {
   constructor(x, z) {
     this.isPlayer = true;
@@ -288,7 +290,9 @@ export class Player {
     A.gun = false;
     if (U.t >= it.dur) {
       if (it.heal) this.health = Math.min(100, this.health + it.heal);
-      if (it.boost) { this.boostT = it.boost; G.hud.toast('⚡ Sprint-Boost für 30 Sekunden!'); }
+      if (it.drunk && G.interiors) G.interiors.drunk = Math.max(G.interiors.drunk, it.drunk);
+      if (it.high) G.highT = Math.max(G.highT || 0, it.high);
+      if (it.boost) { this.boostT = it.boost; G.hud.toast(`⚡ Sprint-Boost für ${it.boost} Sekunden!`); }
       else if (it.heal) G.hud.toast(`+${it.heal} Gesundheit`);
       if (it.anim === 'smoke') G.hud.toast('Entspannt … aber gesund war das nicht.');
       this.useItem = null; A.handMouth = 0; A.prop = null; A.headPitch = 0;
@@ -475,6 +479,15 @@ export class Player {
     if (I.pressed('radio')) G.audio.nextStation();
     if (I.pressed('weapon')) this.nextWeapon();
     if (v.police && I.pressed('siren')) v.siren = !v.siren;
+    // Panzer: Turm folgt der Kamera, Kanone feuert Granaten
+    if (v.T.tank) {
+      const rel = G.cam.yaw - v.h;
+      const tu = v.parts.turret, ba = v.parts.barrel;
+      tu.rotation.y = dampAngleT(tu.rotation.y, rel, 3, dt);
+      ba.rotation.x = clamp(-(G.cam.pitch + 0.2) * 0.8, -0.35, 0.12);
+      v.cannonT = (v.cannonT || 0) - dt;
+      if (I.held('fire') && v.cannonT <= 0) { v.cannonT = 1.8; G.combat.fireShell(v); }
+    } else
     // Drive-by
     if (I.held('fire') && this.fireT <= 0 && this.weapon !== 'fists' && this.ammo[this.weapon] > 0) {
       const w = WEAPONS[this.weapon];

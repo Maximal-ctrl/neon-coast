@@ -89,6 +89,7 @@ export class Vehicle {
       const wb = this.geo.wheelbase;
       let yaw = -(vf / wb) * Math.tan(this.steer);
       if (inp.handbrake) yaw *= 1.45;
+      if (T.tank) yaw += -inp.steer * 0.95 * Math.max(0, 1 - Math.abs(vf) / 6); // Ketten: Drehen auf der Stelle
       this.yawRate = yaw;
       this.h += yaw * dt;
       this.slip = Math.abs(vl);

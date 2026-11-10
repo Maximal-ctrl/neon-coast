@@ -49,8 +49,7 @@ function rawHill(x, z) {
 }
 // Bergdorf "Monte Solera" auf einem Plateau + Serpentinenstraße vom Damm hinauf
 export const VILLAGE = { x: -160, z: -752, r: 92, y: 26 };
-export const HILL_ROAD = (() => {
-  const ctrl = [[40, -490], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]];
+function spline(ctrl) {
   const pts = [];
   for (let k = 0; k < ctrl.length - 1; k++) {
     const p0 = ctrl[Math.max(0, k - 1)], p1 = ctrl[k], p2 = ctrl[k + 1], p3 = ctrl[Math.min(ctrl.length - 1, k + 2)];
@@ -62,42 +61,65 @@ export const HILL_ROAD = (() => {
     }
   }
   pts.push(ctrl[ctrl.length - 1]);
-  // Höhenprofil: geglättetes Gelände, Steigung begrenzt, Anfang = Dammhöhe, Ende = Dorf
+  return pts;
+}
+// Höhenprofil: geglättetes Gelände, Steigung begrenzt; fixed(i) -> feste Höhe oder null
+function profile(pts, startY, slope, fixedY) {
   let hs = pts.map(([x, z]) => Math.max(0.9, rawHill(x, z)[0]));
   for (let it = 0; it < 6; it++) hs = hs.map((_, i) => { let s = 0, c = 0; for (let j = -6; j <= 6; j++) { const v = hs[i + j]; if (v !== undefined) { s += v; c++; } } return s / c; });
-  const n = hs.length; hs[0] = 0.9;
-  const fixed = pts.map(([x, z]) => Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4);
-  fixed[0] = true;
-  for (let i = 0; i < n; i++) if (fixed[i] && i) hs[i] = VILLAGE.y;
+  const n = hs.length;
+  const fixed = pts.map((p, i) => (i === 0 ? startY : fixedY ? fixedY(p) : null));
+  for (let i = 0; i < n; i++) if (fixed[i] != null) hs[i] = fixed[i];
   const seg = (i) => Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
   for (let it = 0; it < 4; it++) {
-    for (let i = 1; i < n; i++) if (!fixed[i]) hs[i] = Math.min(hs[i], hs[i - 1] + seg(i - 1) * 0.11);
-    for (let i = n - 2; i > 0; i--) if (!fixed[i]) hs[i] = Math.max(hs[i], hs[i + 1] - seg(i) * 0.11);
+    for (let i = 1; i < n; i++) if (fixed[i] == null) hs[i] = Math.min(hs[i], hs[i - 1] + seg(i - 1) * slope);
+    for (let i = n - 2; i > 0; i--) if (fixed[i] == null) hs[i] = Math.max(hs[i], hs[i + 1] - seg(i) * slope);
   }
-  const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]);
-  return { pts, hs, bb: [Math.min(...xs) - 30, Math.min(...zs) - 30, Math.max(...xs) + 30, Math.max(...zs) + 30] };
+  return hs;
+}
+function bbox(pts) { const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]); return [Math.min(...xs) - 30, Math.min(...zs) - 30, Math.max(...xs) + 30, Math.max(...zs) + 30]; }
+
+export const HILL_ROAD = (() => {
+  const pts = spline([[40, -490], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]]);
+  const hs = profile(pts, 0.9, 0.11, ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null));
+  return { pts, hs, bb: bbox(pts) };
 })();
-// Abstand zur Bergstraße -> [abstand, straßenhöhe]
+// Serpentinen hinauf zum Anwesen auf dem Gipfel (Abzweig bei der ersten Kurve der Bergstraße)
+export const SUMMIT_JOIN = (() => { let b = 0, bd = 1e9; HILL_ROAD.pts.forEach(([x, z], i) => { const d = Math.hypot(x - 34, z + 585); if (d < bd) { bd = d; b = i; } }); return b; })();
+export const SUMMIT_ROAD = (() => {
+  const j = HILL_ROAD.pts[SUMMIT_JOIN];
+  const pts = spline([[j[0], j[1]], [80, -592], [150, -580], [230, -566], [310, -580], [380, -606], [432, -646], [414, -694], [452, -736], [492, -758], [498, -796], [478, -828], [498, -858], [530, -872]]);
+  const hs = profile(pts, HILL_ROAD.hs[SUMMIT_JOIN], 0.17, null);
+  return { pts, hs, bb: bbox(pts) };
+})();
+export const MANSION = (() => { const e = SUMMIT_ROAD.pts[SUMMIT_ROAD.pts.length - 1]; return { x: e[0], z: e[1] - 40, r: 58, y: SUMMIT_ROAD.hs[SUMMIT_ROAD.hs.length - 1] }; })();
+export const HILL_ROADS = [HILL_ROAD, SUMMIT_ROAD];
+// Abstand zur nächsten Bergstraße -> [abstand, straßenhöhe]
 export function hillRoadAt(x, z) {
-  const R = HILL_ROAD, b = R.bb;
-  if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) return null;
-  let best = 1e9, by = 0;
-  const P = R.pts;
-  for (let i = 0; i < P.length - 1; i++) {
-    const ax = P[i][0], az = P[i][1], dx = P[i + 1][0] - ax, dz = P[i + 1][1] - az;
-    const l2 = dx * dx + dz * dz;
-    let t = ((x - ax) * dx + (z - az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
-    const ex = ax + dx * t - x, ez = az + dz * t - z, d2 = ex * ex + ez * ez;
-    if (d2 < best) { best = d2; by = R.hs[i] + (R.hs[i + 1] - R.hs[i]) * t; }
+  let best = 1e9, by = 0, hit = false;
+  for (const R of HILL_ROADS) {
+    const b = R.bb;
+    if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
+    hit = true;
+    const P = R.pts;
+    for (let i = 0; i < P.length - 1; i++) {
+      const ax = P[i][0], az = P[i][1], dx = P[i + 1][0] - ax, dz = P[i + 1][1] - az;
+      const l2 = dx * dx + dz * dz;
+      let t = ((x - ax) * dx + (z - az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = ax + dx * t - x, ez = az + dz * t - z, d2 = ex * ex + ez * ez;
+      if (d2 < best) { best = d2; by = R.hs[i] + (R.hs[i + 1] - R.hs[i]) * t; }
+    }
   }
-  return [Math.sqrt(best), by];
+  return hit ? [Math.sqrt(best), by] : null;
 }
 export function hillHeight(x, z) {
   if (x < HILLS.x0 || x > HILLS.x1 || z < HILLS.z0 || z > HILLS.z1) return -6;
   let [h, d] = rawHill(x, z);
-  // Dorfplateau
+  // Dorfplateau & Anwesen auf dem Gipfel
   const V = VILLAGE, dv = Math.hypot(x - V.x, z - V.z);
   if (dv < V.r + 60) h = lerp(h, V.y, 1 - smoothstep(V.r, V.r + 60, dv));
+  const M = MANSION, dm = Math.hypot(x - M.x, z - M.z);
+  if (dm < M.r + 70) h = lerp(h, M.y, 1 - smoothstep(M.r, M.r + 70, dm));
   const ed = Math.min(x - HILLS.x0, HILLS.x1 - x, z - HILLS.z0);
   const edge = smoothstep(0, 140, ed);
   h = h * edge - 6 * (1 - edge);
@@ -251,6 +273,44 @@ export class World {
     const i = clamp(Math.round((x + HALF) / CELL), I0, NB), j = clamp(Math.round((z + HALF) / CELL), 0, NB);
     return this.nodes[C.nodeId(i, j)];
   }
+  // ---------------------------------------------------------- Bergstraßen-Netz (Navigation, KI)
+  buildHillNet() {
+    const cw = [];
+    for (let z = -364; z > -490; z -= 8) cw.push([40, z]);
+    const L1 = { pts: [...cw, ...HILL_ROAD.pts] };
+    const L2 = { pts: SUMMIT_ROAD.pts, join: cw.length + SUMMIT_JOIN };
+    this.hillLines = [L1, L2];
+    this.hillGate = this.nodes[C.nodeId(5, 0)];
+  }
+  inHills(x, z) { return z < -372; }
+  hillLocate(x, z) {
+    let best = { line: 0, idx: 0, d: 1e18 };
+    this.hillLines.forEach((L, li) => { L.pts.forEach((p, i) => { const d = (p[0] - x) ** 2 + (p[1] - z) ** 2; if (d < best.d) best = { line: li, idx: i, d }; }); });
+    best.d = Math.sqrt(best.d);
+    return best;
+  }
+  // Punkte vom Stadtrand (Damm) bis zum Ort auf dem Bergnetz
+  hillRoot(loc) {
+    const [L1, L2] = this.hillLines;
+    if (loc.line === 0) return L1.pts.slice(0, loc.idx + 1);
+    return [...L1.pts.slice(0, L2.join + 1), ...L2.pts.slice(0, loc.idx + 1)];
+  }
+  gridPath(ax, az, bx, bz) { const a = this.nearestNode(ax, az), b = this.nearestNode(bx, bz); return this.route(a.id, b.id).map((id) => [this.nodes[id].x, this.nodes[id].z]); }
+  // Navigationsroute (Stadt-Graph + Bergstraßen), endet am Ziel
+  gpsPath(ax, az, bx, bz) {
+    const aH = this.inHills(ax, az), bH = this.inHills(bx, bz), G0 = this.hillGate;
+    let out;
+    if (!aH && !bH) out = this.gridPath(ax, az, bx, bz);
+    else if (!aH && bH) out = [...this.gridPath(ax, az, G0.x, G0.z), ...this.hillRoot(this.hillLocate(bx, bz))];
+    else if (aH && !bH) out = [...this.hillRoot(this.hillLocate(ax, az)).reverse(), ...this.gridPath(G0.x, G0.z, bx, bz)];
+    else {
+      const ra = this.hillRoot(this.hillLocate(ax, az)), rb = this.hillRoot(this.hillLocate(bx, bz));
+      let k = 0; while (k < ra.length && k < rb.length && ra[k] === rb[k]) k++;
+      out = [...ra.slice(Math.max(0, k - 1)).reverse(), ...rb.slice(k)];
+    }
+    out.push([bx, bz]);
+    return out;
+  }
   // Ampelphase: 'G' | 'Y' | 'R'
   signal(nodeId, axisNS) {
     const n = this.nodes[nodeId];
@@ -296,6 +356,7 @@ export class World {
     this.makeMaterials();
     await tick(0.2, 'Straßen werden asphaltiert …');
     this.buildGraph();
+    this.buildHillNet();
     this.buildGround();
     await tick(0.35, 'Hochhäuser werden gebaut …');
     this.B = {};
@@ -1102,12 +1163,16 @@ export class World {
       if (Math.abs(x - 40) < 12 && z > -620) continue;
       const rr = hillRoadAt(x, z); if (rr && rr[0] < 9) continue;
       if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 8) continue;
+      if (Math.hypot(x - MANSION.x, z - MANSION.z) < MANSION.r + 12) continue;
       if (vnoise(x * 0.012, z * 0.012) < 0.42 && y > 6) continue;
       if (y < 5) this.addPalm(x, z, rnd); else this.addTree(x, z, rnd);
     }
-    this.genHillRoad();
+    this.villageRoads = [];
+    this.genHillRoad(HILL_ROAD);
+    this.genHillRoad(SUMMIT_ROAD);
+    this.hillRoad = HILL_ROAD;
     this.genVillage();
-    this.genObservatory();
+    this.genMansion();
     // Damm mit Straße
     const CW = CAUSEWAY, P = this.B.props, cc = rgb(0xb9b5ad), asph = rgb(0x34363b), wh = rgb(0xe9e9e4);
     P.quad([CW.x0, -0.02, CW.z1], [CW.x1, -0.02, CW.z1], [CW.x1, CW.y1 - 0.02, CW.z0], [CW.x0, CW.y1 - 0.02, CW.z0], [0, 0, 1, 1], asph);
@@ -1130,8 +1195,8 @@ export class World {
     this.pois.hills = { x: 40, z: -720, name: 'Solera Hills' };
   }
 
-  genHillRoad() {
-    const R = HILL_ROAD, P = this.B.props, pts = R.pts, n = pts.length;
+  genHillRoad(R) {
+    const P = this.B.props, pts = R.pts, n = pts.length;
     const asph = rgb(0x323439), shoulder = rgb(0x8c8573), wh = rgb(0xe9e9e4), ye = rgb(0xe7b923);
     const nrm = (i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; };
     const strip = (o0, o1, dy, col, every = 0) => {
@@ -1159,8 +1224,7 @@ export class World {
       P.quad([p1[0], yb + 0.45, p1[1]], [p0[0], ya + 0.45, p0[1]], [p0[0], ya + 0.8, p0[1]], [p1[0], yb + 0.8, p1[1]], [0, 0, 1, 1], rgb(0xc9ccd0));
       if (i % 2 === 0) P.box(p0[0] - 0.08, ya, p0[1] - 0.08, p0[0] + 0.08, ya + 0.8, p0[1] + 0.08, { col: rgb(0x77797d) });
     }
-    this.villageRoads = [R.pts];
-    this.hillRoad = R;
+    this.villageRoads.push(R.pts);
   }
 
   // Alles in fn wird auf Höhe dy angehoben (Geometrie & Kollision)
@@ -1266,20 +1330,60 @@ export class World {
     P.addGeometry(new THREE.CylinderGeometry(0.12, 0.16, 0.7, 10).rotateZ(Math.PI / 2.4), new THREE.Matrix4().makeTranslation(cx + 10.1, 1.35, cz - 7.9), rgb(0x2a6f97));
   }
 
-  genObservatory() {
-    // Sternwarte auf dem höchsten Gipfel (Wahrzeichen, weithin sichtbar)
-    let bx = 560, bz = -840, by = -1;
-    for (let x = 480; x <= 660; x += 10) for (let z = -900; z <= -780; z += 10) { const y = hillHeight(x, z); if (y > by) { by = y; bx = x; bz = z; } }
-    const P = this.B.props, wh = rgb(0xf2f0ea);
-    this.B.concrete.box(bx - 16, by - 4, bz - 12, bx + 16, by + 0.3, bz + 12, { col: rgb(0xd8d2c6), topScale: 3, uw: 3, vh: 3 });
-    this.facadeBox('deco', bx - 12, bz - 7, bx + 12, bz + 7, by, by + 9, { tint: 0xf4efe4, roof: true });
-    for (const s of [-1, 1]) {
-      P.addGeometry(new THREE.CylinderGeometry(4.2, 4.2, 3, 24), new THREE.Matrix4().makeTranslation(bx + s * 7, by + 10.5, bz), wh);
-      P.addGeometry(new THREE.SphereGeometry(4.3, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.Matrix4().makeTranslation(bx + s * 7, by + 12, bz), rgb(0x9aa3ad));
-    }
-    this.addBox(bx - 12, bz - 7, bx + 12, bz + 7, by - 5, by + 16, 'bld');
-    this.footprints.push([bx - 12, bz - 7, bx + 12, bz + 7]);
-    this.pois.observatory = { x: bx, z: bz, name: 'Sternwarte' };
+  genMansion() {
+    // Anwesen der Familie Valcourt auf dem Gipfel – Schauplatz der Endmission
+    const M = MANSION, cx = M.x, cz = M.z, rnd = mulberry32(8080);
+    this.raised(M.y, () => {
+      const P = this.B.props, A = this.B.accent, wall = rgb(0xe9e3d6), dark = rgb(0x2b2b30);
+      // Rasen & Einfahrt
+      this.B.grass.box(cx - 50, 0.02, cz - 48, cx + 50, 0.05, cz + 48, { sides: false, topScale: 6 });
+      this.B.concrete.box(cx - 5, 0.02, cz + 8, cx + 5, 0.09, cz + 48, { col: rgb(0xd8cfbf), topScale: 2.6, uw: 2.6, vh: 2.6 });
+      this.B.concrete.box(cx - 18, 0.02, cz + 10, cx + 18, 0.09, cz + 30, { col: rgb(0xd8cfbf), topScale: 2.6, uw: 2.6, vh: 2.6 });
+      // Mauer mit Tor
+      const W = (x0, z0, x1, z1) => { P.box(x0, 0, z0, x1, 2.6, z1, { col: wall }); P.box(x0 - 0.1, 2.6, z0 - 0.1, x1 + 0.1, 2.8, z1 + 0.1, { col: rgb(0xcfc6b4) }); this.addBox(x0, z0, x1, z1, -1, 2.8, 'bld'); };
+      W(cx - 50, cz - 48, cx + 50, cz - 47.4); W(cx - 50, cz - 48, cx - 49.4, cz + 48); W(cx + 49.4, cz - 48, cx + 50, cz + 48);
+      W(cx - 50, cz + 47.4, cx - 6, cz + 48); W(cx + 6, cz + 47.4, cx + 50, cz + 48);
+      for (const s of [-1, 1]) { P.box(cx + s * 6 - 0.6, 0, cz + 47.1, cx + s * 6 + 0.6, 3.6, cz + 48.3, { col: wall }); A.box(cx + s * 6 - 0.3, 3.6, cz + 47.4, cx + s * 6 + 0.3, 3.8, cz + 48, { col: rgb(0xffd9a0, 1.5) }); }
+      // Brunnen im Vorhof
+      P.addGeometry(new THREE.CylinderGeometry(4, 4.3, 0.8, 28), new THREE.Matrix4().makeTranslation(cx, 0.4, cz + 20), rgb(0xf1ece2));
+      this.B.poolw.addGeometry(new THREE.CircleGeometry(3.6, 28).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(cx, 0.82, cz + 20));
+      P.addGeometry(new THREE.CylinderGeometry(0.3, 0.5, 2.8, 12), new THREE.Matrix4().makeTranslation(cx, 1.4, cz + 20), rgb(0xf1ece2));
+      this.addCircle(cx, cz + 20, 4.2, 1, 'fountain');
+      // Haupthaus: zwei versetzte Kuben, Glasfront, Holzlamellen
+      this.facadeBox('house', cx - 24, cz - 18, cx + 24, cz + 8, 0, 5.2, { rnd, tint: 0xfbf8f2, roof: false });
+      this.facadeBox('glass', cx - 9, cz + 4, cx + 9, cz + 8.6, 0, 9.4, { rnd, roof: false });
+      this.facadeBox('house', cx - 18, cz - 24, cx + 28, cz + 3, 5.2, 10.4, { rnd, tint: 0xf4efe6, roof: false });
+      this.roofTop(cx - 24, cz - 18, cx + 24, cz + 8, 5.2, false);
+      this.roofTop(cx - 18, cz - 24, cx + 28, cz + 3, 10.4, true);
+      this.roofTop(cx - 9, cz + 4, cx + 9, cz + 8.6, 9.4, false);
+      P.box(cx - 19, 10.3, cz - 25, cx + 29, 10.7, cz + 4, { col: rgb(0x3a3a3e) });
+      for (let k = 0; k < 18; k++) this.B.wood.box(cx + 12 + k * 0.85, 5.6, cz + 3.05, cx + 12.35 + k * 0.85, 10.1, cz + 3.3, {});
+      A.box(cx - 24.2, 5.1, cz + 8.05, cx + 24.2, 5.2, cz + 8.2, { col: rgb(0xffe2b0, 1.4) });
+      // Eingangsvordach & Säulen
+      P.box(cx - 7, 4.2, cz + 8.6, cx + 7, 4.5, cz + 14, { col: rgb(0x2a2a2e) });
+      for (const s of [-1, 1]) P.box(cx + s * 6.4 - 0.2, 0, cz + 13.4, cx + s * 6.4 + 0.2, 4.2, cz + 13.8, { col: rgb(0xd9d4ca) });
+      this.collider(cx - 24, cz - 18, cx + 24, cz + 8.6, 11);
+      this.collider(cx - 18, cz - 24, cx + 28, cz - 18, 11);
+      // Garage mit drei Toren
+      this.facadeBox('house', cx + 28, cz - 6, cx + 44, cz + 10, 0, 4.4, { rnd, tint: 0xf4efe6 });
+      for (let k = 0; k < 3; k++) P.box(cx + 29 + k * 5, 0, cz + 10.02, cx + 33 + k * 5, 3.2, cz + 10.12, { col: dark });
+      this.collider(cx + 28, cz - 6, cx + 44, cz + 10, 4.6);
+      // Infinity-Pool & Terrasse hinter dem Haus
+      this.B.concrete.box(cx - 30, 0, cz - 44, cx + 30, 0.25, cz - 25, { col: rgb(0xeee8dc), topScale: 2, uw: 2, vh: 2 });
+      this.B.poolw.box(cx - 22, 0.25, cz - 40, cx + 22, 0.27, cz - 30, { sides: false });
+      for (let k = 0; k < 6; k++) { const x = cx - 20 + k * 8; P.box(x - 0.7, 0.25, cz - 28.5, x + 0.7, 0.55, cz - 26.5, { col: rgb(0xffffff) }); P.box(x - 0.7, 0.55, cz - 28.5, x + 0.7, 1.1, cz - 28.2, { col: rgb(0xffffff) }); }
+      for (let k = 0; k < 8; k++) this.addPalm(cx - 46 + rnd() * 92, k % 2 ? cz - 46 + rnd() * 3 : cz + 30 + rnd() * 14, rnd);
+      // Hubschrauberlandeplatz
+      P.addGeometry(new THREE.CylinderGeometry(9, 9, 0.4, 32), new THREE.Matrix4().makeTranslation(cx - 36, 0.2, cz - 2), rgb(0x55585e));
+      A.box(cx - 37.2, 0.42, cz - 5, cx - 36.2, 0.45, cz + 1, { col: rgb(0xffffff, 1.2) });
+      A.box(cx - 35.8, 0.42, cz - 5, cx - 34.8, 0.45, cz + 1, { col: rgb(0xffffff, 1.2) });
+      A.box(cx - 36.2, 0.42, cz - 2.5, cx - 35.8, 0.45, cz - 1.5, { col: rgb(0xffffff, 1.2) });
+      // Gartenleuchten
+      for (let k = 0; k < 10; k++) { const z = cz + 12 + k * 3.6; for (const s of [-1, 1]) { P.box(cx + s * 5.6 - 0.08, 0, z - 0.08, cx + s * 5.6 + 0.08, 0.7, z + 0.08, { col: dark }); A.box(cx + s * 5.6 - 0.12, 0.7, z - 0.12, cx + s * 5.6 + 0.12, 0.85, z + 0.12, { col: rgb(0xffd9a0, 1.6) }); } }
+      for (let k = 0; k < 4; k++) this.parkingSpots.push([cx - 14 + k * 4.5, cz + 26, 0]);
+    });
+    this.pois.mansion = { x: cx, z: cz + 30, name: 'Anwesen Valcourt' };
+    this.pois.mansionGate = { x: cx, z: cz + 52 };
   }
 
   // Leuchtschild mit Text (eigenes Mesh)

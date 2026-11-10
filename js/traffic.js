@@ -53,8 +53,8 @@ export class AIDriver {
     let opts = cur.nbr.filter((n) => n !== prevId);
     if (!opts.length) opts = cur.nbr;
     if (this.mode === 'flee') {
-      const P = G.player;
-      const px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
+      const P = G.player, F = this.fleeFrom && !this.fleeFrom.removed ? this.fleeFrom : null;
+      const px = F ? F.x : P.inCar ? P.vehicle.x : P.x, pz = F ? F.z : P.inCar ? P.vehicle.z : P.z;
       opts.sort((a, b) => dist2(G.world.nodes[b].x, G.world.nodes[b].z, px, pz) - dist2(G.world.nodes[a].x, G.world.nodes[a].z, px, pz));
       return chance(0.75) ? opts[0] : pick(opts);
     }
@@ -79,6 +79,7 @@ export class AIDriver {
   }
   targetNode() {
     if (this.mode === 'goto' && this.goal) return G.world.nearestNode(this.goal.x, this.goal.z).id;
+    if (this.target && !this.target.removed) return G.world.nearestNode(this.target.x, this.target.z).id;
     const P = G.player;
     const px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
     return G.world.nearestNode(px, pz).id;
@@ -130,7 +131,67 @@ export class AIDriver {
       return;
     }
     if (this.mode === 'police' || this.mode === 'chase') return this.updatePursuit(dt);
+    if (this.hill) return this.followHill(dt);
     this.followPath(dt, this.mode === 'traffic' && this.scared <= 0);
+  }
+
+  // ---------------------------------------------------- Bergstraßen
+  startHill(line, idx, dir) { this.hill = { line, idx, dir }; this.pts = []; this.route = []; }
+  hillPoint(L, i, dir) {
+    const P = L.pts, a = P[Math.max(0, Math.min(P.length - 1, i))], b = P[Math.max(0, Math.min(P.length - 1, i + dir))];
+    let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    return [a[0] - dz * 2.3, a[1] + dx * 2.3];
+  }
+  followHill(dt) {
+    const v = this.v, W = G.world, H = this.hill;
+    let L = W.hillLines[H.line];
+    // Fortschritt entlang der Linie
+    for (let k = 0; k < 6; k++) {
+      const [x, z] = this.hillPoint(L, H.idx, H.dir);
+      if (Math.hypot(x - v.x, z - v.z) > 7) break;
+      H.idx += H.dir;
+      // Abzweig zur Gipfelstraße
+      const L2 = W.hillLines[1];
+      if (H.line === 0 && H.idx === L2.join && chance(this.mode === 'police' ? 0 : 0.35)) { H.line = 1; H.idx = 0; H.dir = 1; L = L2; }
+      if (H.line === 1 && H.idx < 0) { H.line = 0; H.idx = L2.join; H.dir = chance(0.5) ? 1 : -1; L = W.hillLines[0]; }
+      if (H.line === 0 && H.idx < 0) {
+        // zurück in die Stadt (Straßengraph)
+        this.hill = null;
+        const g = W.hillGate;
+        this.startEdge(g.id, C.nodeId(5, 1), 2);
+        return;
+      }
+      if (H.idx >= L.pts.length) { if (G.peds.inView(v.x, v.z) === false) v.despawnMe = true; H.dir = -1; H.idx = L.pts.length - 2; }
+    }
+    const [tx, tz] = this.hillPoint(L, H.idx + H.dir * 2, H.dir);
+    const want = Math.atan2(tx - v.x, tz - v.z);
+    const diff = angleDiff(v.h, want);
+    v.input.steer = clamp(-diff * 2.6, -1, 1);
+    const fx = Math.sin(v.h), fz = Math.cos(v.h);
+    const sp = Math.max(0, v.fwdSpeed);
+    let target = this.cruise * (this.scared > 0 ? 1.6 : 1);
+    if (Math.abs(diff) > 0.4) target = Math.min(target, 9);
+    const obst = this.obstacleAhead(fx, fz);
+    if (obst < 30) target = Math.min(target, Math.max(0, (obst - 4.5) * 0.9));
+    this.drive(target, sp, dt, obst);
+  }
+  // Verfolgung über die Navigationsroute (auch in den Bergen)
+  pursuitPath(dt, tx, tz) {
+    const v = this.v, W = G.world;
+    this.pathT = (this.pathT || 0) - dt;
+    if (this.pathT <= 0 || !this.gps) { this.pathT = 0.6; this.gps = W.gpsPath(v.x, v.z, tx, tz); }
+    let tgt = this.gps[this.gps.length - 1];
+    for (const p of this.gps) if (Math.hypot(p[0] - v.x, p[1] - v.z) > 10) { tgt = p; break; }
+    while (this.gps.length > 1 && Math.hypot(this.gps[0][0] - v.x, this.gps[0][1] - v.z) < 10) this.gps.shift();
+    const want = Math.atan2(tgt[0] - v.x, tgt[1] - v.z);
+    const diff = angleDiff(v.h, want);
+    v.input.steer = clamp(-diff * 2.6, -1, 1);
+    const sp = Math.max(0, v.fwdSpeed);
+    let target = this.cruise;
+    if (Math.abs(diff) > 0.5) target = Math.min(target, 12);
+    const fx = Math.sin(v.h), fz = Math.cos(v.h), obst = this.obstacleAhead(fx, fz);
+    if (obst < 25) target = Math.min(target, Math.max(4, (obst - 3) * 1.2));
+    this.drive(target, sp, dt, obst);
   }
 
   followPath(dt, obeyLights) {
@@ -223,14 +284,14 @@ export class AIDriver {
   // Verfolgung (Polizei / Missionsgegner)
   updatePursuit(dt) {
     const v = this.v, inp = v.input;
-    const P = G.player;
-    const tv = P.inCar ? P.vehicle : null;
+    const P = G.player, T = this.target && !this.target.removed ? this.target : null;
+    const tv = T || (P.inCar ? P.vehicle : null);
     const tx = tv ? tv.x : P.x, tz = tv ? tv.z : P.z;
     const d = Math.hypot(tx - v.x, tz - v.z);
     const sp = Math.max(0, v.fwdSpeed);
     v.siren = true;
     if (d < 45 && G.world.lineOfSight(v.x, v.y + 1.3, v.z, tx, (tv ? tv.y : P.y) + 1, tz)) {
-      G.police.spotted();
+      if (!T) G.police.spotted();
       // direktes Anfahren mit Vorhalt
       const lead = tv ? Math.min(1.2, d / 25) : 0;
       const ax = tx + (tv ? tv.vx * lead : 0), az = tz + (tv ? tv.vz * lead : 0);
@@ -246,6 +307,10 @@ export class AIDriver {
       // Rückwärts wenn Ziel hinter uns und nah
       if (Math.abs(diff) > 2.2 && d < 12 && sp < 4) { inp.throttle = 0; inp.brake = 1; inp.noReverse = false; inp.steer = -inp.steer; }
       this.direct = true;
+    } else if (G.world.inHills(v.x, v.z) || G.world.inHills(tx, tz)) {
+      this.direct = false;
+      this.cruise = 24;
+      this.pursuitPath(dt, tx, tz);
     } else {
       if (this.direct || this.route.length < 2) {
         this.direct = false;
@@ -324,6 +389,31 @@ export class TrafficManager {
     return v;
   }
 
+  // Fahrzeug auf den Bergstraßen erzeugen
+  spawnHillCar(px, pz, key = null, mode = 'traffic', minD = 70, maxD = 170) {
+    const W = G.world;
+    for (let k = 0; k < 20; k++) {
+      const li = chance(0.7) ? 0 : 1, L = W.hillLines[li];
+      const idx = 2 + Math.floor(Math.random() * (L.pts.length - 4));
+      const [x0, z0] = L.pts[idx];
+      const d2 = dist2(x0, z0, px, pz);
+      if (d2 < minD * minD || d2 > maxD * maxD) continue;
+      if (mode === 'traffic' && G.peds.inView(x0, z0) && d2 < 140 * 140) continue;
+      const dir = mode === 'police' ? (dist2(L.pts[Math.min(L.pts.length - 1, idx + 3)][0], L.pts[Math.min(L.pts.length - 1, idx + 3)][1], px, pz) < d2 ? 1 : -1) : chance(0.5) ? 1 : -1;
+      const tmp = { pts: L.pts };
+      const [x, z] = AIDriver.prototype.hillPoint.call(null, tmp, idx, dir);
+      const nb = L.pts[Math.max(0, Math.min(L.pts.length - 1, idx + dir))];
+      if (G.vehicles.some((o) => dist2(o.x, o.z, x, z) < 100)) continue;
+      const v = G.vm.spawn(key || pick(TRAFFIC_MIX.filter((t) => t !== 'taxi')), x, z, Math.atan2(nb[0] - L.pts[idx][0], nb[1] - L.pts[idx][1]));
+      if (!v) return null;
+      v.driver = { isPed: true, look: v.T.police ? copLook() : randomLook(), isCop: !!v.T.police };
+      v.ai = new AIDriver(v, mode);
+      if (mode !== 'police') { v.ai.cruise = rand(10, 14); v.ai.startHill(li, idx, dir); }
+      return v;
+    }
+    return null;
+  }
+
   spawnParked(x, z, h, key) {
     const v = G.vm.spawn(key || pick(TRAFFIC_MIX.filter((k) => k !== 'taxi')), x, z, h);
     if (v) v.parked = true;
@@ -361,7 +451,8 @@ export class TrafficManager {
     if (G.interior) this.spawnT = 1;
     if (this.spawnT <= 0) {
       this.spawnT = 0.25;
-      if (this.carCount() < this.target) this.spawnCar(px, pz);
+      if (G.world.inHills(px, pz) && pz < -400) { if (this.carCount() < (G.quality === 'low' ? 4 : 7)) this.spawnHillCar(px, pz); }
+      else if (this.carCount() < this.target) this.spawnCar(px, pz);
     }
   }
 

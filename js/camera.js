@@ -43,14 +43,22 @@ export class CameraRig {
       return;
     }
     const sens = G.settings.sensitivity * (G.isTouch ? 1.6 : 1);
+    // Im Fahrzeug: Blickwinkel relativ zum Fahrzeug (dreht mit), Maus verschiebt den Versatz
+    const veh = P.inCar ? P.vehicle : null;
+    if (veh) {
+      const back = veh.fwdSpeed < -3 ? Math.PI : 0;
+      this.carBase = veh.h + back;
+      if (this.lastVeh !== veh) { this.lastVeh = veh; this.carYaw = this.carBase; this.carOff = this.yaw - this.carBase; }
+    } else this.lastVeh = null;
     if (I.lookDX || I.lookDY) {
-      this.yaw -= I.lookDX * 0.0028 * sens;
+      const dy = I.lookDX * 0.0028 * sens;
+      if (veh) this.carOff = (this.carOff || 0) - dy; else this.yaw -= dy;
       this.pitch -= I.lookDY * 0.0024 * sens * (G.settings.invertY ? -1 : 1);
-      this.userT = G.isTouch ? 2.2 : 1.4;
+      if (Math.abs(I.lookDX) + Math.abs(I.lookDY) > 1.5) this.userT = G.isTouch ? 2.2 : 1.6;
     }
     this.userT -= dt;
     if (I.pressed('camera') && P.inCar) this.carView = (this.carView + 1) % 3;
-    let tx, ty, tz, dist, minPitch = -1.25, maxPitch = 0.55;
+    let tx, ty, tz, dist, minPitch = -1.25, maxPitch = 1.25;
     let fovT = 65;
     if (P.inCar) {
       const v = P.vehicle;
@@ -58,13 +66,18 @@ export class CameraRig {
       tx = v.x; ty = v.y + 1.3 + (this.carView === 1 ? 1 : 0); tz = v.z;
       dist = (v.T.L * 0.9 + 3.6) * (this.carView === 1 ? 1.5 : 1) + Math.min(2.5, sp * 0.05);
       if (this.carView === 2) { dist = 0.5; ty = v.y + v.height * 0.8 + 0.1; }
+      // Versatz zurück zur Fahrtrichtung, wenn die Maus ruht
+      let off = ((this.carOff || 0) + Math.PI) % (Math.PI * 2); if (off < 0) off += Math.PI * 2; off -= Math.PI;
       if (this.userT <= 0 && (sp > 1.5 || this.carView === 2)) {
-        const back = v.fwdSpeed < -2 ? v.h + Math.PI : v.h;
-        this.yaw = dampAngle(this.yaw, back, this.carView === 2 ? 12 : 3, dt);
+        off = damp(off, 0, this.carView === 2 ? 10 : 2.2, dt);
         this.pitch = damp(this.pitch, this.carView === 2 ? -0.05 : -0.2, 2, dt);
       }
+      this.carOff = off;
+      // Fahrzeugrichtung weich nachführen (kein Ruckeln bei Lenkstößen)
+      this.carYaw = this.carYaw == null || this.snapNext ? this.carBase : dampAngle(this.carYaw, this.carBase, 8, dt);
+      this.yaw = this.carYaw + off;
       fovT = 66 + Math.min(16, sp * 0.28);
-      maxPitch = 0.3;
+      maxPitch = 0.95;
     } else {
       tx = P.x; ty = P.y + 1.55; tz = P.z;
       const aiming = P.anim.aim && !G.isTouch;

@@ -604,48 +604,96 @@ export class Interiors {
 
   // ------------------------------------------------------------ Solera Bank
   buildBank() {
-    const marble = canvasTex(256, 256, (g, w) => {
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { g.fillStyle = (i + j) % 2 ? '#e9e4da' : '#cfc6b6'; g.fillRect(i * 128, j * 128, 128, 128); }
-      for (let k = 0; k < 120; k++) { g.strokeStyle = `rgba(120,110,100,${Math.random() * 0.15})`; g.beginPath(); g.moveTo(Math.random() * w, Math.random() * w); g.lineTo(Math.random() * w, Math.random() * w); g.stroke(); }
+    const marble = canvasTex(512, 512, (g, w) => {
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#efe9de' : '#2a2622'; g.fillRect(i * 128, j * 128, 128, 128); }
+      for (let k = 0; k < 260; k++) { g.strokeStyle = `rgba(${Math.random() < 0.5 ? '160,150,140' : '255,255,255'},${Math.random() * 0.18})`; g.lineWidth = Math.random() * 2; g.beginPath(); g.moveTo(Math.random() * w, Math.random() * w); g.bezierCurveTo(Math.random() * w, Math.random() * w, Math.random() * w, Math.random() * w, Math.random() * w, Math.random() * w); g.stroke(); }
+      g.strokeStyle = 'rgba(200,170,90,0.5)'; g.lineWidth = 3; for (let k = 0; k <= 512; k += 128) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k, 512); g.moveTo(0, k); g.lineTo(512, k); g.stroke(); }
     }, true);
-    marble.repeat.set(8, 9);
+    marble.repeat.set(6, 7);
     const mats = {
-      floor: new THREE.MeshStandardMaterial({ map: marble, roughness: 0.2, metalness: 0.1 }),
-      ceil: new THREE.MeshStandardMaterial({ color: 0xf6f2ea, emissive: 0x6a665e, roughness: 1 }),
-      wall: new THREE.MeshStandardMaterial({ color: 0xd8cfc0, emissive: 0x2a2620, roughness: 0.8 }),
+      floor: new THREE.MeshStandardMaterial({ map: marble, roughness: 0.12, metalness: 0.1, envMapIntensity: 1.2 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xf2ece0, emissive: 0x4a4438, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xe6dccb, emissive: 0x231e18, roughness: 0.75 }),
     };
-    const R = this.room('bank', 1500, 150, 22, 26, 6, mats);
+    const R = this.room('bank', 1500, 150, 30, 36, 8, mats);
     R.name = 'Solera Bank';
-    R.spawn = { x: 1500, z: 158, yaw: Math.PI };
-    const wood = new THREE.MeshStandardMaterial({ color: 0x5b3a22, roughness: 0.5 });
-    this.box(R, 1500, 0.6, 145.8, 18, 1.2, 1.6, wood, true);
-    this.box(R, 1500, 1.23, 145.8, 18.2, 0.06, 1.7, new THREE.MeshStandardMaterial({ color: 0x1b1b1b, metalness: 0.7, roughness: 0.2 }));
-    const glass = new THREE.MeshStandardMaterial({ color: 0x9fd6ff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.5, depthWrite: false });
-    this.box(R, 1500, 1.9, 145.5, 18, 1.3, 0.05, glass);
-    // Tresortür
-    const steel = new THREE.MeshStandardMaterial({ color: 0xb8bcc4, metalness: 0.95, roughness: 0.25 });
-    const vault = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.5, 40).rotateX(Math.PI / 2), steel);
-    vault.position.set(1500, 2.6, 137.3); R.g.add(vault);
-    for (let k = 0; k < 3; k++) { const s = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.12, 0.12), steel); s.position.set(1500, 2.6, 137.65); s.rotation.z = (k * Math.PI) / 3; R.g.add(s); }
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.4), new THREE.MeshBasicMaterial({ map: textTex('SOLERA BANK', '#ffd23f', 768, 128, 70), transparent: true, depthWrite: false }));
-    sign.position.set(1500, 5.3, 137.25); R.g.add(sign);
-    // Säulen & Pflanzen
-    for (const x of [1492, 1508]) {
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 6, 16), new THREE.MeshStandardMaterial({ color: 0xf2eee6, roughness: 0.4 }));
-      c.position.set(x, 3, 153); R.g.add(c);
-      G.world.addCircle(x, 153, 0.55, 6, 'pillar');
+    R.spawn = { x: 1500, z: 164.5, yaw: Math.PI };
+    const gold = rgb(0xc9a14a), wood = rgb(0x4a2c18), dark = rgb(0x1b1b1e), cream = rgb(0xf3eee4);
+    this.furnish(R, (B, col) => {
+      // Holzvertäfelung & Goldleisten an den Wänden
+      for (const [x0, z0, x1, z1] of [[1485, 132, 1485.3, 168], [1514.7, 132, 1515, 168], [1485, 167.7, 1515, 168]]) { B.box(x0, 0, z0, x1, 2.2, z1, { col: wood }); B.box(x0, 2.2, z0, x1, 2.32, z1, { col: gold }); B.box(x0, 7.4, z0, x1, 7.6, z1, { col: gold }); }
+      // Pilaster
+      for (let z = 136; z <= 166; z += 6) for (const x of [1485.3, 1514.2]) B.box(x, 0, z - 0.4, x + 0.5, 8, z + 0.4, { col: cream });
+      // Säulen in der Halle
+      for (const [x, z] of [[1491, 153], [1509, 153], [1491, 161], [1509, 161]]) {
+        B.addGeometry(new THREE.CylinderGeometry(0.55, 0.62, 7.4, 20), new THREE.Matrix4().makeTranslation(x, 3.7, z), cream);
+        B.box(x - 0.8, 0, z - 0.8, x + 0.8, 0.35, z + 0.8, { col: cream }); B.box(x - 0.8, 7.4, z - 0.8, x + 0.8, 8, z + 0.8, { col: cream });
+        B.addGeometry(new THREE.TorusGeometry(0.6, 0.06, 6, 20).rotateX(Math.PI / 2), new THREE.Matrix4().makeTranslation(x, 0.4, z), gold);
+        col(x - 0.62, z - 0.62, x + 0.62, z + 0.62, 8);
+      }
+      // Schalter mit Panzerglas
+      B.box(1486, 0, 145.4, 1509.2, 1.15, 146.4, { col: wood }); B.box(1485.9, 1.15, 145.3, 1509.3, 1.22, 146.5, { col: dark });
+      B.box(1486, 0.15, 146.4, 1509.2, 0.3, 146.45, { col: gold });
+      col(1486, 145.4, 1509.2, 146.4, 1.2);
+      for (let x = 1486; x <= 1509; x += 4.6) { B.box(x - 0.05, 1.22, 145.8, x + 0.05, 2.9, 145.9, { col: gold }); }
+      B.box(1486, 2.85, 145.75, 1509.2, 2.95, 145.95, { col: gold });
+      for (let k = 0; k < 5; k++) B.box(1488.3 + k * 4.6 - 0.6, 1.22, 145.5, 1488.3 + k * 4.6 + 0.6, 1.24, 146.2, { col: rgb(0x2a6f4a) });
+      // Schreibtische & Schließfächer hinter dem Schalter
+      for (const x of [1489, 1495, 1505]) { B.box(x - 1.2, 0, 141.5, x + 1.2, 0.78, 142.5, { col: wood }); B.box(x - 0.35, 0.78, 141.7, x + 0.35, 1.2, 141.75, { col: dark }); col(x - 1.2, 141.5, x + 1.2, 142.5, 0.8); }
+      for (let r = 0; r < 6; r++) for (let c = 0; c < 9; c++) B.box(1485.4, 0.3 + r * 0.55, 139.5 + c * 0.66, 1485.6, 0.8 + r * 0.55, 140.1 + c * 0.66, { col: rgb(0xb8a070) });
+      // Tresorwand mit Öffnung
+      B.box(1485, 0, 137.5, 1497.4, 8, 138.5, { col: rgb(0x8f959e) }); B.box(1502.6, 0, 137.5, 1515, 8, 138.5, { col: rgb(0x8f959e) }); B.box(1497.4, 5, 137.5, 1502.6, 8, 138.5, { col: rgb(0x8f959e) });
+      col(1485, 137.5, 1497.4, 138.5, 8); col(1502.6, 137.5, 1515, 138.5, 8);
+      B.addGeometry(new THREE.TorusGeometry(2.75, 0.3, 10, 40), new THREE.Matrix4().makeTranslation(1500, 2.6, 138.55), rgb(0xd0d4da));
+      // Zahlenfeld am Tresor
+      B.box(1503.4, 1.3, 138.5, 1504.2, 2.3, 138.6, { col: dark }); B.box(1503.5, 1.9, 138.6, 1504.1, 2.2, 138.62, { col: rgb(0x2bff8a) });
+      // Tresorraum: Goldbarren & Geldpaletten
+      for (const [x, z] of [[1489, 134], [1493, 134], [1507, 134], [1511, 134]]) {
+        B.box(x - 1.2, 0, z - 1, x + 1.2, 0.15, z + 1, { col: rgb(0x6b4f2a) });
+        for (let a = 0; a < 3; a++) for (let b = 0; b < 4; b++) for (let c = 0; c < 2 + (a + b) % 2; c++) B.box(x - 1 + b * 0.5, 0.15 + c * 0.22, z - 0.8 + a * 0.55, x - 0.6 + b * 0.5, 0.35 + c * 0.22, z - 0.4 + a * 0.55, { col: x < 1500 ? rgb(0x3f7a3f) : rgb(0xe6b422) });
+      }
+      for (let k = 0; k < 4; k++) B.box(1486 + k * 7.5, 0, 132.2, 1490 + k * 7.5, 2.4, 132.8, { col: rgb(0x6b7078) });
+      // Kordel-Absperrungen, Bänke, Infotheke, Geldautomaten
+      for (let k = 0; k < 6; k++) { const x = 1493 + k * 2.8; B.addGeometry(new THREE.CylinderGeometry(0.06, 0.08, 1, 8), new THREE.Matrix4().makeTranslation(x, 0.5, 150), gold); B.addGeometry(new THREE.SphereGeometry(0.1, 8, 6), new THREE.Matrix4().makeTranslation(x, 1.02, 150), gold); if (k < 5) B.box(x, 0.85, 149.97, x + 2.8, 0.9, 150.03, { col: rgb(0x8a1030) }); }
+      for (const x of [1496, 1504]) { B.box(x - 1.6, 0, 158.6, x + 1.6, 0.48, 159.4, { col: rgb(0x3a2a20) }); col(x - 1.6, 158.6, x + 1.6, 159.4, 0.5); }
+      B.box(1511, 0, 158, 1513.5, 1.05, 160.5, { col: wood }); col(1511, 158, 1513.5, 160.5, 1.05);
+      for (let k = 0; k < 3; k++) { const z = 152 + k * 1.6; B.box(1514.1, 0, z, 1514.7, 1.9, z + 1.2, { col: rgb(0x26303a) }); B.box(1514.05, 1.1, z + 0.15, 1514.1, 1.6, z + 1.05, { col: rgb(0x19e6ff) }); }
+      // Teppich-Läufer
+      B.box(1497.5, 0.005, 150.5, 1502.5, 0.015, 167.5, { col: rgb(0x7a1020) });
+      B.box(1497.3, 0.004, 150.3, 1502.7, 0.012, 167.7, { col: gold });
+    });
+    // Tresortür (dreht sich beim Öffnen)
+    const steel = new THREE.MeshStandardMaterial({ color: 0xc2c6cc, metalness: 0.95, roughness: 0.22 });
+    const piv = new THREE.Group(); piv.position.set(1497.4, 0, 138.6);
+    const door = new THREE.Mesh(new THREE.CylinderGeometry(2.45, 2.45, 0.7, 48).rotateX(Math.PI / 2), steel); door.position.set(2.6, 2.6, 0.2); piv.add(door);
+    for (let k = 0; k < 3; k++) { const s = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.14, 0.14), steel); s.position.set(2.6, 2.6, 0.62); s.rotation.z = (k * Math.PI) / 3; piv.add(s); }
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.3, 24).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.25 })); hub.position.set(2.6, 2.6, 0.7); piv.add(hub);
+    for (let k = 0; k < 8; k++) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.5, 8), steel); const a = (k / 8) * Math.PI * 2; b.position.set(2.6 + Math.cos(a) * 2.25, 2.6 + Math.sin(a) * 2.25, -0.1); b.rotation.x = Math.PI / 2; piv.add(b); }
+    R.g.add(piv);
+    this.vaultDoor = piv; this.vaultOpen = 0;
+    this.vaultBox = G.world.addBox(1497.4, 137.4, 1502.6, 138.9, -1, 6, 'bld');
+    // Kronleuchter
+    for (const z of [154, 162]) {
+      const ch = new THREE.Group();
+      const goldM = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.9, roughness: 0.3 });
+      ch.add(new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.06, 8, 32).rotateX(Math.PI / 2), goldM));
+      for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2, b = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.2, 1.6) })); b.position.set(Math.cos(a) * 1.4, 0.15, Math.sin(a) * 1.4); ch.add(b); }
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4, 6), goldM); cord.position.y = 0.8; ch.add(cord);
+      ch.position.set(1500, 6.4, z); R.g.add(ch);
     }
-    const pot = new THREE.MeshStandardMaterial({ color: 0x333333 }), leaf = new THREE.MeshStandardMaterial({ color: 0x2f7d32, roughness: 0.8, flatShading: true });
-    for (const [x, z] of [[1490.2, 161.8], [1509.8, 161.8], [1490.2, 148.5], [1509.8, 148.5]]) {
-      this.box(R, x, 0.35, z, 0.7, 0.7, 0.7, pot);
-      const l = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), leaf); l.position.set(x, 1.2, z); R.g.add(l);
-    }
-    const bench = new THREE.MeshStandardMaterial({ color: 0x2b2d42, roughness: 0.6 });
-    this.box(R, 1500, 0.25, 157, 4, 0.5, 0.8, bench);
-    R.exit = new Marker(1500, 161, 0x7cff6b, { label: 'X', r: 1.1 });
-    R.rob = new Marker(1500, 148.4, 0xff3b5c, { label: '!', r: 1.2 });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.5), new THREE.MeshBasicMaterial({ map: textTex('SOLERA BANK', '#d4af37', 768, 128, 70), transparent: true, depthWrite: false }));
+    sign.position.set(1500, 6.2, 138.62); R.g.add(sign);
+    const sign2 = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.9), new THREE.MeshBasicMaterial({ map: textTex('SEIT 1924', '#e6dccb', 512, 128, 56), transparent: true, depthWrite: false }));
+    sign2.position.set(1500, 5.3, 138.62); R.g.add(sign2);
+    R.exit = new Marker(1500, 166.3, 0x7cff6b, { label: 'X', r: 1.1 });
+    R.rob = new Marker(1500, 148.8, 0xff3b5c, { label: '!', r: 1.2 });
     R.markers = [R.exit, R.rob];
     for (const m of R.markers) m.group.visible = false;
+  }
+  setVault(open) {
+    this.vaultOpen = open;
+    this.vaultDoor.rotation.y = -1.9 * open;
+    this.vaultBox.y1 = open > 0.5 ? -50 : 6;
   }
 
   spawnBankPeds() {
@@ -655,9 +703,11 @@ export class Interiors {
       this.peds.push(p);
       return p;
     };
-    for (const x of [1495, 1500, 1505]) add(x, 143.9, { ...randomLook(), shirt: C(0xf4f1ec), sleeve: C(0x2b3a55), pants: C(0x2b3a55), legs: C(0x2b3a55), hat: null }, 0, 'teller');
-    add(1508.5, 159.5, copLook(), Math.PI, 'guard');
-    for (const [x, z] of [[1496, 150], [1503.5, 151.5], [1499, 155.5]]) add(x, z, randomLook(), Math.PI + rand(-0.4, 0.4), 'customer');
+    if (!this.alarm) this.setVault(0);
+    for (const x of [1488.3, 1492.9, 1497.5, 1502.1, 1506.7]) add(x, 144.6, { ...randomLook(), shirt: C(0xf4f1ec), sleeve: C(0x2b3a55), pants: C(0x2b3a55), legs: C(0x2b3a55), hat: null }, 0, 'teller');
+    add(1495, 140.6, { ...randomLook(), shirt: C(0x1d1d22), sleeve: C(0x1d1d22), pants: C(0x1d1d22), legs: C(0x1d1d22), hair: C(0x9e9e9e), hat: null, scale: 1 }, 0, 'manager');
+    for (const [x, z] of [[1487.5, 164], [1512.5, 147.5]]) add(x, z, { ...copLook(), shirt: C(0x2b2b30), sleeve: C(0x2b2b30), hat: C(0x111111) }, Math.PI, 'guard');
+    for (const [x, z] of [[1495, 151.5], [1499, 151.3], [1503, 151.6], [1507, 155], [1496, 159.5]]) add(x, z, randomLook(), Math.PI + rand(-0.4, 0.4), 'customer');
   }
 
   // ------------------------------------------------------------ Betreten / Verlassen
@@ -703,10 +753,10 @@ export class Interiors {
       if (!this.dealerHint) { this.dealerHint = true; G.hud.hint('Willkommen bei <b>Solera Motors</b>!<br>Geh zum pinken <b>A</b> vor dem Drehteller, um Autos anzusehen und zu kaufen.', 8); }
     } else if (kind === 'bank') {
       this.spawnBankPeds();
-      this.light.position.set(1500, 5, 150);
+      this.light.position.set(1500, 6.5, 152);
       this.light.color.setHex(0xfff2dc);
       this.light.intensity = 140;
-      if (!this.bankHint) { this.bankHint = true; G.hud.hint('Die <b>Solera Bank</b>.<br>Mit einer Waffe kannst du am roten <b>!</b>-Marker einen <b>Überfall</b> starten.', 8); }
+      if (!this.bankHint) { this.bankHint = true; G.hud.hint('Die <b>Solera Bank</b>.<br>Mit einer Waffe startest du am roten <b>!</b> einen <b>Überfall</b>: Wachen ausschalten, Tresor aufbohren, Beute schnappen, fliehen.', 9); }
     }
     for (const m of R.markers) m.latch = true;
   }
@@ -862,6 +912,9 @@ export class Interiors {
   }
 
   updateBank(dt, R, on) {
+    if (!G.missions.active || G.missions.active.id !== 'heist') this.alarm = false;
+    if (this.alarm) { const f = Math.floor(G.time * 3) % 2; this.light.color.setHex(f ? 0xff2020 : 0x2040ff); this.light.intensity = 220; }
+    else { this.light.color.setHex(0xfff2dc); this.light.intensity = 105; }
     const ready = !G.missions.active && G.time >= this.heistReady;
     R.rob.group.visible = ready;
     if (!ready) { R.rob.latch = dist2(G.player.x, G.player.z, R.rob.x, R.rob.z) < 1.69; return; }
@@ -873,39 +926,107 @@ export class Interiors {
   }
 }
 
-// Banküberfall als wiederholbarer Nebenauftrag
+// Banküberfall in mehreren Phasen (wiederholbarer Nebenauftrag)
 function heistDef(I) {
   return {
     id: 'heist', title: 'Banküberfall', side: true, reward: 0,
     *run(m) {
       const P = G.player;
-      G.hud.bigToast('ÜBERFALL!', 'Alle auf den Boden – äh, Hände hoch!');
+      const inBank = () => G.interior && G.interior.kind === 'bank';
+      const near = (x, z, r) => dist2(P.x, P.z, x, z) < r * r;
+      m.failIf(() => P.state === 'dead' || P.state === 'busted', 'Überfall gescheitert – die Beute ist weg.');
+      G.hud.bigToast('ÜBERFALL!', 'Alle auf den Boden – Hände hoch!');
       G.audio.wantedUp();
-      for (const p of I.peds) { p.surrender = true; if (p.role === 'guard') p.anim.gun = false; }
-      const total = Math.round(rand(7000, 14000) / 100) * 100;
-      let t = 0, alarm = false;
-      const dur = 15;
-      m.objective('Leere die Kassen – <b>bleib am Schalter</b>!');
-      while (t < dur) {
-        if (!G.interior || G.interior.kind !== 'bank') { m.fail('Überfall abgebrochen – du bist zu früh gegangen.'); yield; return; }
-        if (dist2(P.x, P.z, 1500, 148.5) < 7 * 7) t += G.dt;
-        G.hud.racePos(`BEUTE  $${Math.floor((total * t) / dur)}`);
-        if (!alarm && t > 5) { alarm = true; G.hud.toast('Stiller Alarm ausgelöst! Die Polizei ist unterwegs.'); G.police.setLevel(2); }
-        if (alarm) G.police.spotted();
+      // Phase 1: Kontrolle über die Halle
+      const guards = I.peds.filter((p) => p.role === 'guard');
+      const mgr = I.peds.find((p) => p.role === 'manager');
+      for (const p of I.peds) {
+        if (p.role === 'guard') { p.state = 'gang'; p.isGang = true; p.hostile = true; p.gangGun = true; p.health = 90; p.aggroR = 40; p.anim.gun = true; p.mk = m.marker(0, 0, 0xff3b5c, { follow: p, arrow: true, blipCol: '#ff3b5c' }); }
+        else { p.surrender = true; p.anim.handsUp = true; }
+      }
+      G.hud.subtitle('Wachmann', 'Waffe runter! Sofort!', '#ff3b5c');
+      m.objective('Schalte die <b>Wachleute</b> aus!');
+      yield* m.until(() => !inBank() || m.aliveGang(guards) === 0);
+      if (!inBank()) { m.fail('Überfall abgebrochen.'); yield; return; }
+      G.hud.subtitle();
+      // Phase 2: Filialleiter zum Tresor zwingen
+      const mk = m.marker(0, 0, 0xffd23f, { follow: mgr, arrow: true, blipCol: '#ffd23f' });
+      m.objective('Schnapp dir den <b>Filialleiter</b> hinter dem Schalter.');
+      yield* m.until(() => !inBank() || !mgr.alive || near(mgr.x, mgr.z, 2.4));
+      m.removeMarker(mk);
+      if (!inBank()) { m.fail('Überfall abgebrochen.'); yield; return; }
+      if (mgr.alive) {
+        mgr.surrender = false; mgr.anim.handsUp = true;
+        mgr.state = 'goto'; mgr.gotoSpeed = 2.6; mgr.tx = 1503.8; mgr.tz = 139.6;
+        G.hud.subtitle('Filialleiter', 'Nicht schießen! Ich … ich gebe den Code ein!', '#ffd23f');
+        yield* m.wait(4);
+        G.hud.subtitle('Filialleiter', 'Das Zeitschloss! Ohne Bohrer kriegen Sie den nie auf …', '#ffd23f');
+        yield* m.wait(2.5);
+        G.hud.subtitle();
+      }
+      // Alarm
+      I.alarm = true;
+      G.police.setLevel(3); G.police.spotted();
+      G.hud.toast('🚨 Stiller Alarm ausgelöst – die Polizei ist unterwegs!');
+      // Phase 3: Tresor aufbohren, während die Polizei stürmt
+      const dm = m.marker(1500, 139.6, 0xff9f1c, { r: 1.4, label: '⚙', blipCol: '#ff9f1c' });
+      m.objective('Setze den <b>Bohrer</b> am Tresor an.');
+      yield* m.until(() => !inBank() || near(1500, 139.6, 1.8));
+      if (!inBank()) { m.fail('Überfall abgebrochen.'); yield; return; }
+      m.removeMarker(dm);
+      let drill = 0, wave = 0, waveT = 3;
+      const dur = 24;
+      while (drill < dur) {
+        if (!inBank()) { m.fail('Überfall abgebrochen.'); yield; return; }
+        const on = near(1500, 139.6, 5);
+        if (on) drill += G.dt;
+        G.police.spotted();
+        if (Math.random() < 0.5) G.effects.sparks(1500 + Math.random() - 0.5, 2.6 + Math.random() - 0.5, 139.2, 2);
+        if (Math.random() < 0.08) G.audio.noiseHit(0.2, 'bandpass', 3200, 0.06, 1800, 3);
+        const pct = Math.floor((drill / dur) * 100);
+        G.hud.racePos(`BOHRER  ${'█'.repeat(Math.floor(pct / 10))}${'░'.repeat(10 - Math.floor(pct / 10))}  ${pct}%`);
+        m.objective(on ? 'Halte die <b>Polizei</b> auf, bis der Bohrer durch ist!' : 'Zurück zum <b>Bohrer</b> – er stoppt ohne dich!');
+        waveT -= G.dt;
+        if (waveT <= 0 && wave < 4) {
+          wave++; waveT = 6.5;
+          G.hud.toast(wave === 1 ? '🚔 Die Polizei stürmt die Bank!' : '🚔 Weitere Einsatzkräfte!');
+          for (let k = 0; k < 2 + (wave > 2 ? 1 : 0); k++) { const c = G.peds.spawnCop(1496 + k * 4, 166); c.health = 110; I.peds.push(c); }
+          G.police.setLevel(Math.min(5, 3 + Math.floor(wave / 2)));
+        }
         yield;
       }
       G.hud.racePos('');
-      G.audio.cash();
-      G.police.setLevel(3); G.police.spotted();
-      m.objective(`Beute: <b>$${total}</b> – raus hier! Folge dem grünen <b>X</b>.`);
+      // Phase 4: Tresor auf, Beute einsammeln
+      G.audio.explosion(1500, 139); G.cam.shake(0.5);
+      for (let t = 0; t < 1.2; t += G.dt) { I.setVault(Math.min(1, t / 1.2)); yield; }
+      I.setVault(1);
+      const piles = [[1489, 134, 2500, 'cash'], [1493, 134, 2500, 'cash'], [1507, 134, 6000, 'gold'], [1511, 134, 6000, 'gold'], [1496, 133.2, 1500, 'cash'], [1504, 133.2, 1500, 'cash']];
+      const mks = piles.map(([x, z, , k]) => m.marker(x, z + 1.8, k === 'gold' ? 0xffd23f : 0x7cff6b, { r: 1, label: k === 'gold' ? '★' : '$', blipCol: k === 'gold' ? '#ffd23f' : '#7cff6b' }));
+      let loot = 0, left = piles.length;
+      m.timerLeft = 30;
+      while (left > 0 && m.timerLeft > 0.5) {
+        piles.forEach(([x, z, amt], i) => { if (mks[i] && near(x, z + 1.8, 1.6)) { loot += amt; m.removeMarker(mks[i]); mks[i] = null; left--; G.audio.cash(); G.hud.toast(`💰 +$${amt.toLocaleString('de-DE')}  (Beute: $${loot.toLocaleString('de-DE')})`); } });
+        G.hud.racePos(`BEUTE  $${loot.toLocaleString('de-DE')}`);
+        m.objective('Räum den <b>Tresor</b> aus, bevor die SWAT kommt!');
+        G.police.spotted();
+        yield;
+      }
+      for (const mk2 of mks) if (mk2) m.removeMarker(mk2);
+      m.timerLeft = null; G.hud.timer(null);
+      // Phase 5: Flucht
+      G.police.setLevel(4); G.police.spotted();
+      m.objective(`Beute: <b>$${loot.toLocaleString('de-DE')}</b> – raus hier! (grünes <b>X</b>)`);
       while (G.interior) { G.police.spotted(); yield; }
-      m.objective(`Hänge die <b>Polizei</b> ab, um die Beute ($${total}) zu sichern.`);
-      G.police.spotted();
+      I.alarm = false;
+      G.police.setLevel(Math.max(G.police.level, 4)); G.police.spotted();
+      m.objective(`Hänge die <b>Polizei</b> ab, um die Beute ($${loot.toLocaleString('de-DE')}) zu sichern.`);
       yield* m.until(() => G.police.level === 0);
-      P.addMoney(total);
-      G.hud.banner('BEUTE GESICHERT', '#7dffa0', `Banküberfall · +$${total}`);
+      G.hud.racePos('');
+      P.addMoney(loot);
+      G.hud.banner('BEUTE GESICHERT', '#7dffa0', `Banküberfall · +$${loot.toLocaleString('de-DE')}`);
       G.audio.jingle();
-      I.heistReady = G.time + 300;
+      I.heistReady = G.time + 420;
+      G.stats.heists = (G.stats.heists || 0) + 1;
       G.save.write();
     },
   };
