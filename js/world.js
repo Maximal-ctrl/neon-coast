@@ -27,109 +27,9 @@ const CONTAINER_COLS = [0xc0392b, 0x2471a3, 0x229954, 0xd68910, 0x7d3c98, 0x8391
 export const SIGN = { HOTEL: 0, MOTEL: 1, BAR: 2, CLUB: 3, DINER: 4, TACOS: 5, PIZZA: 6, H24: 7, SOLERA: 8, PARADISE: 9, DANCE: 10, VELVET: 11, NEONFM: 12, KLINIK: 13, SURF: 14, PIER: 15, GARAGE: 16, BANK: 17, POLIZEI: 18, WAFFEN: 19 };
 
 
-// ---------------------------------------------------------------- Gelände "Solera Hills"
-function vhash(ix, iz) { let h = Math.imul(ix | 0, 374761393) + Math.imul(iz | 0, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
-function vnoise(x, z) {
-  const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
-  const sx = fx * fx * (3 - 2 * fx), sz = fz * fz * (3 - 2 * fz);
-  const a = vhash(ix, iz), b = vhash(ix + 1, iz), c = vhash(ix, iz + 1), d = vhash(ix + 1, iz + 1);
-  return a + (b - a) * sx + (c - a) * sz + (a - b - c + d) * sx * sz;
-}
-function fbm(x, z) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < 5; i++) { s += a * vnoise(x * f, z * f); f *= 2.03; a *= 0.5; } return s / 0.97; }
-export const HILLS = { x0: -560, x1: 760, z0: -1160, z1: -436 };
-export const CAUSEWAY = { x0: 32, x1: 48, z0: -492, z1: -384, y1: 0.9 };
-function rawHill(x, z) {
-  const shore = -478 + 22 * Math.sin(x * 0.011) + 10 * Math.sin(x * 0.033 + 1.3);
-  const d = shore - z; // > 0: landeinwärts
-  let h = d < 0 ? -1.4 + d * 0.12 : -1.4 + Math.min(d, 25) * 0.09;
-  const m = fbm(x * 0.0045 + 3.1, z * 0.0045 + 7.7);
-  const r = 1 - Math.abs(vnoise(x * 0.006 + 11, z * 0.006 - 4) * 2 - 1);
-  h += (Math.max(0, m - 0.3) * 270 + r * r * 32 + (fbm(x * 0.03, z * 0.03) - 0.5) * 3) * smoothstep(20, 300, d);
-  return [h, d];
-}
-// Bergdorf "Monte Solera" auf einem Plateau + Serpentinenstraße vom Damm hinauf
-export const VILLAGE = { x: -160, z: -752, r: 92, y: 26 };
-function spline(ctrl) {
-  const pts = [];
-  for (let k = 0; k < ctrl.length - 1; k++) {
-    const p0 = ctrl[Math.max(0, k - 1)], p1 = ctrl[k], p2 = ctrl[k + 1], p3 = ctrl[Math.min(ctrl.length - 1, k + 2)];
-    const n = Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) / 4);
-    for (let i = 0; i < n; i++) {
-      const t = i / n, t2 = t * t, t3 = t2 * t;
-      const f = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
-      pts.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
-    }
-  }
-  pts.push(ctrl[ctrl.length - 1]);
-  return pts;
-}
-// Höhenprofil: geglättetes Gelände, Steigung begrenzt; fixed(i) -> feste Höhe oder null
-function profile(pts, startY, slope, fixedY) {
-  let hs = pts.map(([x, z]) => Math.max(0.9, rawHill(x, z)[0]));
-  for (let it = 0; it < 6; it++) hs = hs.map((_, i) => { let s = 0, c = 0; for (let j = -6; j <= 6; j++) { const v = hs[i + j]; if (v !== undefined) { s += v; c++; } } return s / c; });
-  const n = hs.length;
-  const fixed = pts.map((p, i) => (i === 0 ? startY : fixedY ? fixedY(p) : null));
-  for (let i = 0; i < n; i++) if (fixed[i] != null) hs[i] = fixed[i];
-  const seg = (i) => Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]);
-  for (let it = 0; it < 4; it++) {
-    for (let i = 1; i < n; i++) if (fixed[i] == null) hs[i] = Math.min(hs[i], hs[i - 1] + seg(i - 1) * slope);
-    for (let i = n - 2; i > 0; i--) if (fixed[i] == null) hs[i] = Math.max(hs[i], hs[i + 1] - seg(i) * slope);
-  }
-  return hs;
-}
-function bbox(pts) { const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]); return [Math.min(...xs) - 30, Math.min(...zs) - 30, Math.max(...xs) + 30, Math.max(...zs) + 30]; }
-
-export const HILL_ROAD = (() => {
-  const pts = spline([[40, -490], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]]);
-  const hs = profile(pts, 0.9, 0.11, ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null));
-  return { pts, hs, bb: bbox(pts) };
-})();
-// Serpentinen hinauf zum Anwesen auf dem Gipfel (Abzweig bei der ersten Kurve der Bergstraße)
-export const SUMMIT_JOIN = (() => { let b = 0, bd = 1e9; HILL_ROAD.pts.forEach(([x, z], i) => { const d = Math.hypot(x - 34, z + 585); if (d < bd) { bd = d; b = i; } }); return b; })();
-export const SUMMIT_ROAD = (() => {
-  const j = HILL_ROAD.pts[SUMMIT_JOIN];
-  const pts = spline([[j[0], j[1]], [80, -592], [150, -580], [230, -566], [310, -580], [380, -606], [432, -646], [414, -694], [452, -736], [492, -758], [498, -796], [478, -828], [498, -858], [530, -872]]);
-  const hs = profile(pts, HILL_ROAD.hs[SUMMIT_JOIN], 0.17, null);
-  return { pts, hs, bb: bbox(pts) };
-})();
-export const MANSION = (() => { const e = SUMMIT_ROAD.pts[SUMMIT_ROAD.pts.length - 1]; return { x: e[0], z: e[1] - 40, r: 58, y: SUMMIT_ROAD.hs[SUMMIT_ROAD.hs.length - 1] }; })();
-export const HILL_ROADS = [HILL_ROAD, SUMMIT_ROAD];
-// Abstand zur nächsten Bergstraße -> [abstand, straßenhöhe]
-export function hillRoadAt(x, z) {
-  let best = 1e9, by = 0, hit = false;
-  for (const R of HILL_ROADS) {
-    const b = R.bb;
-    if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
-    hit = true;
-    const P = R.pts;
-    for (let i = 0; i < P.length - 1; i++) {
-      const ax = P[i][0], az = P[i][1], dx = P[i + 1][0] - ax, dz = P[i + 1][1] - az;
-      const l2 = dx * dx + dz * dz;
-      let t = ((x - ax) * dx + (z - az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
-      const ex = ax + dx * t - x, ez = az + dz * t - z, d2 = ex * ex + ez * ez;
-      if (d2 < best) { best = d2; by = R.hs[i] + (R.hs[i + 1] - R.hs[i]) * t; }
-    }
-  }
-  return hit ? [Math.sqrt(best), by] : null;
-}
-export function hillHeight(x, z) {
-  if (x < HILLS.x0 || x > HILLS.x1 || z < HILLS.z0 || z > HILLS.z1) return -6;
-  let [h, d] = rawHill(x, z);
-  // Dorfplateau & Anwesen auf dem Gipfel
-  const V = VILLAGE, dv = Math.hypot(x - V.x, z - V.z);
-  if (dv < V.r + 60) h = lerp(h, V.y, 1 - smoothstep(V.r, V.r + 60, dv));
-  const M = MANSION, dm = Math.hypot(x - M.x, z - M.z);
-  if (dm < M.r + 70) h = lerp(h, M.y, 1 - smoothstep(M.r, M.r + 70, dm));
-  const ed = Math.min(x - HILLS.x0, HILLS.x1 - x, z - HILLS.z0);
-  const edge = smoothstep(0, 140, ed);
-  h = h * edge - 6 * (1 - edge);
-  // Straße einschneiden / aufschütten
-  const r = hillRoadAt(x, z);
-  if (r) h = lerp(h, r[1] - 0.12, 1 - smoothstep(8.5, 26, r[0]));
-  // unter dem Damm: Gelände unter Wasser halten, damit nichts durch die Fahrbahn ragt
-  if (z > CAUSEWAY.z0 && Math.abs(x - 40) < 16) h = Math.min(h, -1.2);
-  return Math.max(-6, h);
-}
+// Gelände, Landstraßen & Orte: siehe terrain.js
+import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES } from './terrain.js';
+export { HILLS, CAUSEWAY, VILLAGE, MANSION, HILL_ROAD, SUMMIT_ROAD, hillHeight };
 
 export class World {
   constructor(scene, quality) {
@@ -192,11 +92,10 @@ export class World {
   }
 
   groundHeight(x, z) {
-    const CW = CAUSEWAY;
-    if (x > CW.x0 && x < CW.x1 && z > CW.z0 && z < CW.z1) return lerp(0, CW.y1, (CW.z1 - z) / (CW.z1 - CW.z0));
+    if (z < -384 && z > -492) for (const CW of C.CAUSEWAYS) if (x > CW.x0 && x < CW.x1) return lerp(0, CW.y1, (CW.z1 - z) / (CW.z1 - CW.z0));
     if (z < HILLS.z1) {
       const r = hillRoadAt(x, z);
-      if (r && r[0] < 5) return r[1];
+      if (r && r[0] < 5.2) return r[1];
       return hillHeight(x, z);
     }
     for (let i = 0; i < this.rooms.length; i++) { const r = this.rooms[i]; if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return r.y; }
@@ -273,41 +172,58 @@ export class World {
     const i = clamp(Math.round((x + HALF) / CELL), I0, NB), j = clamp(Math.round((z + HALF) / CELL), 0, NB);
     return this.nodes[C.nodeId(i, j)];
   }
-  // ---------------------------------------------------------- Bergstraßen-Netz (Navigation, KI)
+  // ---------------------------------------------------------- Landstraßen-Netz (Navigation, KI)
   buildHillNet() {
-    const cw = [];
-    for (let z = -364; z > -490; z -= 8) cw.push([40, z]);
-    const L1 = { pts: [...cw, ...HILL_ROAD.pts] };
-    const L2 = { pts: SUMMIT_ROAD.pts, join: cw.length + SUMMIT_JOIN };
-    this.hillLines = [L1, L2];
-    this.hillGate = this.nodes[C.nodeId(5, 0)];
+    this.net = NET;
+    for (const g of GATES) g.city = this.nodes[C.nodeId(g.gate[0], g.gate[1])];
+    this.hillGate = GATES[0].city;
   }
   inHills(x, z) { return z < -372; }
-  hillLocate(x, z) {
-    let best = { line: 0, idx: 0, d: 1e18 };
-    this.hillLines.forEach((L, li) => { L.pts.forEach((p, i) => { const d = (p[0] - x) ** 2 + (p[1] - z) ** 2; if (d < best.d) best = { line: li, idx: i, d }; }); });
-    best.d = Math.sqrt(best.d);
-    return best;
-  }
-  // Punkte vom Stadtrand (Damm) bis zum Ort auf dem Bergnetz
-  hillRoot(loc) {
-    const [L1, L2] = this.hillLines;
-    if (loc.line === 0) return L1.pts.slice(0, loc.idx + 1);
-    return [...L1.pts.slice(0, L2.join + 1), ...L2.pts.slice(0, loc.idx + 1)];
-  }
+  netLocate(x, z) { return netLocate(x, z); }
   gridPath(ax, az, bx, bz) { const a = this.nearestNode(ax, az), b = this.nearestNode(bx, bz); return this.route(a.id, b.id).map((id) => [this.nodes[id].x, this.nodes[id].z]); }
-  // Navigationsroute (Stadt-Graph + Bergstraßen), endet am Ziel
+  // Punkte entlang einer Kante von Index i0 nach i1 (beide Richtungen)
+  edgeSlice(e, i0, i1) { const out = []; if (i0 <= i1) for (let i = i0; i <= i1; i++) out.push(e.pts[i]); else for (let i = i0; i >= i1; i--) out.push(e.pts[i]); return out; }
+  // Weg im Landstraßennetz. Start/Ziel: { node } oder { edge, idx }
+  netPath(A, B) {
+    const E = NET.edges;
+    if (A.edge != null && B.edge != null && A.edge === B.edge) return this.edgeSlice(E[A.edge], A.idx, B.idx);
+    const ends = (S, out) => {
+      if (S.node != null) return [{ n: S.node, cost: 0, pts: [] }];
+      const e = E[S.edge], f = S.idx / (e.pts.length - 1);
+      const toA = this.edgeSlice(e, S.idx, 0), toB = this.edgeSlice(e, S.idx, e.pts.length - 1);
+      return [{ n: e.a, cost: e.len * f, pts: out ? toA : toA.slice().reverse() }, { n: e.b, cost: e.len * (1 - f), pts: out ? toB : toB.slice().reverse() }];
+    };
+    let best = null;
+    for (const a of ends(A, true)) for (const b of ends(B, false)) {
+      const r = netRoute(a.n, b.n), len = a.cost + r.len + b.cost;
+      if (!best || len < best.len) best = { len, a, b, r };
+    }
+    if (!best || best.len > 1e17) return [];
+    const out = [...best.a.pts];
+    for (const [ei, dir] of best.r.steps) { const e = E[ei]; out.push(...(dir > 0 ? e.pts : e.pts.slice().reverse())); }
+    out.push(...best.b.pts);
+    out.len = best.len;
+    return out;
+  }
+  // Navigationsroute (Stadt-Graph + Landstraßen), endet am Ziel
   gpsPath(ax, az, bx, bz) {
-    const aH = this.inHills(ax, az), bH = this.inHills(bx, bz), G0 = this.hillGate;
+    const aH = this.inHills(ax, az), bH = this.inHills(bx, bz);
     let out;
     if (!aH && !bH) out = this.gridPath(ax, az, bx, bz);
-    else if (!aH && bH) out = [...this.gridPath(ax, az, G0.x, G0.z), ...this.hillRoot(this.hillLocate(bx, bz))];
-    else if (aH && !bH) out = [...this.hillRoot(this.hillLocate(ax, az)).reverse(), ...this.gridPath(G0.x, G0.z, bx, bz)];
+    else if (aH && bH) out = this.netPath(netLocate(ax, az), netLocate(bx, bz));
     else {
-      const ra = this.hillRoot(this.hillLocate(ax, az)), rb = this.hillRoot(this.hillLocate(bx, bz));
-      let k = 0; while (k < ra.length && k < rb.length && ra[k] === rb[k]) k++;
-      out = [...ra.slice(Math.max(0, k - 1)).reverse(), ...rb.slice(k)];
+      // über den günstigeren Damm
+      const cx = aH ? bx : ax, cz = aH ? bz : az, loc = netLocate(aH ? ax : bx, aH ? az : bz);
+      let best = null;
+      for (const g of GATES) {
+        const np = this.netPath({ node: g.id }, loc);
+        const len = (np.len || 0) + Math.abs(g.city.x - cx) + Math.abs(g.city.z - cz);
+        if (!best || len < best.len) best = { len, g, np };
+      }
+      const grid = this.gridPath(cx, cz, best.g.city.x, best.g.city.z);
+      out = aH ? [...best.np.slice().reverse(), ...grid.reverse()] : [...grid, ...best.np];
     }
+    out = out.slice();
     out.push([bx, bz]);
     return out;
   }
@@ -373,6 +289,8 @@ export class World {
     this.B.concrete = new GeoBuilder(true);
     this.B.wood = new GeoBuilder(false);
     this.B.poolw = new GeoBuilder(false);
+    this.B.asph = new GeoBuilder(false);
+    this.B.walk = new GeoBuilder(false);
     this.palmPos = []; this.treePos = []; this.containers = []; this.umbrellas = []; this.towels = [];
     for (let bj = 0; bj < NB; bj++) for (let bi = I0; bi < NB; bi++) this.genBlock(bi, bj);
     await tick(0.55, 'Strand & Pier werden angelegt …');
@@ -420,8 +338,10 @@ export class World {
       sand: new THREE.MeshStandardMaterial({ map: T.sand, vertexColors: true, roughness: 1 }),
       land: new THREE.MeshStandardMaterial({ map: T.concrete, color: 0x9a978f, roughness: 0.95 }),
     };
+    this.M.asph = new THREE.MeshStandardMaterial({ color: 0x3b3d42, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    this.M.walk = new THREE.MeshStandardMaterial({ color: 0xb4b0a8, roughness: 0.9 });
     // Matte Flächen spiegeln den Himmel kaum (sonst Blaustich)
-    for (const k of ['road', 'land', 'concrete', 'grass', 'sand', 'roof', 'tile', 'wood']) this.M[k].envMapIntensity = 0.35;
+    for (const k of ['road', 'land', 'concrete', 'grass', 'sand', 'roof', 'tile', 'wood', 'asph', 'walk']) this.M[k].envMapIntensity = 0.35;
     this.M.signs.color.setScalar(0.6);
     // Fotorealistische Detailschicht (echte PBR-Texturen)
     if (TEX.asphalt) {
@@ -435,6 +355,8 @@ export class World {
       applyDetail(M.sand, { a: 'sand', mode: 'xz', scale: 4, col: 0.8 });
       applyDetail(M.concrete, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.7 });
       applyDetail(M.land, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.6 });
+      applyDetail(M.asph, { a: 'asphalt', mode: 'xz', scale: 3.2, col: 0.95, nrm: 0.9 });
+      applyDetail(M.walk, { a: 'pavement', mode: 'xz', scale: 2.6, col: 0.8 });
     }
     this.M.accent.color.setScalar(0.3);
   }
@@ -1124,78 +1046,95 @@ export class World {
   }
 
   genHills() {
-    const W = 1320, D = 724, cx = (HILLS.x0 + HILLS.x1) / 2, cz = (HILLS.z0 + HILLS.z1) / 2;
-    const g = new THREE.PlaneGeometry(W, D, 220, 120);
-    g.rotateX(-Math.PI / 2); g.translate(cx, 0, cz);
-    const p = g.attributes.position;
-    for (let k = 0; k < p.count; k++) p.setY(k, hillHeight(p.getX(k), p.getZ(k)));
+    // Gelände-Mesh direkt aus dem Höhenfeld (gleiche Dreiecke wie die Höhenabfrage)
+    const HM = buildHeightmap();
+    const pos = new Float32Array(GW * GD * 3), cols = new Float32Array(GW * GD * 3);
+    for (let j = 0; j < GD; j++) for (let i = 0; i < GW; i++) { const k = (j * GW + i) * 3; pos[k] = HILLS.x0 + i * GRID; pos[k + 1] = HM[j * GW + i]; pos[k + 2] = HILLS.z0 + j * GRID; }
+    const idx = new Uint32Array((GW - 1) * (GD - 1) * 6);
+    let q = 0;
+    for (let j = 0; j < GD - 1; j++) for (let i = 0; i < GW - 1; i++) { const a = j * GW + i, b = a + 1, c = a + GW, d = c + 1; idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = d; idx[q++] = b; idx[q++] = c; }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeVertexNormals();
-    const n = g.attributes.normal, cols = new Float32Array(p.count * 3), c = new THREE.Color(), c2 = new THREE.Color();
-    for (let k = 0; k < p.count; k++) {
-      const x = p.getX(k), y = p.getY(k), z = p.getZ(k), ny = n.getY(k);
+    const n = g.attributes.normal, c = new THREE.Color(), c2 = new THREE.Color(), c3 = new THREE.Color();
+    for (let k = 0; k < GW * GD; k++) {
+      const x = pos[k * 3], y = pos[k * 3 + 1], z = pos[k * 3 + 2], ny = n.getY(k);
       const nz = vnoise(x * 0.05, z * 0.05), big = vnoise(x * 0.01 + 5, z * 0.01);
+      const dry = smoothstep(-520, -950, x) * smoothstep(-2300, -1900, z); // Tierra Seca im Westen
       if (y < -0.6) c.setHex(0x8a7a58);
       else if (y < 1.2) c.setHex(0xd8c08a);
       else {
         c.setHex(0x4f7f34).lerp(c2.setHex(0x8a9a4a), big * 0.7);
-        if (y > 40) c.lerp(c2.setHex(0x6b6a45), smoothstep(40, 80, y));
-        const rock = Math.max(smoothstep(0.86, 0.72, ny), smoothstep(75, 105, y));
-        c.lerp(c2.setHex(0x7d776d).lerp(new THREE.Color(0x5e5952), nz), rock);
-        if (y > 118) c.lerp(c2.setHex(0xd9d6cf), smoothstep(118, 140, y));
+        c.lerp(c2.setHex(0xb99a62).lerp(c3.setHex(0x9a7a4a), big), dry * 0.92);
+        if (y > 40) c.lerp(c2.setHex(0x6b6a45), smoothstep(40, 110, y) * (1 - dry));
+        const rock = Math.max(smoothstep(0.86, 0.7, ny), smoothstep(150, 230, y));
+        c.lerp(c2.setHex(dry > 0.5 ? 0x9a7f62 : 0x7d776d).lerp(c3.setHex(0x5e5952), nz), rock);
+        if (y > 270) c.lerp(c2.setHex(0xe9e9ec), smoothstep(270, 340, y) * smoothstep(0.55, 0.8, ny));
       }
       c.multiplyScalar(0.88 + nz * 0.24);
       cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    g.computeBoundingSphere();
     const terrMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.4 });
     if (TEX.grass) applyDetail(terrMat, { a: 'grass', b: 'rock', mode: 'terrain', scale: 3, scaleB: 7, col: 0.85, nrm: 0.9 });
     const mesh = new THREE.Mesh(g, terrMat);
     mesh.receiveShadow = true;
     this.scene.add(mesh);
-    // Wälder & Palmen
+    // Wälder: dichter im Grünen, Pinien im Gebirge, kaum Bäume im trockenen Westen
     const rnd = mulberry32(4242);
-    for (let k = 0; k < 2600 && this.treePos.length < 900; k++) {
-      const x = HILLS.x0 + 60 + rnd() * (W - 120), z = HILLS.z0 + 60 + rnd() * (D - 80);
+    const cap = this.treePos.length + (this.q === 'low' ? 1500 : this.q === 'medium' ? 3400 : 4800);
+    const W = HILLS.x1 - HILLS.x0, D = HILLS.z1 - HILLS.z0;
+    for (let k = 0; k < 60000 && this.treePos.length < cap; k++) {
+      const x = HILLS.x0 + 40 + rnd() * (W - 80), z = HILLS.z0 + 40 + rnd() * (D - 60);
       const y = hillHeight(x, z);
-      if (y < 1.4 || y > 85) continue;
-      const e = 2, sl = Math.abs(hillHeight(x + e, z) - y) + Math.abs(hillHeight(x, z + e) - y);
-      if (sl > 1.6) continue;
-      if (Math.abs(x - 40) < 12 && z > -620) continue;
-      const rr = hillRoadAt(x, z); if (rr && rr[0] < 9) continue;
+      if (y < 1.4 || y > 250) continue;
+      const e = 3, sl = Math.abs(hillHeight(x + e, z) - y) + Math.abs(hillHeight(x, z + e) - y);
+      if (sl > 2.6) continue;
+      const rr = hillRoadAt(x, z); if (rr && rr[0] < 10) continue;
       if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 8) continue;
       if (Math.hypot(x - MANSION.x, z - MANSION.z) < MANSION.r + 12) continue;
-      if (vnoise(x * 0.012, z * 0.012) < 0.42 && y > 6) continue;
-      if (y < 5) this.addPalm(x, z, rnd); else this.addTree(x, z, rnd);
+      if (Math.hypot(x - LOOKOUT.x, z - LOOKOUT.z) < LOOKOUT.r + 6) continue;
+      if (C.townAt(x, z, 34)) continue;
+      if (x > AIRFIELD.x0 - 20 && x < AIRFIELD.x1 + 20 && z > AIRFIELD.z0 - 20 && z < AIRFIELD.z1 + 20) continue;
+      const dry = smoothstep(-520, -950, x) * smoothstep(-2300, -1900, z);
+      if (rnd() < dry * 0.93) continue;
+      if (vnoise(x * 0.012, z * 0.012) < 0.42 && y > 6 && rnd() < 0.9) continue;
+      if (y < 5 && rnd() < 0.7) this.addPalm(x, z, rnd); else this.addTree(x, z, rnd);
     }
     this.villageRoads = [];
-    this.genHillRoad(HILL_ROAD);
-    this.genHillRoad(SUMMIT_ROAD);
+    for (const R of HILL_ROADS) this.genHillRoad(R, R === HILL_ROAD || R === SUMMIT_ROAD);
     this.hillRoad = HILL_ROAD;
     this.genVillage();
     this.genMansion();
-    // Damm mit Straße
-    const CW = CAUSEWAY, P = this.B.props, cc = rgb(0xb9b5ad), asph = rgb(0x34363b), wh = rgb(0xe9e9e4);
-    P.quad([CW.x0, -0.02, CW.z1], [CW.x1, -0.02, CW.z1], [CW.x1, CW.y1 - 0.02, CW.z0], [CW.x0, CW.y1 - 0.02, CW.z0], [0, 0, 1, 1], asph);
-    P.box(CW.x0 - 0.6, -3, CW.z0, CW.x0, 0.2, CW.z1, { col: cc });
-    P.box(CW.x1, -3, CW.z0, CW.x1 + 0.6, 0.2, CW.z1, { col: cc });
-    for (let z = CW.z1 - 2; z > CW.z0; z -= 6) {
-      const t = (CW.z1 - z) / (CW.z1 - CW.z0), y = lerp(0, CW.y1, t) + 0.01;
-      P.quad([39.9, y, z], [40.1, y, z], [40.1, y, z - 3], [39.9, y, z - 3], [0, 0, 1, 1], rgb(0xe7b923));
-    }
-    for (const sx of [CW.x0, CW.x1]) {
-      const x0 = sx === CW.x0 ? sx - 0.6 : sx, x1 = x0 + 0.6;
-      for (let z = CW.z1; z > CW.z0; z -= 6) {
-        const t = (CW.z1 - z) / (CW.z1 - CW.z0), y = lerp(0, CW.y1, t);
-        P.box(x0, y, z - 6, x1, y + 0.9, z, { col: cc });
+    this.genLookout();
+    this.genTowns();
+    // Dämme mit Straße
+    for (const CW of C.CAUSEWAYS) {
+      const P = this.B.props, cc = rgb(0xb9b5ad), asph = rgb(0x34363b), wh = rgb(0xe9e9e4), mx = (CW.x0 + CW.x1) / 2;
+      P.quad([CW.x0, -0.02, CW.z1], [CW.x1, -0.02, CW.z1], [CW.x1, CW.y1 - 0.02, CW.z0], [CW.x0, CW.y1 - 0.02, CW.z0], [0, 0, 1, 1], asph);
+      P.box(CW.x0 - 0.6, -3, CW.z0, CW.x0, 0.2, CW.z1, { col: cc });
+      P.box(CW.x1, -3, CW.z0, CW.x1 + 0.6, 0.2, CW.z1, { col: cc });
+      for (let z = CW.z1 - 2; z > CW.z0; z -= 6) {
+        const t = (CW.z1 - z) / (CW.z1 - CW.z0), y = lerp(0, CW.y1, t) + 0.01;
+        P.quad([mx - 0.1, y, z], [mx + 0.1, y, z], [mx + 0.1, y, z - 3], [mx - 0.1, y, z - 3], [0, 0, 1, 1], rgb(0xe7b923));
       }
-      this.addBox(x0, CW.z0, x1, CW.z1, -1, 2, 'rail');
-      P.quad([sx === CW.x0 ? CW.x0 + 0.2 : CW.x1 - 0.35, 0.02, CW.z1], [sx === CW.x0 ? CW.x0 + 0.35 : CW.x1 - 0.2, 0.02, CW.z1], [sx === CW.x0 ? CW.x0 + 0.35 : CW.x1 - 0.2, CW.y1, CW.z0], [sx === CW.x0 ? CW.x0 + 0.2 : CW.x1 - 0.35, CW.y1, CW.z0], [0, 0, 1, 1], wh);
+      for (const sx of [CW.x0, CW.x1]) {
+        const x0 = sx === CW.x0 ? sx - 0.6 : sx, x1 = x0 + 0.6;
+        for (let z = CW.z1; z > CW.z0; z -= 6) {
+          const t = (CW.z1 - z) / (CW.z1 - CW.z0), y = lerp(0, CW.y1, t);
+          P.box(x0, y, z - 6, x1, y + 0.9, z, { col: cc });
+        }
+        this.addBox(x0, CW.z0, x1, CW.z1, -1, 2, 'rail');
+        P.quad([sx === CW.x0 ? CW.x0 + 0.2 : CW.x1 - 0.35, 0.02, CW.z1], [sx === CW.x0 ? CW.x0 + 0.35 : CW.x1 - 0.2, 0.02, CW.z1], [sx === CW.x0 ? CW.x0 + 0.35 : CW.x1 - 0.2, CW.y1, CW.z0], [sx === CW.x0 ? CW.x0 + 0.2 : CW.x1 - 0.35, CW.y1, CW.z0], [0, 0, 1, 1], wh);
+      }
+      for (let z = CW.z1 - 10; z > CW.z0; z -= 24) { this.pierLamps.push([CW.x0 + 0.4, z, Math.PI / 2]); this.pierLamps.push([CW.x1 - 0.4, z - 12, -Math.PI / 2]); }
     }
-    for (let z = CW.z1 - 10; z > CW.z0; z -= 24) { this.pierLamps.push([CW.x0 + 0.4, z, Math.PI / 2]); this.pierLamps.push([CW.x1 - 0.4, z - 12, -Math.PI / 2]); }
     this.pois.hills = { x: 40, z: -720, name: 'Solera Hills' };
   }
 
-  genHillRoad(R) {
+  genHillRoad(R, lamps = false) {
     const P = this.B.props, pts = R.pts, n = pts.length;
     const asph = rgb(0x323439), shoulder = rgb(0x8c8573), wh = rgb(0xe9e9e4), ye = rgb(0xe7b923);
     const nrm = (i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; };
@@ -1203,21 +1142,23 @@ export class World {
       for (let i = 0; i < n - 1; i++) {
         if (every && i % every >= every / 2) continue;
         const [ax, az] = pts[i], [bx, bz] = pts[i + 1], na = nrm(i), nb = nrm(i + 1), ya = R.hs[i] + dy, yb = R.hs[i + 1] + dy;
-        P.quad([ax + na[0] * o0, ya, az + na[1] * o0], [ax + na[0] * o1, ya, az + na[1] * o1], [bx + nb[0] * o1, yb, bz + nb[1] * o1], [bx + nb[0] * o0, yb, bz + nb[1] * o0], [0, 0, 1, 1], col);
+        (col ? P : this.B.asph).quad([ax + na[0] * o0, ya, az + na[1] * o0], [ax + na[0] * o1, ya, az + na[1] * o1], [bx + nb[0] * o1, yb, bz + nb[1] * o1], [bx + nb[0] * o0, yb, bz + nb[1] * o0], [0, 0, 1, 1], col);
       }
     };
     strip(-7, 7, -0.08, shoulder);
-    strip(-4.8, 4.8, 0.0, asph);
+    strip(-4.8, 4.8, 0.0, null);
     strip(-4.4, -4.2, 0.02, wh); strip(4.2, 4.4, 0.02, wh);
     strip(-0.1, 0.1, 0.02, ye, 2);
     // Leitplanke auf der Talseite + Laternen
-    for (let i = 4; i < n - 3; i += 9) {
+    for (let i = 4; lamps && i < n - 3; i += 9) {
       const [x, z] = pts[i], [nx, nz] = nrm(i), side = i % 18 < 9 ? 1 : -1;
       this.pierLamps.push([x + nx * 6.4 * side, z + nz * 6.4 * side, Math.atan2(-nx * side, -nz * side) - Math.PI / 2]);
     }
     for (let i = 0; i < n - 1; i++) {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1], [nx, nz] = nrm(i);
-      const side = hillHeight(ax + nx * 14, az + nz * 14) < hillHeight(ax - nx * 14, az - nz * 14) ? 1 : -1;
+      const hL = hillHeight(ax + nx * 16, az + nz * 16), hR = hillHeight(ax - nx * 16, az - nz * 16);
+      const side = hL < hR ? 1 : -1;
+      if (R.hs[i] - Math.min(hL, hR) < 2.2 || C.townAt(ax, az, 12)) continue; // Leitplanke nur am Abhang
       const o = 6.2 * side, ya = R.hs[i] - 0.1, yb = R.hs[i + 1] - 0.1;
       const p0 = [ax + nx * o, az + nz * o], p1 = [bx + nx * o, bz + nz * o];
       P.quad([p0[0], ya + 0.45, p0[1]], [p1[0], yb + 0.45, p1[1]], [p1[0], yb + 0.8, p1[1]], [p0[0], ya + 0.8, p0[1]], [0, 0, 1, 1], rgb(0xc9ccd0));
@@ -1225,6 +1166,160 @@ export class World {
       if (i % 2 === 0) P.box(p0[0] - 0.08, ya, p0[1] - 0.08, p0[0] + 0.08, ya + 0.8, p0[1] + 0.08, { col: rgb(0x77797d) });
     }
     this.villageRoads.push(R.pts);
+  }
+
+  // ---------------------------------------------------------- Orte im Umland
+  // Ladenzeile an der Südkante eines Blocks; doors: [{ id, kind, name, col, label, awning }]
+  shopRow(x0, z0, x1, z1, rnd, doors, y, tints = PASTEL) {
+    const n = Math.max(2, Math.round((x1 - x0) / 13)), w = (x1 - x0) / n, d = Math.min(13, z1 - z0);
+    for (let k = 0; k < n; k++) {
+      const hx0 = x0 + k * w + 0.3, hx1 = x0 + (k + 1) * w - 0.3, h = 7.4 + Math.floor(rnd() * 2) * 3.2;
+      this.B.store.box(hx0 - 0.06, 0, z1 - d - 0.06, hx1 + 0.06, 4, z1 + 0.06, { uw: 24, vh: 4.5, uo: Math.floor(rnd() * 4) / 4, top: false });
+      this.facadeBox('apt', hx0, z1 - d, hx1, z1, 4, h, { rnd, tint: tints[Math.floor(rnd() * tints.length)], roof: false });
+      if (rnd() < 0.6) this.B.tile.gable(hx0, z1 - d, hx1, z1, h, 2.4, true, rgb(0xffffff), 0.4); else this.roofTop(hx0, z1 - d, hx1, z1, h, true);
+      this.collider(hx0, z1 - d, hx1, z1, h + 2);
+      const dr = doors[k];
+      if (dr) this.townDoors.push({ ...dr, x: (hx0 + hx1) / 2, z: z1 + 1.6, nx: 0, nz: 1, y0: y });
+    }
+  }
+  // Tankstelle mit Shop (Tür nach Süden)
+  gasStation(x0, z0, x1, z1, rnd, door, y) {
+    const P = this.B.props, cx = (x0 + x1) / 2;
+    this.B.concrete.box(x0, 0.02, z0, x1, 0.12, z1, { col: rgb(0x9a9a98), topScale: 2.6, uw: 2.6, vh: 2.6 });
+    // Shop hinten
+    this.facadeBox('office', cx - 11, z0 + 2, cx + 11, z0 + 13, 0, 4.6, { rnd, tint: 0xeef2f5 });
+    this.B.store.box(cx - 11.06, 0, z0 + 12.9, cx + 11.06, 4, z0 + 13.06, { uw: 24, vh: 4.5, uo: 0.25, top: false });
+    this.collider(cx - 11, z0 + 2, cx + 11, z0 + 13, 5);
+    // Dach über den Zapfsäulen
+    const zc = z0 + 30;
+    P.box(cx - 13, 5.2, zc - 6, cx + 13, 5.9, zc + 6, { col: rgb(0xf2f2f2) });
+    this.B.accent.box(cx - 13.05, 5.2, zc - 6.05, cx + 13.05, 5.45, zc + 6.05, { col: rgb(0xff5a1f, 1.3) });
+    for (const sx of [-9, 9]) for (const sz of [-3.5, 3.5]) { P.box(cx + sx - 0.25, 0, zc + sz - 0.25, cx + sx + 0.25, 5.2, zc + sz + 0.25, { col: rgb(0xd9d9d9) }); this.addCircle(cx + sx, zc + sz, 0.4, 5, 'pillar'); }
+    for (const sx of [-6, 0, 6]) { P.box(cx + sx - 0.45, 0.12, zc - 0.9, cx + sx + 0.45, 1.7, zc + 0.9, { col: rgb(0xd62828) }); P.box(cx + sx - 0.47, 1.1, zc - 0.5, cx + sx + 0.47, 1.5, zc + 0.5, { col: rgb(0x111111) }); this.addBox(cx + sx - 0.5, zc - 1, cx + sx + 0.5, zc + 1, -1, 1.7, 'bld'); }
+    // Preistafel
+    P.box(x1 - 3, 0, z1 - 3, x1 - 2.7, 6, z1 - 2.7, { col: rgb(0x555555) });
+    this.B.accent.box(x1 - 4.2, 3.6, z1 - 3.05, x1 - 1.5, 6.2, z1 - 2.65, { col: rgb(0xff5a1f, 1.1) });
+    this.townDoors.push({ ...door, x: cx, z: z0 + 14.6, nx: 0, nz: 1, y0: y });
+    this.parkingSpots.push([cx - 6, zc + 3.2, Math.PI / 2], [cx + 6, zc - 3.2, -Math.PI / 2]);
+  }
+  genTowns() {
+    this.townDoors = []; this.townLoops = {};
+    const CS = C.TOWN_CS, HW = 4.5;
+    for (const t of C.TOWNS) {
+      const r = C.townRect(t), rnd = mulberry32(900 + t.cx), loops = [];
+      const tints = t.style === 'desert' ? [0xe8c9a0, 0xd9b48a, 0xf0dcc0, 0xc9a27a, 0xeadfce] : t.style === 'coast' ? PASTEL : WEST;
+      this.raised(t.y, () => {
+        const P = this.B.props;
+        // Fahrbahn als eine Fläche, Blöcke mit Gehweg darauf
+        this.B.asph.box(r.x0 - HW - 2, 0.02, r.z0 - HW - 2, r.x1 + HW + 2, 0.06, r.z1 + HW + 2, { sides: false, topScale: 1 });
+        for (let i = 0; i <= t.nx; i++) for (let j = 0; j < t.nz; j++) for (let k = 0; k < 5; k++) { const x = r.x0 + i * CS, z = r.z0 + j * CS + 12 + k * 10; P.quad([x - 0.08, 0.075, z + 4], [x + 0.08, 0.075, z + 4], [x + 0.08, 0.075, z], [x - 0.08, 0.075, z], [0, 0, 1, 1], rgb(0xe9e9e4)); }
+        for (let j = 0; j <= t.nz; j++) for (let i = 0; i < t.nx; i++) for (let k = 0; k < 5; k++) { const z = r.z0 + j * CS, x = r.x0 + i * CS + 12 + k * 10; P.quad([x, 0.075, z + 0.08], [x + 4, 0.075, z + 0.08], [x + 4, 0.075, z - 0.08], [x, 0.075, z - 0.08], [0, 0, 1, 1], rgb(0xe9e9e4)); }
+        // Laternen an den Kreuzungen
+        for (let i = 0; i <= t.nx; i++) for (let j = 0; j <= t.nz; j++) this.pierLamps.push([r.x0 + i * CS + HW + 0.8, r.z0 + j * CS + HW + 0.8, Math.PI * 1.25]);
+        const special = {
+          valverde: { '1,1': 'plaza', '2,1': 'hall', '0,2': 'gas', '3,0': 'park', '1,2': 'shops', '2,2': 'shops2', '2,0': 'apt', '1,0': 'apt' },
+          bahia: { '0,1': 'hotel', '1,1': 'shops', '2,1': 'hotel', '3,1': 'shops2', '0,0': 'gas', '2,0': 'park' },
+          ranchos: { '1,1': 'shops', '0,0': 'gas', '2,0': 'hangar', '2,1': 'shops2', '0,1': 'trailer' },
+        }[t.key];
+        const doorSets = {
+          valverde: { shops: [{ id: 'v_diner', kind: 'diner', name: 'DINER VALVERDE', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'v_gun', kind: 'gunshop', name: 'WAFFEN', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, { id: 'v_bar', kind: 'bar', name: 'CANTINA VERDE', col: '#7cff6b', label: '🍺', awning: 0x1f5a3a }, null], shops2: [{ id: 'v_moda', kind: 'boutique', name: 'MODA VALVERDE', col: '#ff6fb0', label: 'M', awning: 0x2b2d42 }, null, { id: 'v_house', kind: 'house', name: 'WOHNUNG', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null], gas: { id: 'v_shop', kind: 'shop', name: '24/7 VALVERDE', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+          bahia: { shops: [{ id: 'b_bar', kind: 'bar', name: 'BAR AZUL', col: '#19e6ff', label: '🍺', awning: 0x1d4e89 }, { id: 'b_moda', kind: 'boutique', name: 'SURF & STYLE', col: '#ff6fb0', label: 'M', awning: 0xff8fab }, null, { id: 'b_diner', kind: 'diner', name: 'FISH & GRILL', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }], shops2: [{ id: 'b_house', kind: 'house', name: 'STRANDWOHNUNG', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null, null, null], gas: { id: 'b_shop', kind: 'shop', name: '24/7 BAHÍA', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+          ranchos: { shops: [{ id: 'r_diner', kind: 'diner', name: 'ROUTE 7 DINER', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'r_bar', kind: 'bar', name: 'SALOON SECA', col: '#ffb35c', label: '🍺', awning: 0x6b3a1f }, null, null], shops2: [{ id: 'r_gun', kind: 'gunshop', name: 'AMMO RANCH', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, { id: 'r_house', kind: 'house', name: 'RANCHHAUS', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null, null], gas: { id: 'r_shop', kind: 'shop', name: '24/7 LOS RANCHOS', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+        }[t.key];
+        for (let i = 0; i < t.nx; i++) for (let j = 0; j < t.nz; j++) {
+          const bx0 = r.x0 + i * CS + HW, bz0 = r.z0 + j * CS + HW, bx1 = bx0 + CS - 2 * HW, bz1 = bz0 + CS - 2 * HW;
+          this.B.walk.box(bx0, 0.02, bz0, bx1, 0.2, bz1, { topScale: 1, uw: 2.6, vh: 2.6 });
+          loops.push([[bx0 + 1.1, bz0 + 1.1], [bx1 - 1.1, bz0 + 1.1], [bx1 - 1.1, bz1 - 1.1], [bx0 + 1.1, bz1 - 1.1]]);
+          const X0 = bx0 + 2.4, Z0 = bz0 + 2.4, X1 = bx1 - 2.4, Z1 = bz1 - 2.4;
+          const kind = special[i + ',' + j] || 'houses';
+          this.raised(0.2, () => {
+            if (kind === 'plaza') {
+              const cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2;
+              P.addGeometry(new THREE.CylinderGeometry(4.2, 4.5, 0.8, 28), new THREE.Matrix4().makeTranslation(cx, 0.4, cz), rgb(0xe2d8c4));
+              this.B.poolw.addGeometry(new THREE.CircleGeometry(3.8, 28).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(cx, 0.72, cz));
+              P.addGeometry(new THREE.CylinderGeometry(0.4, 0.7, 3, 12), new THREE.Matrix4().makeTranslation(cx, 1.5, cz), rgb(0xe2d8c4));
+              this.addCircle(cx, cz, 4.5, 1, 'fountain');
+              for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; this.addTree(cx + Math.cos(a) * 20, cz + Math.sin(a) * 20, rnd); }
+              for (let k = 0; k < 4; k++) this.bench(X0 + 8 + k * 12, Z1 - 2, Math.PI);
+            } else if (kind === 'hall') {
+              const cx = (X0 + X1) / 2;
+              this.facadeBox('deco', cx - 16, Z0 + 6, cx + 16, Z0 + 26, 0, 12, { rnd, tint: 0xf3ead6 });
+              this.facadeBox('deco', cx - 4, Z0 + 12, cx + 4, Z0 + 20, 12, 22, { rnd, tint: 0xf3ead6, roof: false });
+              P.addGeometry(new THREE.ConeGeometry(6, 5, 4).rotateY(Math.PI / 4), new THREE.Matrix4().makeTranslation(cx, 24.5, Z0 + 16), rgb(0x8a4a32));
+              for (let k = 0; k < 6; k++) P.addGeometry(new THREE.CylinderGeometry(0.45, 0.5, 8, 12), new THREE.Matrix4().makeTranslation(cx - 12.5 + k * 5, 4, Z0 + 27.5), rgb(0xf6f1e8));
+              P.box(cx - 15, 8, Z0 + 26, cx + 15, 9, Z0 + 29, { col: rgb(0xe9e2d4) });
+              this.collider(cx - 16, Z0 + 6, cx + 16, Z0 + 26, 14);
+              this.textSign(t.name.toUpperCase() + ' RATHAUS', cx, t.y + 10.4, Z0 + 29.1, 0, '#e9d8a6', 9);
+              for (let k = 0; k < 4; k++) this.addPalm(X0 + 3 + k * ((X1 - X0 - 6) / 3), Z1 - 3, rnd);
+            } else if (kind === 'gas') this.gasStation(X0, Z0, X1, Z1, rnd, doorSets.gas, t.y + 0.2);
+            else if (kind === 'park') this.genPark(X0, Z0, X1, Z1, rnd);
+            else if (kind === 'shops' || kind === 'shops2') {
+              this.shopRow(X0, Z0, X1, Z1, rnd, doorSets[kind], t.y + 0.2, tints);
+              this.grid2(X0, Z0, X1, Z1 - 16, 2, 1, 3, (a, b, c2, e) => { if (e - b > 13) this.house(a, b, c2, e, rnd); });
+            } else if (kind === 'apt') {
+              this.grid2(X0, Z0, X1, Z1, 2, 2, 4, (a, b, c2, e) => this.tower(a, b, c2, e, 12 + rnd() * 12, 'apt', rnd, { tint: tints[Math.floor(rnd() * tints.length)], store: rnd() < 0.5 }));
+            } else if (kind === 'hotel') {
+              const h = 18 + rnd() * 14;
+              this.tower(X0 + 4, Z0, X1 - 4, Z0 + 22, h, 'deco', rnd, { tint: PASTEL[Math.floor(rnd() * PASTEL.length)], crown: true, crownColor: ACCENT[Math.floor(rnd() * 3)] });
+              this.B.concrete.box(X0 + 6, 0, Z0 + 28, X1 - 6, 0.15, Z1 - 4, { col: rgb(0xeee8dc), topScale: 2, uw: 2, vh: 2 });
+              this.B.poolw.box(X0 + 10, 0.15, Z0 + 32, X1 - 10, 0.17, Z1 - 8, { sides: false });
+              for (let k = 0; k < 5; k++) this.addPalm(X0 + 4 + rnd() * (X1 - X0 - 8), Z0 + 25 + rnd() * 3, rnd);
+            } else if (kind === 'hangar') {
+              this.warehouse(X0, Z0, X1, Z0 + 22, rnd);
+              this.warehouse(X0, Z0 + 28, X0 + 26, Z1, rnd);
+            } else if (kind === 'trailer') {
+              for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) { const tx = X0 + 4 + a * 17, tz = Z0 + 6 + b * 26; P.box(tx, 0.5, tz, tx + 11, 3.2, tz + 3.4, { col: rgb([0xe9e4da, 0xbfd8e0, 0xe6d3a8][(a + b) % 3]) }); P.box(tx - 0.1, 3.2, tz - 0.1, tx + 11.1, 3.35, tz + 3.5, { col: rgb(0x9aa1ab) }); this.collider(tx, tz, tx + 11, tz + 3.4, 3.4); }
+            } else this.grid2(X0, Z0, X1, Z1, 2, 2, 3, (a, b, c2, e) => this.house(a, b, c2, e, rnd));
+          });
+          // Parkplätze am Straßenrand
+          if ((i + j) % 2 === 0) this.parkingSpots.push([bx0 + 14, bz1 + 2.4, Math.PI / 2], [bx0 + 34, bz1 + 2.4, Math.PI / 2]);
+        }
+        // Ortsschild
+        this.textSign(t.name.toUpperCase(), r.x0 - 9, t.y + 3.2, r.z1 - CS / 2, -Math.PI / 2, '#ffffff', 7, 'rgba(20,90,50,0.95)');
+        this.textSign(t.name.toUpperCase(), r.x1 + 9, t.y + 3.2, r.z0 + CS / 2, Math.PI / 2, '#ffffff', 7, 'rgba(20,90,50,0.95)');
+      });
+      for (let i = 0; i <= t.nx; i++) this.villageRoads.push([[r.x0 + i * CS, r.z0], [r.x0 + i * CS, r.z1]]);
+      for (let j = 0; j <= t.nz; j++) this.villageRoads.push([[r.x0, r.z0 + j * CS], [r.x1, r.z0 + j * CS]]);
+      this.townLoops[t.key] = loops;
+      this.pois[t.key] = { x: t.cx, z: t.cz, name: t.name };
+    }
+    this.townLoops.village = this.villageLoops;
+    this.genAirfield();
+  }
+  genAirfield() {
+    const A = AIRFIELD, P = this.B.props;
+    this.raised(A.y, () => {
+      this.B.asph.box(A.x0, 0.02, A.z0 + 8, A.x1, 0.08, A.z1 - 8, { sides: false, topScale: 1 });
+      for (let x = A.x0 + 20; x < A.x1 - 20; x += 30) P.quad([x, 0.1, (A.z0 + A.z1) / 2 + 0.4], [x + 14, 0.1, (A.z0 + A.z1) / 2 + 0.4], [x + 14, 0.1, (A.z0 + A.z1) / 2 - 0.4], [x, 0.1, (A.z0 + A.z1) / 2 - 0.4], [0, 0, 1, 1], rgb(0xf2f2f2));
+      for (const x of [A.x0 + 6, A.x1 - 12]) for (let k = 0; k < 6; k++) P.quad([x, 0.1, A.z0 + 12 + k * 5.5 + 3], [x + 6, 0.1, A.z0 + 12 + k * 5.5 + 3], [x + 6, 0.1, A.z0 + 12 + k * 5.5], [x, 0.1, A.z0 + 12 + k * 5.5], [0, 0, 1, 1], rgb(0xf2f2f2));
+      // Tower & Hangar
+      const hx = A.x1 - 70;
+      P.box(hx, 0, A.z0 - 2, hx + 6, 14, A.z0 + 4, { col: rgb(0xe4e0d6) });
+      P.box(hx - 1.5, 14, A.z0 - 3.5, hx + 7.5, 17.5, A.z0 + 5.5, { col: rgb(0x2a3a4a) });
+      this.B.accent.box(hx + 2.6, 17.5, A.z0 + 0.6, hx + 3.4, 19, A.z0 + 1.4, { col: [3, 0.2, 0.2] });
+      this.addBox(hx, A.z0 - 2, hx + 6, A.z0 + 4, -1, 18, 'bld');
+      // Windsack-Mast & Lichter
+      for (let x = A.x0 + 10; x < A.x1; x += 40) for (const z of [A.z0 + 8.5, A.z1 - 8.5]) this.B.accent.box(x - 0.2, 0.08, z - 0.2, x + 0.2, 0.3, z + 0.2, { col: rgb(0x19e6ff, 1.6) });
+    });
+    this.pois.airfield = { x: (A.x0 + A.x1) / 2, z: (A.z0 + A.z1) / 2, name: 'Flugplatz Los Ranchos' };
+  }
+  genLookout() {
+    const L = LOOKOUT, P = this.B.props;
+    this.raised(L.y, () => {
+      this.B.concrete.box(L.x - 22, 0.02, L.z - 22, L.x + 22, 0.18, L.z + 22, { col: rgb(0xc9c3b6), topScale: 2.6, uw: 2.6, vh: 2.6 });
+      for (let k = 0; k < 44; k++) { const a = (k / 44) * Math.PI * 2; if (a > 1.2 && a < 1.95) continue; const x = L.x + Math.cos(a) * 21.5, z = L.z + Math.sin(a) * 21.5; P.box(x - 0.08, 0.18, z - 0.08, x + 0.08, 1.2, z + 0.08, { col: rgb(0x55585e) }); }
+      P.addGeometry(new THREE.TorusGeometry(21.5, 0.06, 6, 60, Math.PI * 2 - 0.75).rotateX(Math.PI / 2).rotateY(-1.95), new THREE.Matrix4().makeTranslation(L.x, 1.2, L.z), rgb(0x55585e));
+      for (const a of [3.6, 4.4, 5.2]) { const x = L.x + Math.cos(a) * 19, z = L.z + Math.sin(a) * 19; P.box(x - 0.07, 0.18, z - 0.07, x + 0.07, 1.3, z + 0.07, { col: rgb(0x333333) }); P.addGeometry(new THREE.CylinderGeometry(0.12, 0.16, 0.7, 10).rotateZ(Math.PI / 2.4), new THREE.Matrix4().makeTranslation(x, 1.45, z), rgb(0x2a6f97)); }
+      for (let k = 0; k < 3; k++) this.bench(L.x - 8 + k * 8, L.z - 14, 0);
+      // Funkmast
+      P.box(L.x + 14, 0, L.z - 16, L.x + 14.6, 46, L.z - 15.4, { col: rgb(0xd9d9d9) });
+      for (let y = 6; y < 46; y += 8) P.box(L.x + 13.2, y, L.z - 16.8, L.x + 15.4, y + 0.2, L.z - 14.6, { col: rgb(0xc0392b) });
+      this.B.accent.box(L.x + 13.9, 46, L.z - 16.1, L.x + 14.7, 47, L.z - 15.3, { col: [3, 0.15, 0.15] });
+      this.addBox(L.x + 14, L.z - 16, L.x + 14.6, L.z - 15.4, -1, 46, 'bld');
+      for (let k = 0; k < 4; k++) this.parkingSpots.push([L.x - 10 + k * 5, L.z + 14, 0]);
+    });
+    this.textSign('MIRADOR DEL CIELO', L.x, L.y + 3.4, L.z - 21.6, 0, '#ffffff', 8, 'rgba(20,60,110,0.95)');
+    this.pois.lookout = { x: L.x, z: L.z, name: 'Mirador del Cielo' };
   }
 
   // Alles in fn wird auf Höhe dy angehoben (Geometrie & Kollision)
@@ -1430,6 +1525,7 @@ export class World {
     add('villa', 'villa', 'VILLA AURELIO', V.x - 22.95, V.z + 39, 0, 1, '#e9d8a6', 0x3a5a40, V.y, 'A');
     // Hafen
     add('harbor', 'office', 'HAFENBÜRO', -30, 371.4, 0, -1, '#19e6ff', 0x1d3557, 0, 'K');
+    for (const d of this.townDoors || []) add(d.id, d.kind, d.name, d.x, d.z, d.nx, d.nz, d.col, d.awning, d.y0, d.label);
   }
 
   genHarborOffice() {
@@ -1441,8 +1537,7 @@ export class World {
   genQuay() {
     const L = C.LAND, Pr = this.B.props, c = rgb(0xb9b5ad);
     const wall = (x0, z0, x1, z1) => { Pr.box(x0, -0.02, z0, x1, 0.9, z1, { col: c }); this.addBox(x0, z0, x1, z1, -1, 0.9, 'quay'); };
-    wall(L.minX, L.minZ, CAUSEWAY.x0 - 1, L.minZ + 0.5);
-    wall(CAUSEWAY.x1 + 1, L.minZ, L.maxX, L.minZ + 0.5);
+    { const cws = [...C.CAUSEWAYS].sort((a, b) => a.x0 - b.x0); let x = L.minX; for (const cw of cws) { wall(x, L.minZ, cw.x0 - 1, L.minZ + 0.5); x = cw.x1 + 1; } wall(x, L.minZ, L.maxX, L.minZ + 0.5); }
     wall(L.minX, L.maxZ - 0.5, L.maxX, L.maxZ);
     wall(L.minX, L.minZ, L.minX + 0.5, L.maxZ);
     // Poller
@@ -1554,6 +1649,8 @@ export class World {
     add(B.concrete, M.concrete, false, true);
     add(B.wood, M.wood, true, true);
     add(B.poolw, M.poolw, false, false);
+    add(B.asph, M.asph, false, true);
+    add(B.walk, M.walk, false, true);
     this.B = null;
   }
 
@@ -1601,10 +1698,22 @@ export class World {
     const crownGeo = crown.build();
     const palmMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
     const crownMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, side: THREE.DoubleSide });
-    const n = this.palmPos.length;
-    const tIM = new THREE.InstancedMesh(trunk, palmMat, n), cIM = new THREE.InstancedMesh(crownGeo, crownMat, n);
-    this.palmPos.forEach(([x, z, sc, yaw], i) => { const y = this.groundHeight(x, z); setM(tIM, i, x, y, z, yaw, sc); setM(cIM, i, x, y, z, yaw, sc); });
-    for (const im of [tIM, cIM]) { im.castShadow = true; im.receiveShadow = false; im.computeBoundingSphere(); scene.add(im); }
+    // Vegetation in 400-m-Kacheln: nur sichtbare und nahe Kacheln werden gezeichnet
+    this.vegChunks = [];
+    const chunked = (list, geos, mats, dy = 0, recv = false) => {
+      const by = new Map();
+      for (const t of list) { const k = Math.floor(t[0] / 400) + ',' + Math.floor(t[1] / 400); let l = by.get(k); if (!l) by.set(k, (l = [])); l.push(t); }
+      for (const [k, l] of by) {
+        const [cx, cz] = k.split(',').map(Number);
+        geos.forEach((geo, gi) => {
+          const im = new THREE.InstancedMesh(geo, mats[gi], l.length);
+          l.forEach(([x, z, sc, yaw], i) => setM(im, i, x, this.groundHeight(x, z) + dy, z, yaw, sc));
+          im.castShadow = true; im.receiveShadow = recv; im.computeBoundingSphere(); scene.add(im);
+          this.vegChunks.push({ im, x: cx * 400 + 200, z: cz * 400 + 200 });
+        });
+      }
+    };
+    chunked(this.palmPos, [trunk, crownGeo], [palmMat, crownMat]);
 
     // Laubbäume (mehrere Blattwolken, weich schattiert) & Pinien für die Berge
     const rndT = mulberry32(31337);
@@ -1656,13 +1765,9 @@ export class World {
     }
     const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, side: THREE.DoubleSide });
     const bPos = [], pPos = [];
-    for (const t of this.treePos) (this.groundHeight(t[0], t[1]) > 9 && t[1] < HILLS.z1 ? pPos : bPos).push(t);
-    for (const [geo, list] of [[broad.build(), bPos], [pine.build(), pPos]]) {
-      const im = new THREE.InstancedMesh(geo, leafMat, Math.max(1, list.length));
-      list.forEach(([x, z, sc, yaw], i) => setM(im, i, x, this.groundHeight(x, z) - 0.1, z, yaw, sc * (geo === undefined ? 1 : 1)));
-      im.count = list.length;
-      im.castShadow = true; im.receiveShadow = true; im.computeBoundingSphere(); scene.add(im);
-    }
+    for (const t of this.treePos) ((this.groundHeight(t[0], t[1]) > 9 && t[1] < HILLS.z1 && !C.townAt(t[0], t[1], 40) && Math.hypot(t[0] - VILLAGE.x, t[1] - VILLAGE.z) > VILLAGE.r) ? pPos : bPos).push(t);
+    chunked(bPos, [broad.build()], [leafMat], -0.1, true);
+    chunked(pPos, [pine.build()], [leafMat], -0.1, true);
 
     // Straßenlaternen
     const lb = new GeoBuilder(true), dark = rgb(0x2e3136);
@@ -1828,8 +1933,8 @@ export class World {
 
   // ------------------------------------------------------------- Karte
   drawMap() {
-    const S = 2048;
-    const MB = { x0: -700, x1: 1100, z0: -1180, z1: 620 };
+    const S = this.q === 'low' ? 2048 : 3072;
+    const MB = { x0: -1950, x1: 2250, z0: -3300, z1: 900 };
     this.mapBounds = MB;
     const c = document.createElement('canvas');
     c.width = c.height = S;
@@ -1914,21 +2019,23 @@ export class World {
     rect(-330, 398, -92, 426, '#5d6b78', 6);
     for (const cx of [-330, -250, -170, -90]) rect(cx - 6, 372, cx + 6, 384, '#d9a520');
     // Solera Hills
-    const step = 8;
+    const step = 10;
     for (let z = HILLS.z0; z < HILLS.z1 + 20; z += step) for (let x = HILLS.x0; x < HILLS.x1; x += step) {
       const y = hillHeight(x + step / 2, z + step / 2);
       if (y < -0.7) continue;
-      const shade = Math.min(1, Math.max(0, (hillHeight(x + step, z) - hillHeight(x, z + step)) * 0.08 + 0.5));
+      const shade = Math.min(1, Math.max(0, (hillHeight(x + step, z) - hillHeight(x, z + step)) * 0.06 + 0.5));
+      const dry = smoothstep(-520, -950, x) * smoothstep(-2300, -1900, z);
       let col;
       if (y < 1.2) col = [226, 212, 172];
-      else if (y > 105) col = [236, 236, 232];
-      else if (y > 70) col = [176, 168, 150];
-      else col = [150 - y * 0.6, 176 - y * 0.5, 120 - y * 0.3];
+      else if (y > 290) col = [240, 240, 238];
+      else if (y > 170) col = [176, 168, 150];
+      else { const t = Math.min(1, y / 170); col = [150 - t * 40 + dry * 70, 176 - t * 36 + dry * 10, 120 - t * 20 + dry * 5]; }
       const f = 0.78 + shade * 0.44;
       g.fillStyle = `rgb(${col[0] * f | 0},${col[1] * f | 0},${col[2] * f | 0})`;
       g.fillRect(sx(x), sz(z), step * sc + 1, step * sc + 1);
     }
-    rect(CAUSEWAY.x0, CAUSEWAY.z0, CAUSEWAY.x1, CAUSEWAY.z1, '#fbe9a6');
+    for (const cw of C.CAUSEWAYS) rect(cw.x0, cw.z0, cw.x1, cw.z1, '#fbe9a6');
+    rect(AIRFIELD.x0, AIRFIELD.z0 + 8, AIRFIELD.x1, AIRFIELD.z1 - 8, '#8d8a83');
     for (const [x0, z0, x1, z1] of this.footprints) if (z1 < HILLS.z1) rect(x0 + 0.5, z0 + 0.5, x1 - 0.5, z1 - 0.5, '#b3ada1');
     hillLines(14, '#9a968d'); hillLines(10, '#ffffff');
     this.mapCanvas = c;
@@ -1992,6 +2099,13 @@ export class World {
   }
 
   update(dt) {
+    // Vegetationskacheln nach Entfernung ein-/ausblenden
+    this.vegT = (this.vegT || 0) - dt;
+    if (this.vegT <= 0 && this.vegChunks) {
+      this.vegT = 0.4;
+      const cp = G.camera.position, far = G.quality === 'low' ? 620 : G.quality === 'medium' ? 900 : 1150;
+      for (const c of this.vegChunks) c.im.visible = Math.hypot(c.x - cp.x, c.z - cp.z) < far + 290;
+    }
     const night = G.world.env ? G.world.env.night : 0;
     // Nachtbeleuchtung
     const n = night;

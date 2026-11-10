@@ -726,7 +726,8 @@ const NEW_MISSIONS = [
       if (G.interior) G.interiors.exit();
       const P = G.player;
       let route;
-      if (C.districtAt(P.x, P.z) === 'village' && G.world.villageLoops) route = [...pick(G.world.villageLoops), ...pick(G.world.villageLoops)];
+      const tl = G.world.townLoops && G.world.townLoops[C.districtAt(P.x, P.z)];
+      if (tl) route = [...pick(tl), ...pick(tl)];
       else {
         const [bi, bj] = C.blockOf(P.x, P.z), cb = (v, a, b) => clamp(v, a, b);
         const b0 = cb(bi, C.I0, C.NB - 1), b1 = cb(bj, 0, C.NB - 1);

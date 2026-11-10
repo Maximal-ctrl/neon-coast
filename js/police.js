@@ -59,7 +59,7 @@ export class Police {
     this.level = 0; this.heat = 0; this.arrestT = 0;
     for (const b of this.blocks || []) for (const v of b.cars) if (!v.removed && v !== G.player.vehicle && !G.peds.inView(v.x, v.z)) v.remove(); else v.persistent = false;
     this.blocks = [];
-    for (const v of G.vehicles) if (v.police && v.ai && !v.persistent) { v.ai.mode = 'traffic'; v.siren = false; v.ai.cruise = 13; v.ai.route = []; v.ai.pts = []; if (G.world.inHills(v.x, v.z)) { const l = G.world.hillLocate(v.x, v.z); v.ai.startHill(l.line, l.idx, -1); } else { const n = G.world.nearestNode(v.x, v.z); v.ai.startEdge(n.id, n.nbr[0]); } }
+    for (const v of G.vehicles) if (v.police && v.ai && !v.persistent) { v.ai.mode = 'traffic'; v.siren = false; v.ai.cruise = 13; v.ai.route = []; v.ai.pts = []; if (G.world.inHills(v.x, v.z)) { const l = G.world.netLocate(v.x, v.z); v.ai.startHill(l.edge, l.idx, 1); } else { const n = G.world.nearestNode(v.x, v.z); v.ai.startEdge(n.id, n.nbr[0]); } }
     for (const p of G.peds.list) if (p.isCop && p.state === 'cop') { p.state = 'walk'; p.path = null; p.anim.gun = false; }
   }
 

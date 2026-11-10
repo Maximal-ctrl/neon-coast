@@ -136,41 +136,47 @@ export class AIDriver {
   }
 
   // ---------------------------------------------------- Bergstraßen
-  startHill(line, idx, dir) { this.hill = { line, idx, dir }; this.pts = []; this.route = []; }
-  hillPoint(L, i, dir) {
-    const P = L.pts, a = P[Math.max(0, Math.min(P.length - 1, i))], b = P[Math.max(0, Math.min(P.length - 1, i + dir))];
+  // Fahren im Landstraßennetz: Kante, Index, Richtung (+1 = a→b)
+  startHill(edge, idx, dir) { this.hill = { edge, idx, dir }; this.pts = []; this.route = []; }
+  hillPoint(E, i, dir) {
+    const P = E.pts, a = P[Math.max(0, Math.min(P.length - 1, i))], b = P[Math.max(0, Math.min(P.length - 1, i + dir))];
     let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    if (l < 0.01) { const c = P[Math.max(0, Math.min(P.length - 1, i - dir))]; dx = (a[0] - c[0]); dz = (a[1] - c[1]); const m = Math.hypot(dx, dz) || 1; dx /= m; dz /= m; }
     return [a[0] - dz * 2.3, a[1] + dx * 2.3];
   }
   followHill(dt) {
-    const v = this.v, W = G.world, H = this.hill;
-    let L = W.hillLines[H.line];
-    // Fortschritt entlang der Linie
+    const v = this.v, W = G.world, H = this.hill, N = W.net;
+    let E = N.edges[H.edge];
+    // Fortschritt entlang der Kante, an Knoten nächste Kante wählen
     for (let k = 0; k < 6; k++) {
-      const [x, z] = this.hillPoint(L, H.idx, H.dir);
+      const [x, z] = this.hillPoint(E, H.idx, H.dir);
       if (Math.hypot(x - v.x, z - v.z) > 7) break;
       H.idx += H.dir;
-      // Abzweig zur Gipfelstraße
-      const L2 = W.hillLines[1];
-      if (H.line === 0 && H.idx === L2.join && chance(this.mode === 'police' ? 0 : 0.35)) { H.line = 1; H.idx = 0; H.dir = 1; L = L2; }
-      if (H.line === 1 && H.idx < 0) { H.line = 0; H.idx = L2.join; H.dir = chance(0.5) ? 1 : -1; L = W.hillLines[0]; }
-      if (H.line === 0 && H.idx < 0) {
-        // zurück in die Stadt (Straßengraph)
+      if (H.idx >= 0 && H.idx < E.pts.length) continue;
+      const node = N.nodes[H.dir > 0 ? E.b : E.a];
+      if (node.gate && node.city) {
+        // über den Damm zurück in die Stadt (Straßengraph)
         this.hill = null;
-        const g = W.hillGate;
-        this.startEdge(g.id, C.nodeId(5, 1), 2);
+        this.startEdge(node.city.id, C.nodeId(node.gate[0], node.gate[1] + 1), 2);
         return;
       }
-      if (H.idx >= L.pts.length) { if (G.peds.inView(v.x, v.z) === false) v.despawnMe = true; H.dir = -1; H.idx = L.pts.length - 2; }
+      const opts = node.edges.filter((e) => e !== E.id);
+      if (!opts.length) { if (G.peds.inView(v.x, v.z) === false) v.despawnMe = true; H.dir = -H.dir; H.idx = H.dir > 0 ? 1 : E.pts.length - 2; continue; }
+      // geradeaus bevorzugen
+      const P0 = E.pts[H.dir > 0 ? E.pts.length - 2 : 1], hx = node.x - P0[0], hz = node.z - P0[1];
+      let pickE = opts[Math.floor(Math.random() * opts.length)];
+      if (chance(0.6)) { let bd = -9; for (const ei of opts) { const e2 = N.edges[ei], q = e2.a === node.id ? e2.pts[1] : e2.pts[e2.pts.length - 2], d = ((q[0] - node.x) * hx + (q[1] - node.z) * hz) / ((Math.hypot(q[0] - node.x, q[1] - node.z) || 1) * (Math.hypot(hx, hz) || 1)); if (d > bd) { bd = d; pickE = ei; } } }
+      E = N.edges[pickE];
+      H.edge = pickE; H.dir = E.a === node.id ? 1 : -1; H.idx = H.dir > 0 ? 1 : E.pts.length - 2;
     }
-    const [tx, tz] = this.hillPoint(L, H.idx + H.dir * 2, H.dir);
+    const [tx, tz] = this.hillPoint(E, Math.max(0, Math.min(E.pts.length - 1, H.idx + H.dir * 2)), H.dir);
     const want = Math.atan2(tx - v.x, tz - v.z);
     const diff = angleDiff(v.h, want);
     v.input.steer = clamp(-diff * 2.6, -1, 1);
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
     const sp = Math.max(0, v.fwdSpeed);
-    let target = this.cruise * (this.scared > 0 ? 1.6 : 1);
-    if (Math.abs(diff) > 0.4) target = Math.min(target, 9);
+    let target = (E.town ? Math.min(this.cruise, 10) : this.cruise * 1.25) * (this.scared > 0 ? 1.6 : 1);
+    if (Math.abs(diff) > 0.4) target = Math.min(target, 8);
     const obst = this.obstacleAhead(fx, fz);
     if (obst < 30) target = Math.min(target, Math.max(0, (obst - 4.5) * 0.9));
     this.drive(target, sp, dt, obst);
@@ -389,26 +395,31 @@ export class TrafficManager {
     return v;
   }
 
-  // Fahrzeug auf den Bergstraßen erzeugen
+  // Fahrzeug im Landstraßennetz erzeugen (Landstraßen, Orte)
   spawnHillCar(px, pz, key = null, mode = 'traffic', minD = 70, maxD = 170) {
-    const W = G.world;
-    for (let k = 0; k < 20; k++) {
-      const li = chance(0.7) ? 0 : 1, L = W.hillLines[li];
-      const idx = 2 + Math.floor(Math.random() * (L.pts.length - 4));
-      const [x0, z0] = L.pts[idx];
+    const W = G.world, N = W.net;
+    for (let k = 0; k < 24; k++) {
+      // zufälliger Punkt im Ring um den Spieler -> nächste Kante
+      const a = Math.random() * Math.PI * 2, r = minD + Math.random() * (maxD - minD);
+      const loc = W.netLocate(px + Math.cos(a) * r, pz + Math.sin(a) * r);
+      if (!loc || loc.d > 60) continue;
+      const E = N.edges[loc.edge];
+      if (E.causeway != null) continue;
+      const idx = Math.max(1, Math.min(E.pts.length - 2, loc.idx));
+      const [x0, z0] = E.pts[idx];
       const d2 = dist2(x0, z0, px, pz);
-      if (d2 < minD * minD || d2 > maxD * maxD) continue;
+      if (d2 < minD * minD * 0.8 || d2 > maxD * maxD * 1.3) continue;
       if (mode === 'traffic' && G.peds.inView(x0, z0) && d2 < 140 * 140) continue;
-      const dir = mode === 'police' ? (dist2(L.pts[Math.min(L.pts.length - 1, idx + 3)][0], L.pts[Math.min(L.pts.length - 1, idx + 3)][1], px, pz) < d2 ? 1 : -1) : chance(0.5) ? 1 : -1;
-      const tmp = { pts: L.pts };
-      const [x, z] = AIDriver.prototype.hillPoint.call(null, tmp, idx, dir);
-      const nb = L.pts[Math.max(0, Math.min(L.pts.length - 1, idx + dir))];
+      const fwd = E.pts[Math.min(E.pts.length - 1, idx + 3)];
+      const dir = mode === 'police' ? (dist2(fwd[0], fwd[1], px, pz) < d2 ? 1 : -1) : chance(0.5) ? 1 : -1;
+      const [x, z] = AIDriver.prototype.hillPoint.call(null, E, idx, dir);
+      const nb = E.pts[idx + dir];
       if (G.vehicles.some((o) => dist2(o.x, o.z, x, z) < 100)) continue;
-      const v = G.vm.spawn(key || pick(TRAFFIC_MIX.filter((t) => t !== 'taxi')), x, z, Math.atan2(nb[0] - L.pts[idx][0], nb[1] - L.pts[idx][1]));
+      const v = G.vm.spawn(key || pick(TRAFFIC_MIX.filter((t) => t !== 'taxi')), x, z, Math.atan2(nb[0] - x0, nb[1] - z0));
       if (!v) return null;
       v.driver = { isPed: true, look: v.T.police ? copLook() : randomLook(), isCop: !!v.T.police };
       v.ai = new AIDriver(v, mode);
-      if (mode !== 'police') { v.ai.cruise = rand(10, 14); v.ai.startHill(li, idx, dir); }
+      if (mode !== 'police') { v.ai.cruise = rand(11, 15); v.ai.startHill(loc.edge, idx, dir); const sp = 8; v.vx = Math.sin(v.h) * sp; v.vz = Math.cos(v.h) * sp; }
       return v;
     }
     return null;
@@ -451,7 +462,7 @@ export class TrafficManager {
     if (G.interior) this.spawnT = 1;
     if (this.spawnT <= 0) {
       this.spawnT = 0.25;
-      if (G.world.inHills(px, pz) && pz < -400) { if (this.carCount() < (G.quality === 'low' ? 4 : 7)) this.spawnHillCar(px, pz); }
+      if (G.world.inHills(px, pz) && pz < -400) { if (this.carCount() < (G.quality === 'low' ? 6 : G.quality === 'medium' ? 10 : 14)) this.spawnHillCar(px, pz, null, 'traffic', 70, 190); }
       else if (this.carCount() < this.target) this.spawnCar(px, pz);
     }
   }

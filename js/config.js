@@ -79,6 +79,13 @@ export const DISTRICT_NAMES = {
   pier: 'Sunset Pier',
   sea: 'Offenes Meer',
   hills: 'Solera Hills',
+  sierra: 'Sierra Alta',
+  westland: 'Tierra Seca',
+  eastcoast: 'Costa Este',
+  estate: 'Anwesen Valcourt',
+  valverde: 'Valverde',
+  bahia: 'Bahía Blanca',
+  ranchos: 'Los Ranchos',
   club: 'Club Velvet',
   bank: 'Solera Bank',
 };
@@ -86,7 +93,9 @@ export const DISTRICT_NAMES = {
 export function districtAt(x, z) {
   if (x > PIER.rampEnd - 10 && z > PIER_PLAT.z0 - 10 && z < PIER_PLAT.z1 + 10 && x < PIER_PLAT.x1 + 5) return 'pier';
   if (Math.hypot(x + 160, z + 752) < 112) return 'village';
-  if (z < -440 && z > -1160 && x > -560 && x < 760) return 'hills';
+  { const t = townAt(x, z); if (t) return t.key; }
+  if (Math.hypot(x - 530, z + 912) < 70) return 'estate';
+  if (z < -440 && z > REGION.z0 && x > REGION.x0 && x < REGION.x1) return z < -2150 ? 'sierra' : x < -700 ? 'westland' : x > 900 ? 'eastcoast' : 'hills';
   if (x > 470) return 'sea';
   if (x > BEACH_X0) return 'beach';
   if (x < LAND.minX || z < LAND.minZ || z > LAND.maxZ) return 'sea';
@@ -102,3 +111,25 @@ export const RAMPS = [
   { x: -106, z: 160, dir: Math.PI / 2, len: 12, wid: 7, h: 2.2 }, // Plaza
   { x: 405, z: 250, dir: Math.PI, len: 12, wid: 7, h: 2.6 },      // Strand Süd
 ];
+
+// ------------------------------------------------------------ Solera County (Umland)
+// Region nördlich der Stadt: Küste im Süden, Ringgebirge im Westen, Norden und Osten
+export const REGION = { x0: -1800, x1: 2100, z0: -3100, z1: -436 };
+// Dämme von der Stadt zum Festland (x-Mitte, Breite 16 m)
+export const CAUSEWAYS = [
+  { x0: 32, x1: 48, z0: -492, z1: -384, y1: 0.9, node: [5, 0] },
+  { x0: -528, x1: -512, z0: -492, z1: -384, y1: 0.9, node: [-2, 0] },
+];
+// Orte im Umland: Straßenraster mit nx × nz Blöcken (Zellgröße cs)
+export const TOWN_CS = 70;
+export const TOWNS = [
+  { key: 'valverde', name: 'Valverde', cx: 300, cz: -1900, nx: 4, nz: 3, style: 'town' },
+  { key: 'bahia', name: 'Bahía Blanca', cx: 1450, cz: -650, nx: 4, nz: 2, style: 'coast', y: 5 },
+  { key: 'ranchos', name: 'Los Ranchos', cx: -1250, cz: -1250, nx: 3, nz: 2, style: 'desert' },
+];
+export const townNode = (t, i, j) => [t.cx + (i - t.nx / 2) * TOWN_CS, t.cz + (j - t.nz / 2) * TOWN_CS];
+export const townRect = (t, m = 0) => ({ x0: t.cx - (t.nx / 2) * TOWN_CS - m, x1: t.cx + (t.nx / 2) * TOWN_CS + m, z0: t.cz - (t.nz / 2) * TOWN_CS - m, z1: t.cz + (t.nz / 2) * TOWN_CS + m });
+export function townAt(x, z, m = 30) {
+  for (const t of TOWNS) { const r = townRect(t, m); if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return t; }
+  return null;
+}

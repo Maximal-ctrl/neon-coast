@@ -83,8 +83,8 @@ export class PedManager {
     }
     return null;
   }
-  spawnVillage(px, pz) {
-    const loops = G.world.villageLoops;
+  spawnVillage(px, pz, loops = null) {
+    if (!loops) return null;
     if (!loops || !loops.length) return null;
     const loop = pick(loops), k = Math.floor(rand(0, loop.length)), p0 = loop[k], p1 = loop[(k + 1) % loop.length], t = rand(0.1, 0.9);
     const x = p0[0] + (p1[0] - p0[0]) * t, z = p0[1] + (p1[1] - p0[1]) * t;
@@ -258,7 +258,7 @@ export class PedManager {
     const px = P.x, pz = P.z;
     // Zielanzahl je Gegend
     const d = C.districtAt(px, pz);
-    const dens = { downtown: 70, midtown: 60, westside: 54, heights: 32, seaside: 58, beach: 60, harbor: 20, pier: 46, sea: 4, oldtown: 62, village: 26, hills: 4 }[d] || 44;
+    const dens = { downtown: 70, midtown: 60, westside: 54, heights: 32, seaside: 58, beach: 60, harbor: 20, pier: 46, sea: 4, oldtown: 62, village: 26, hills: 4, westland: 3, eastcoast: 3, sierra: 2, estate: 2, valverde: 40, bahia: 40, ranchos: 26 }[d] || 44;
     const night = G.world.env.night;
     this.target = Math.round(dens * (1 - night * 0.35) * (G.quality === 'low' ? 0.65 : 1));
     this.spawnT -= dt;
@@ -267,7 +267,7 @@ export class PedManager {
       this.spawnT = 0.1;
       const n = this.list.filter((p) => !p.isCop && p.alive && !p.persistent).length;
       if (n < this.target) {
-        if (d === 'village' || d === 'hills') this.spawnVillage(px, pz);
+        if (G.world.townLoops && (G.world.townLoops[d] || d === 'hills' || d === 'westland' || d === 'eastcoast' || d === 'sierra' || d === 'estate')) this.spawnVillage(px, pz, G.world.townLoops[d]);
         else if ((px > 300 || d === 'beach' || d === 'pier') && chance(0.6)) this.spawnBeach(px, pz);
         else this.spawnSidewalk(px, pz);
       }

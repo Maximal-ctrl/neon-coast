@@ -46,6 +46,10 @@ export class Interiors {
     this.buildBoutique();
     this.buildVilla();
     this.buildOffice();
+    this.buildDiner();
+    this.buildBar();
+    this.buildHouse();
+    this.buildGunshop();
     this.residents = {};
     const sh = G.world.pois.safehouse, shop = G.world.pois.shop, dl = G.world.pois.dealer;
     this.doors = [
@@ -208,6 +212,190 @@ export class Interiors {
     R.resident = { id: 'aurelio', x: 1505.5, z: 1043.9, yaw: 0, look: () => ({ ...randomLook(), skin: C(0xe0ac69), shirt: C(0xf4f1de), sleeve: C(0xf4f1de), pants: C(0x2b2d42), legs: C(0x2b2d42), hair: C(0xcfcfcf), hat: null, bald: false, scale: 1.0 }) };
     R.guests = [[1509, 1055.4, Math.PI, 'guard'], [1491, 1055.4, Math.PI, 'guard']];
     for (const m of R.markers) m.group.visible = false;
+  }
+
+  // ------------------------------------------------------------ Diner
+  buildDiner() {
+    const tiles = canvasTex(256, 256, (g) => { for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { g.fillStyle = (i + j) % 2 ? '#f4f1ea' : '#22262c'; g.fillRect(i * 32, j * 32, 32, 32); } }, true);
+    tiles.repeat.set(5, 3.5);
+    const R = this.room('diner', 1500, 1350, 20, 13, 3.5, {
+      floor: new THREE.MeshStandardMaterial({ map: tiles, roughness: 0.25 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xf2efe8, emissive: 0x3a3832, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xbfe3df, emissive: 0x10201e, roughness: 0.8 }),
+    });
+    R.name = 'Diner'; R.spawn = { x: 1500, z: 1354.4, yaw: Math.PI };
+    R.lightCfg = [1500, 3, 1350, 0xfff0dc, 26];
+    const red = rgb(0xc0392b), chrome = rgb(0xc9ced6), cream = rgb(0xf4f1ea);
+    this.furnish(R, (B, col) => {
+      // Theke mit Hockern
+      B.box(1492, 0, 1345.4, 1506, 1.05, 1346.5, { col: chrome }); B.box(1491.9, 1.05, 1345.3, 1506.1, 1.12, 1346.6, { col: red });
+      col(1491.9, 1345.3, 1506.1, 1346.6, 1.12);
+      for (let k = 0; k < 8; k++) { const x = 1493 + k * 1.7; B.addGeometry(new THREE.CylinderGeometry(0.06, 0.1, 0.7, 8), new THREE.Matrix4().makeTranslation(x, 0.35, 1347.4), chrome); B.addGeometry(new THREE.CylinderGeometry(0.3, 0.3, 0.12, 14), new THREE.Matrix4().makeTranslation(x, 0.76, 1347.4), red); }
+      // Küche dahinter: Grill, Kaffeemaschinen, Durchreiche
+      B.box(1492, 0, 1343.6, 1506, 0.95, 1344.3, { col: chrome }); B.box(1494, 0.95, 1343.7, 1497, 1.0, 1344.2, { col: rgb(0x222222) });
+      B.box(1500, 0.95, 1343.7, 1500.8, 1.55, 1344.2, { col: rgb(0x8a8f99) }); B.box(1501.2, 0.95, 1343.7, 1502, 1.55, 1344.2, { col: rgb(0x8a8f99) });
+      B.box(1492, 2.2, 1343.55, 1506, 2.9, 1343.7, { col: red });
+      // Sitznischen an Fenstern
+      for (const x of [1491.6, 1508.4]) for (let k = 0; k < 3; k++) {
+        const z = 1348.5 + k * 2.6, sx = x < 1500 ? 1 : -1;
+        B.box(x - 0.9, 0, z - 0.2, x + 0.9, 1.15, z + 0.1, { col: red }); B.box(x - 0.9, 0, z + 0.1, x + 0.9, 0.5, z + 0.75, { col: red });
+        B.box(x - 0.9, 0, z + 1.95, x + 0.9, 1.15, z + 2.25, { col: red }); B.box(x - 0.9, 0, z + 1.3, x + 0.9, 0.5, z + 1.95, { col: red });
+        B.box(x - 0.8, 0.72, z + 0.82, x + 0.8, 0.78, z + 1.25, { col: cream }); B.box(x - 0.05, 0, z + 0.98, x + 0.05, 0.72, z + 1.08, { col: chrome });
+        col(x - 0.9, z - 0.2, x + 0.9, z + 2.25, 1.15);
+        void sx;
+      }
+      // Jukebox
+      B.box(1509, 0, 1344, 1509.8, 1.5, 1344.9, { col: rgb(0x7a1e5a) }); B.box(1508.95, 0.9, 1344.1, 1509, 1.4, 1344.8, { col: rgb(0xffd23f) });
+      col(1509, 1344, 1509.8, 1344.9, 1.5);
+      // Chromleiste & Bilder
+      for (const z of [1343.52]) for (let k = 0; k < 4; k++) B.box(1493 + k * 3.6, 1.6, z, 1495 + k * 3.6, 2.1, z + 0.03, { col: rgb([0xffd23f, 0x19e6ff, 0xff6fb0, 0x7cff6b][k]) });
+    });
+    for (const x of [1495, 1500, 1505]) this.lamp(R, x, 2.8, 1349.5, [2.3, 2.0, 1.6], 0.25);
+    this.textPlane(R, 'DINER', '#ff5a5a', 1499, 3.1, 1343.52, 0, 3);
+    R.exit = new Marker(1500, 1356.3, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.counter = new Marker(1499, 1348.6, 0xff5a5a, { label: '🍔', r: 0.9 });
+    R.markers = [R.exit, R.counter];
+    R.resident = { id: 'cook', x: 1499, z: 1344.9, yaw: 0, look: () => ({ ...randomLook(), shirt: C(0xf4f1ea), sleeve: C(0xf4f1ea), pants: C(0x222222), legs: C(0x222222), hat: C(0xf4f1ea) }) };
+    R.guests = [[1494.7, 1347.9, Math.PI, 'stand'], [1503.2, 1347.9, Math.PI, 'stand']];
+    for (const m of R.markers) m.group.visible = false;
+  }
+
+  // ------------------------------------------------------------ Bar / Cantina
+  buildBar() {
+    const planks = canvasTex(256, 256, (g, w) => { for (let i = 0; i < 8; i++) { const b = 0.7 + Math.random() * 0.3; g.fillStyle = `rgb(${92 * b},${58 * b},${36 * b})`; g.fillRect(0, i * 32, w, 31); g.fillStyle = 'rgba(20,10,5,.7)'; g.fillRect(0, i * 32 + 31, w, 1); } }, true);
+    planks.repeat.set(5, 4);
+    const R = this.room('bar', 1500, 1500, 18, 14, 3.6, {
+      floor: new THREE.MeshStandardMaterial({ map: planks, roughness: 0.5 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0x2a1c14, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0x5a3a28, emissive: 0x120a06, roughness: 0.9 }),
+    });
+    R.name = 'Bar'; R.spawn = { x: 1500, z: 1505, yaw: Math.PI };
+    R.lightCfg = [1500, 3, 1500, 0xffb060, 16];
+    const wood = rgb(0x3b2416), brass = rgb(0xc9a14a);
+    this.furnish(R, (B, col) => {
+      B.box(1493, 0, 1494.6, 1505, 1.1, 1495.8, { col: wood }); B.box(1492.9, 1.1, 1494.5, 1505.1, 1.17, 1495.9, { col: rgb(0x1b120c) }); B.box(1493, 0.2, 1495.8, 1505, 0.27, 1496.0, { col: brass });
+      col(1492.9, 1494.5, 1505.1, 1495.9, 1.17);
+      for (let k = 0; k < 7; k++) { const x = 1494 + k * 1.7; B.addGeometry(new THREE.CylinderGeometry(0.05, 0.09, 0.75, 8), new THREE.Matrix4().makeTranslation(x, 0.38, 1496.7), brass); B.addGeometry(new THREE.CylinderGeometry(0.28, 0.28, 0.1, 14), new THREE.Matrix4().makeTranslation(x, 0.8, 1496.7), rgb(0x6d2e2e)); }
+      // Flaschenregal mit Spiegel
+      B.box(1493, 1.2, 1493.05, 1505, 3.1, 1493.15, { col: rgb(0x9fb7c9) });
+      for (let r = 0; r < 3; r++) { B.box(1493, 1.4 + r * 0.55, 1493.15, 1505, 1.45 + r * 0.55, 1493.5, { col: wood }); for (let i = 0; i < 34; i++) B.addGeometry(new THREE.CylinderGeometry(0.05, 0.06, 0.34, 6), new THREE.Matrix4().makeTranslation(1493.3 + i * 0.35, 1.62 + r * 0.55, 1493.32), rgb([0x2a9d8f, 0xe9c46a, 0x8a4b2a, 0xd62828, 0xf4f1ea, 0x355070][(i + r * 2) % 6])); }
+      // Billardtisch
+      B.box(1493.2, 0.7, 1501, 1496, 0.82, 1502.6, { col: rgb(0x1f6b3a) }); B.box(1493.1, 0.6, 1500.9, 1496.1, 0.86, 1501.0, { col: wood }); B.box(1493.1, 0.6, 1502.6, 1496.1, 0.86, 1502.7, { col: wood }); B.box(1493.1, 0.6, 1500.9, 1493.2, 0.86, 1502.7, { col: wood }); B.box(1496, 0.6, 1500.9, 1496.1, 0.86, 1502.7, { col: wood });
+      for (const [x, z] of [[1493.4, 1501.2], [1495.8, 1501.2], [1493.4, 1502.4], [1495.8, 1502.4]]) B.box(x - 0.08, 0, z - 0.08, x + 0.08, 0.7, z + 0.08, { col: wood });
+      for (let i = 0; i < 6; i++) B.addGeometry(new THREE.SphereGeometry(0.05, 8, 6), new THREE.Matrix4().makeTranslation(1494 + (i % 3) * 0.5, 0.87, 1501.5 + Math.floor(i / 3) * 0.5), rgb([0xffd23f, 0xd62828, 0x1d3557, 0xf4f1ea, 0x111111, 0x2a9d8f][i]));
+      col(1493.1, 1500.9, 1496.1, 1502.7, 0.9);
+      // Tische
+      for (const [x, z] of [[1502, 1500], [1505.5, 1502.5], [1502, 1504]]) { B.addGeometry(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 14), new THREE.Matrix4().makeTranslation(x, 0.78, z), wood); B.addGeometry(new THREE.CylinderGeometry(0.06, 0.2, 0.76, 8), new THREE.Matrix4().makeTranslation(x, 0.38, z), rgb(0x222222)); for (const a of [0, 2.1, 4.2]) { const sx = x + Math.cos(a) * 0.9, sz = z + Math.sin(a) * 0.9; B.addGeometry(new THREE.CylinderGeometry(0.22, 0.22, 0.08, 10), new THREE.Matrix4().makeTranslation(sx, 0.5, sz), rgb(0x6d2e2e)); B.addGeometry(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6), new THREE.Matrix4().makeTranslation(sx, 0.25, sz), rgb(0x222222)); } col(x - 0.5, z - 0.5, x + 0.5, z + 0.5, 0.8); }
+      // Dartscheibe & Fässer
+      B.addGeometry(new THREE.CylinderGeometry(0.4, 0.4, 0.06, 20).rotateZ(Math.PI / 2), new THREE.Matrix4().makeTranslation(1508.9, 1.8, 1500), rgb(0xd62828));
+      B.addGeometry(new THREE.CylinderGeometry(0.27, 0.27, 0.07, 20).rotateZ(Math.PI / 2), new THREE.Matrix4().makeTranslation(1508.88, 1.8, 1500), rgb(0xf4f1ea));
+      for (const z of [1494, 1495.2]) { B.addGeometry(new THREE.CylinderGeometry(0.45, 0.45, 1, 12), new THREE.Matrix4().makeTranslation(1507.8, 0.5, z), rgb(0x6b4a2f)); }
+      col(1507.3, 1493.5, 1508.3, 1495.7, 1);
+    });
+    for (const x of [1495, 1499, 1503]) this.lamp(R, x, 2.4, 1495.2, [2.4, 1.5, 0.7], 0.2);
+    this.lamp(R, 1494.6, 2.2, 1501.8, [1.2, 2.2, 1.2], 0.25);
+    this.textPlane(R, 'CERVEZA', '#7cff6b', 1507.5, 2.9, 1493.06, 0, 2.6);
+    R.exit = new Marker(1500, 1506.3, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.bar = new Marker(1499, 1497.8, 0xffb35c, { label: '🍺', r: 0.9 });
+    R.markers = [R.exit, R.bar];
+    R.resident = { id: 'barkeeper', x: 1499, z: 1494, yaw: 0, look: () => ({ ...randomLook(), shirt: C(0x222222), sleeve: C(0x222222), hat: null }) };
+    R.guests = [[1495.7, 1497.3, Math.PI, 'stand'], [1503.6, 1497.3, Math.PI, 'stand'], [1496.6, 1501.8, -Math.PI / 2, 'stand']];
+    for (const m of R.markers) m.group.visible = false;
+  }
+
+  // ------------------------------------------------------------ Wohnhaus (mehrere Türen führen hierher)
+  buildHouse() {
+    const wood = canvasTex(256, 256, (g, w) => { for (let i = 0; i < 8; i++) { const b = 0.82 + Math.random() * 0.22; g.fillStyle = `rgb(${172 * b},${132 * b},${92 * b})`; g.fillRect(0, i * 32, w, 31); g.fillStyle = 'rgba(60,40,20,.5)'; g.fillRect(0, i * 32 + 31, w, 1); } }, true);
+    wood.repeat.set(4, 3.5);
+    const R = this.room('house', 1500, 1650, 16, 13, 3.2, {
+      floor: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.5 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xf6f2ea, emissive: 0x403c36, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0xece4d6, emissive: 0x241f18, roughness: 0.9 }),
+    });
+    R.name = 'Wohnung'; R.spawn = { x: 1500, z: 1654.6, yaw: Math.PI };
+    R.lightCfg = [1500, 2.8, 1650, 0xffe6c4, 22];
+    this.furnish(R, (B, col) => {
+      // Wohnzimmer
+      B.box(1493, 0, 1648, 1497, 0.45, 1649.4, { col: rgb(0x52606d) }); B.box(1493, 0.45, 1648, 1497, 1.0, 1648.35, { col: rgb(0x52606d) });
+      col(1493, 1648, 1497, 1649.4, 1);
+      B.box(1493.6, 0, 1651, 1496.4, 0.4, 1652, { col: rgb(0x2b2b2b) }); col(1493.6, 1651, 1496.4, 1652, 0.4);
+      B.box(1493.2, 0, 1655.9, 1496.8, 0.6, 1656.4, { col: rgb(0x3b2a1e) }); B.box(1493.5, 0.7, 1656.2, 1496.5, 2.3, 1656.3, { col: rgb(0x111111) }); B.box(1493.6, 0.8, 1656.18, 1496.4, 2.2, 1656.2, { col: rgb(0x2a6bb8) });
+      B.box(1492.6, 0.005, 1649.8, 1497.4, 0.015, 1653, { col: rgb(0xb5485f) });
+      // Küche
+      B.box(1502, 0, 1643.6, 1507.6, 0.95, 1644.4, { col: rgb(0xe6e2da) }); B.box(1501.9, 0.95, 1643.5, 1507.7, 1.0, 1644.5, { col: rgb(0x2b2b2b) });
+      B.box(1502, 1.6, 1643.55, 1507.6, 2.4, 1643.95, { col: rgb(0xe6e2da) });
+      B.box(1507.0, 0, 1644.6, 1507.8, 1.95, 1645.5, { col: rgb(0xc9ced6) });
+      col(1501.9, 1643.5, 1507.8, 1644.5, 1); col(1507, 1644.6, 1507.8, 1645.5, 1.95);
+      B.box(1503, 0, 1647, 1505.4, 0.76, 1648.2, { col: rgb(0x8a6a48) }); col(1503, 1647, 1505.4, 1648.2, 0.78);
+      for (const [x, z] of [[1503.5, 1646.6], [1504.9, 1646.6], [1503.5, 1648.6], [1504.9, 1648.6]]) B.box(x - 0.2, 0, z - 0.2, x + 0.2, 0.45, z + 0.2, { col: rgb(0x6b4a2f) });
+      // Schlafbereich
+      B.box(1503.2, 0, 1652.6, 1506.4, 0.45, 1656, { col: rgb(0x3b2a1e) }); B.box(1503.3, 0.45, 1652.7, 1506.3, 0.62, 1655.9, { col: rgb(0xf2f2f2) }); B.box(1503.3, 0.62, 1652.7, 1506.3, 0.72, 1654.6, { col: rgb(0x7a9e7e) });
+      B.box(1503.2, 0, 1656, 1506.4, 1.2, 1656.2, { col: rgb(0x3b2a1e) });
+      col(1503.2, 1652.6, 1506.4, 1656.2, 0.75);
+      B.box(1507, 0, 1653, 1507.8, 2.0, 1655, { col: rgb(0xd9cdb6) }); col(1507, 1653, 1507.8, 1655, 2);
+      // Trennwand
+      B.box(1500.4, 0, 1651.4, 1500.6, 3.2, 1656.4, { col: rgb(0xece4d6) }); col(1500.4, 1651.4, 1500.6, 1656.4, 3.2);
+      // Pflanze, Regal
+      B.box(1492.3, 0, 1644, 1492.8, 1.8, 1646.4, { col: rgb(0x8a6a48) });
+      for (let r = 0; r < 4; r++) for (let i = 0; i < 7; i++) B.box(1492.8, 0.25 + r * 0.42, 1644.1 + i * 0.32, 1492.95, 0.55 + r * 0.42, 1644.36 + i * 0.32, { col: rgb([0xc0392b, 0x2a9d8f, 0xe9c46a, 0x355070, 0xf4f1ea][(i + r) % 5]) });
+    });
+    const view = canvasTex(512, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#6fb2e8'); gr.addColorStop(0.65, '#d6ebfa'); gr.addColorStop(0.66, '#5f8f4a'); gr.addColorStop(1, '#3f6f34'); g.fillStyle = gr; g.fillRect(0, 0, w, h); g.fillStyle = '#7d8a6a'; g.beginPath(); g.moveTo(0, h * 0.66); g.lineTo(120, h * 0.3); g.lineTo(260, h * 0.6); g.lineTo(380, h * 0.25); g.lineTo(512, h * 0.66); g.fill(); });
+    for (const x of [1495, 1504.5]) { const win = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.5), new THREE.MeshBasicMaterial({ map: view })); win.position.set(x, 1.9, 1643.55); R.g.add(win); }
+    this.lamp(R, 1495, 2.6, 1650.5, [2.3, 1.9, 1.3], 0.3); this.lamp(R, 1504.5, 2.6, 1647.5, [2.3, 1.9, 1.3], 0.25);
+    R.exit = new Marker(1500, 1656, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.bed = new Marker(1502.3, 1654.2, 0x7cff6b, { label: '💤', r: 0.8 });
+    R.fridge = new Marker(1506.2, 1645.6, 0x19e6ff, { label: '🥪', r: 0.7 });
+    R.markers = [R.exit, R.bed, R.fridge];
+    for (const m of R.markers) m.group.visible = false;
+  }
+
+  // ------------------------------------------------------------ Waffenladen
+  buildGunshop() {
+    const R = this.room('gunshop', 1500, 1800, 16, 12, 3.4, {
+      floor: new THREE.MeshStandardMaterial({ color: 0x4a4d52, roughness: 0.7 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0x2b2d30, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ color: 0x6b6f5a, emissive: 0x14150f, roughness: 0.9 }),
+    });
+    R.name = 'Waffenladen'; R.spawn = { x: 1500, z: 1803.8, yaw: Math.PI };
+    R.lightCfg = [1500, 3, 1800, 0xfff0e0, 20];
+    const steel = rgb(0x2b2d30), woodc = rgb(0x6b4a2f);
+    this.furnish(R, (B, col) => {
+      // Glastheke
+      B.box(1493, 0, 1795.4, 1505, 0.75, 1796.6, { col: steel }); B.box(1493, 0.75, 1795.4, 1505, 1.05, 1796.6, { col: rgb(0x9fd6ff) }); B.box(1492.9, 1.05, 1795.3, 1505.1, 1.1, 1796.7, { col: steel });
+      col(1492.9, 1795.3, 1505.1, 1796.7, 1.1);
+      for (let i = 0; i < 9; i++) { B.box(1493.6 + i * 1.25, 0.8, 1795.8, 1494.2 + i * 1.25, 0.86, 1796.0, { col: rgb(0x111111) }); B.box(1493.7 + i * 1.25, 0.8, 1796.0, 1493.85 + i * 1.25, 0.86, 1796.25, { col: rgb(0x111111) }); }
+      // Wandhalter mit Gewehren
+      B.box(1493, 1.2, 1794.05, 1505, 2.9, 1794.12, { col: woodc });
+      for (let r = 0; r < 3; r++) for (let i = 0; i < 5; i++) { const x = 1493.6 + i * 2.3, y = 1.45 + r * 0.5; B.box(x, y, 1794.12, x + 1.5, y + 0.07, 1794.2, { col: rgb(0x1b1b1b) }); B.box(x - 0.35, y - 0.06, 1794.12, x + 0.1, y + 0.1, 1794.2, { col: rgb(r % 2 ? 0x6b4a2f : 0x2b2b2b) }); B.box(x + 0.5, y - 0.2, 1794.12, x + 0.62, y, 1794.2, { col: rgb(0x1b1b1b) }); }
+      // Munitionsregale
+      for (const x of [1492.3, 1507.2]) { B.box(x, 0, 1797.5, x + 0.5, 2.2, 1803.5, { col: steel }); for (let r = 0; r < 4; r++) for (let i = 0; i < 10; i++) B.box(x + (x < 1500 ? 0.5 : -0.12), 0.25 + r * 0.5, 1797.7 + i * 0.58, x + (x < 1500 ? 0.62 : 0), 0.55 + r * 0.5, 1798.15 + i * 0.58, { col: rgb([0xb5651d, 0x3a5a40, 0xc0392b, 0xe9c46a][(i + r) % 4]) }); col(x, 1797.5, x + 0.5, 1803.5, 2.2); }
+      // Zielscheiben & Schaufensterpuppe mit Weste
+      for (const x of [1496, 1504]) { B.addGeometry(new THREE.CylinderGeometry(0.5, 0.5, 0.04, 20).rotateX(Math.PI / 2), new THREE.Matrix4().makeTranslation(x, 2.0, 1805.9), rgb(0xf4f1ea)); B.addGeometry(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 20).rotateX(Math.PI / 2), new THREE.Matrix4().makeTranslation(x, 2.0, 1805.88), rgb(0xd62828)); }
+      B.addGeometry(new THREE.CylinderGeometry(0.22, 0.18, 0.7, 10), new THREE.Matrix4().makeTranslation(1506, 1.25, 1797), rgb(0x1d3557)); B.addGeometry(new THREE.SphereGeometry(0.13, 10, 8), new THREE.Matrix4().makeTranslation(1506, 1.78, 1797), rgb(0xd9d9d9)); B.box(1505.97, 0, 1796.97, 1506.03, 0.9, 1797.03, { col: rgb(0x888888) });
+    });
+    this.box(R, 1500, 3.35, 1798, 4, 0.05, 0.4, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.3, 1.25, 1.15) }));
+    this.box(R, 1500, 3.35, 1802, 4, 0.05, 0.4, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.3, 1.25, 1.15) }));
+    this.textPlane(R, 'WAFFEN & MUNITION', '#ff7b39', 1500, 3.1, 1794.14, 0, 5);
+    R.exit = new Marker(1500, 1805.3, 0x7cff6b, { label: 'X', r: 1.0 });
+    R.counter = new Marker(1499, 1798, 0xff7b39, { label: 'W', r: 0.9 });
+    R.markers = [R.exit, R.counter];
+    R.resident = { id: 'gunclerk', x: 1499, z: 1794.8, yaw: 0, look: () => ({ ...randomLook(), shirt: C(0x3a5a40), sleeve: C(0x3a5a40), hat: C(0x222222) }) };
+    for (const m of R.markers) m.group.visible = false;
+  }
+  dinerMenu() {
+    const P = G.player;
+    G.openMenu('DINER', '<div style="opacity:.85">Hausgemacht, heiß und fettig.</div>', [
+      ['Cheeseburger – $9', () => { if (!this.pay(9)) return; P.health = Math.min(100, P.health + 40); G.hud.toast('🍔 +40 Gesundheit'); }],
+      ['Pommes – $4', () => { if (!this.pay(4)) return; P.health = Math.min(100, P.health + 15); G.hud.toast('🍟 +15 Gesundheit'); }],
+      ['Milchshake – $5', () => { if (!this.pay(5)) return; P.health = Math.min(100, P.health + 20); P.boostT = Math.max(P.boostT || 0, 20); G.hud.toast('🥤 +20 Gesundheit, Zuckerschub!'); }],
+      ['Tagesgericht – $14', () => { if (!this.pay(14)) return; P.health = 100; G.hud.toast('🍽️ Volle Gesundheit'); }],
+    ]);
+  }
+  houseBed() {
+    G.openMenu('BETT', 'Eine Runde schlafen?', [
+      ['Schlafen (8 Stunden)', () => { G.hud.fadeIn(); G.timeOfDay = (G.timeOfDay + 8) % 24; G.player.health = 100; G.hud.toast('💤 Ausgeschlafen – volle Gesundheit'); }],
+      ['Spiel speichern', () => { if (G.missions.active && !G.missions.active.side) G.hud.toast('Während eines Auftrags kann nicht gespeichert werden.'); else { G.save.write(); G.hud.toast('Gespeichert'); } }],
+    ]);
   }
 
   // ------------------------------------------------------------ Hafenbüro
@@ -719,7 +907,8 @@ export class Interiors {
     for (const m of R.markers) m.group.visible = true;
     P.x = R.spawn.x; P.z = R.spawn.z; P.y = 0; P.yaw = R.spawn.yaw; P.vx = P.vz = P.vy = 0;
     G.cam.yaw = R.spawn.yaw; G.cam.pitch = -0.15; G.cam.snap();
-    G.interior = { kind, name: door && door.name && kind === 'shop' ? 'Samis 24/7' : R.name, station: 3 };
+    const nice = (t) => t.toLowerCase().replace(/(^|[\s&/-])([a-zäöüéí])/g, (m, a, b) => a + b.toUpperCase());
+    G.interior = { kind, name: door && door.name ? (kind === 'shop' ? 'Samis 24/7' : nice(door.name)) : R.name, station: 3 };
     if (R.lightCfg) {
       const [lx, ly, lz, lc, li] = R.lightCfg;
       this.light.position.set(lx, ly, lz); this.light.color.setHex(lc); this.light.intensity = li;
@@ -842,6 +1031,10 @@ export class Interiors {
     else if (G.interior.kind === 'bank') this.updateBank(dt, R, on);
     else if (G.interior.kind === 'cafe') { if (on(R.counter, 1.1)) this.cafeMenu(); }
     else if (G.interior.kind === 'boutique') { if (on(R.rack, 1.2)) this.boutiqueMenu(); }
+    else if (G.interior.kind === 'diner') { if (on(R.counter, 1.1)) this.dinerMenu(); }
+    else if (G.interior.kind === 'bar') { if (on(R.bar, 1.1)) G.ui.bar(); }
+    else if (G.interior.kind === 'gunshop') { if (on(R.counter, 1.1)) G.ui.gunshop(); }
+    else if (G.interior.kind === 'house') { if (on(R.bed, 1.1)) this.houseBed(); if (on(R.fridge, 1.0)) { G.player.health = Math.min(100, G.player.health + 25); G.hud.toast('🥪 Snack aus dem Kühlschrank: +25 Gesundheit'); } }
   }
   cafeMenu() {
     const P = G.player;

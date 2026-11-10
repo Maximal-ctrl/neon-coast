@@ -343,7 +343,7 @@ export class HUD {
   }
   setZoom(z, cx, cy) {
     const V = this.mapView;
-    z = Math.max(V.min, Math.min(V.min * 8, z));
+    z = Math.max(V.min, Math.min(V.min * 18, z));
     // Punkt unter (cx,cy) bleibt fest
     V.ox = cx - (cx - V.ox) * (z / V.zoom); V.oy = cy - (cy - V.oy) * (z / V.zoom);
     V.zoom = z;
@@ -370,7 +370,7 @@ export class HUD {
         // auf den Spieler zentriert, leicht vergrößert
         const P = G.player, px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
         const [mx, mz] = W.mapToPx(px, pz);
-        const zoom = fit * 1.6;
+        const zoom = fit * 3.4;
         this.mapView = { min: fit * 0.9, zoom, ox: cv.width / 2 - mx * zoom, oy: cv.height / 2 - mz * zoom };
       }
     }
@@ -383,7 +383,7 @@ export class HUD {
     // Bezirksnamen
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.font = `600 ${Math.round(13 * u)}px Oswald, sans-serif`;
-    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['SOLERA HILLS', 200, -900], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860], ['ANWESEN', 530, -990]];
+    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['SOLERA HILLS', 200, -900], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860], ['ANWESEN', 530, -990], ['VALVERDE', 300, -2040], ['BAHÍA BLANCA', 1450, -760], ['LOS RANCHOS', -1250, -1360], ['FLUGPLATZ', -1300, -1090], ['SIERRA ALTA', 300, -2900], ['MIRADOR', 330, -2740], ['TIERRA SECA', -1150, -1750], ['COSTA ESTE', 1050, -620]];
     for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.lineWidth = 3 * u; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.strokeText(t, sx, sy); g.fillStyle = 'rgba(40,44,52,0.9)'; g.fillText(t, sx, sy); }
     // Route
     const tgt = this.getRouteTarget();
