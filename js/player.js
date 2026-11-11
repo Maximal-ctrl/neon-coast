@@ -2,7 +2,8 @@
 import { G } from './state.js';
 import * as C from './config.js';
 import { playerLook } from './models.js';
-import { WEAPONS, WEAPON_ORDER } from './combat.js';
+import { WEAPONS, WEAPON_ORDER, wstats } from './combat.js';
+import { nitroUpdate } from './tuning.js';
 import { circleVsBox, circleVsVeh } from './physics.js';
 import { clamp, damp, dampAngle, angleDiff, dist2, rand, lerp } from './utils.js';
 
@@ -33,6 +34,7 @@ export class Player {
     this.inventory = {};
     this.garage = [];
     this.boostT = 0;
+    this.clip = {}; this.reloadT = 0; this.wmods = {};
     this.useItem = null;
     this.sprinting = false;
     this.r = 0.35;
@@ -59,10 +61,15 @@ export class Player {
       case 'exiting': this.exitUpdate(dt); break;
       case 'knock': this.knockUpdate(dt); break;
       case 'dead': case 'busted': this.deadUpdate(dt); break;
-      case 'cutscene': A.amp = damp(A.amp, 0, 6, dt); break;
+      case 'cutscene': case 'ride': A.amp = damp(A.amp, 0, 6, dt); break;
       default: this.footUpdate(dt, I);
     }
     if (this.boostT > 0) this.boostT -= dt;
+    if (this.reloadT > 0) {
+      this.reloadT -= dt;
+      this.anim.reload = 1;
+      if (this.reloadT <= 0) { const S = wstats(this.weapon, this.wmods[this.weapon]); this.clip[this.weapon] = Math.min(S.mag, this.ammo[this.weapon]); this.anim.reload = 0; G.audio.click(); G.hud.weapon(); }
+    }
     if (this.useItem) this.useUpdate(dt);
     if (G.state === 'playing' && !this.inCar && this.state !== 'dead') G.stats.distanceWalked += Math.hypot(this.vx, this.vz) * dt;
   }
@@ -83,6 +90,7 @@ export class Player {
     let speed = swim ? (this.sprinting ? 3.6 : 2.4) : this.sprinting ? 7.8 : G.isTouch ? lerp(1.2, 5.2, clamp((mag - 0.15) / 0.75, 0, 1)) : 5.0;
     if (this.sprinting) speed *= boost;
     if (this.useItem) speed = Math.min(speed, 2.2);
+    if (G.trip) speed *= G.trip.walk;
     if (mag < 0.12) speed = 0;
     const armed = this.weapon !== 'fists';
     // Zielen
@@ -108,16 +116,18 @@ export class Player {
     // Springen / Schwerkraft
     if (I.pressed('jump') && this.onGround && !swim) { this.vy = 6.2; this.onGround = false; G.audio.jump(); }
     this.x += this.vx * dt; this.z += this.vz * dt;
-    this.gy = W.groundHeight(this.x, this.z);
+    this.gy = W.groundHeight(this.x, this.z, this.y);
     if (swim) {
       this.y = damp(this.y, C.WATER_Y - 0.25, 6, dt);
       this.vy = 0;
       if (this.gy > C.WATER_Y - 1.0) { this.state = 'foot'; this.y = Math.max(this.gy, this.y); }
     } else {
       this.vy -= 18 * dt;
+      if (this.parachute) { this.vy = Math.max(this.vy, -5.5); this.vx *= 0.99; this.vz *= 0.99; }
       this.y += this.vy * dt;
       if (this.y <= this.gy) {
         if (!this.onGround && this.vy < -14) this.damage((-this.vy - 14) * 6, null);
+        this.parachute = false;
         this.y = this.gy; this.vy = 0; this.onGround = true;
       } else if (this.y > this.gy + 0.25) this.onGround = false;
       if (this.gy < C.WATER_Y - 1.1 && this.y < C.WATER_Y - 0.2) {
@@ -126,11 +136,12 @@ export class Player {
     }
     this.collide();
     // Interaktion
-    if (I.pressed('enter') && !swim) {
+    if (I.pressed('enter')) {
       const v = this.nearestVehicle(6);
-      if (v) this.startEnter(v);
+      if (v && (!swim || v.T.boat)) this.startEnter(v);
     }
     if (I.pressed('weapon')) this.nextWeapon();
+    if (I.pressed('radio') || I.pressed('reload')) this.startReload();
     // Feuern
     if (I.held('fire') && this.fireT <= 0 && !swim && !this.useItem) this.fire();
     // Animation
@@ -176,7 +187,8 @@ export class Player {
     for (const v of G.vehicles) {
       if (!v.alive || v.sinking || v.driver === 'player' || v.remote) continue;
       if (Math.abs(v.y - this.y) > 2) continue;
-      const d = dist2(v.x, v.z, this.x, this.z);
+      let d = dist2(v.x, v.z, this.x, this.z);
+      if (v.T.boat || v.T.plane) { const e = Math.max(0, Math.sqrt(d) - v.hl * 0.65); d = e * e; } // große Boote: Abstand zum Rumpf
       if (d < bd) { bd = d; best = v; }
     }
     return best;
@@ -192,7 +204,7 @@ export class Player {
       if (!p.alive) continue;
       const dx = p.x - this.x, dz = p.z - this.z;
       const d = Math.hypot(dx, dz);
-      if (d > 40 || d < 0.5) continue;
+      if (d > (this.wmods[this.weapon] && this.wmods[this.weapon].scope ? 65 : 40) || d < 0.5) continue;
       const dot = Math.max((dx * fx + dz * fz) / d, (dx * cfx + dz * cfz) / d);
       if (dot < 0.55) continue;
       let score = dot * 2 - d / 40;
@@ -213,7 +225,16 @@ export class Player {
     return best;
   }
 
+  // Magazin: verbleibende Schuss im Magazin (lazy), Nachladen
+  clipOf(w) { const S = wstats(w, this.wmods[w]); const c = this.clip[w] ?? Math.min(S.mag, this.ammo[w]); return Math.min(c, this.ammo[w]); }
+  startReload() {
+    const w = this.weapon; if (WEAPONS[w].melee || this.reloadT > 0) return;
+    const S = wstats(w, this.wmods[w]);
+    if (this.clipOf(w) >= Math.min(S.mag, this.ammo[w])) return;
+    this.reloadT = S.reload; G.audio.click(); G.hud.weapon();
+  }
   nextWeapon() {
+    this.reloadT = 0;
     const i = WEAPON_ORDER.indexOf(this.weapon);
     for (let k = 1; k <= WEAPON_ORDER.length; k++) {
       const w = WEAPON_ORDER[(i + k) % WEAPON_ORDER.length];
@@ -238,8 +259,14 @@ export class Player {
       return;
     }
     if (this.ammo[this.weapon] <= 0) { this.nextWeapon(); G.audio.click(); this.fireT = 0.3; return; }
-    this.fireT = w.rate;
+    if (this.reloadT > 0) return;
+    const S = wstats(this.weapon, this.wmods[this.weapon]);
+    let clip = this.clipOf(this.weapon);
+    if (clip <= 0) { this.startReload(); return; }
+    this.fireT = S.rate;
     this.ammo[this.weapon]--;
+    this.clip[this.weapon] = --clip;
+    if (clip <= 0 && this.ammo[this.weapon] > 0) setTimeout(() => this.startReload(), 120);
     this.aimT = 0.6;
     const yaw = this.yaw;
     const ox = this.x + Math.sin(yaw) * 0.55 - Math.cos(yaw) * 0.2, oy = this.y + 1.45, oz = this.z + Math.cos(yaw) * 0.55 + Math.sin(yaw) * 0.2;
@@ -257,7 +284,7 @@ export class Player {
     let dx = tx - ox, dy = ty - oy, dz = tz - oz;
     const L = Math.hypot(dx, dy, dz) || 1;
     G.combat.playerShot(this.weapon, ox, oy, oz, dx / L, dy / L, dz / L, null);
-    G.cam.kick(this.weapon === 'shotgun' ? 0.03 : 0.012);
+    G.cam.kick((this.weapon === 'shotgun' ? 0.03 : 0.012) * S.kick);
     G.hud.weapon();
   }
 
@@ -291,7 +318,7 @@ export class Player {
     if (U.t >= it.dur) {
       if (it.heal) this.health = Math.min(100, this.health + it.heal);
       if (it.drunk && G.interiors) G.interiors.drunk = Math.max(G.interiors.drunk, it.drunk);
-      if (it.high) G.highT = Math.max(G.highT || 0, it.high);
+      if (it.high) G.trip.start(it.trip || (it.boost ? 'pills' : 'joint'), it.high);
       if (it.boost) { this.boostT = it.boost; G.hud.toast(`⚡ Sprint-Boost für ${it.boost} Sekunden!`); }
       else if (it.heal) G.hud.toast(`+${it.heal} Gesundheit`);
       if (it.anim === 'smoke') G.hud.toast('Entspannt … aber gesund war das nicht.');
@@ -301,6 +328,7 @@ export class Player {
 
   // ---- Einsteigen: laufen -> Tür öffnen -> (Fahrer rausziehen) -> hinsetzen -> Tür zu
   startEnter(v) {
+    if (v.T.boat || v.T.plane) { G.hud.fadeIn(); this.enterVehicle(v); return; }
     this.state = 'entering';
     this.enterV = v;
     this.enterPhase = 'walk';
@@ -419,6 +447,7 @@ export class Player {
   exitVehicle(force = false, burning = false) {
     const v = this.vehicle;
     if (!v) return;
+    if (v.T.boat || v.T.plane) { this.exitCraft(v, force); return; }
     const lx = Math.cos(v.h), lz = -Math.sin(v.h);
     let x = v.x + lx * (v.hw + 0.6), z = v.z + lz * (v.hw + 0.6);
     // Seite blockiert? -> andere Seite
@@ -453,6 +482,26 @@ export class Player {
     if (G.missions.onExitVehicle) G.missions.onExitVehicle(v);
   }
 
+  // Boot/Flugzeug verlassen: auf Steg/Ufer, ins Wasser oder mit Fallschirm
+  exitCraft(v, force) {
+    const W = G.world;
+    let best = null, bd = 1e9;
+    for (let r = v.hw + 0.8; r < 8 && !best; r += 1.2) for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2, x = v.x + Math.sin(a) * r, z = v.z + Math.cos(a) * r, gy = W.groundHeight(x, z);
+      if (gy > C.WATER_Y + 0.1 && Math.abs(gy - v.y) < 2.5) { const d = r; if (d < bd) { bd = d; best = [x, z, gy]; } }
+    }
+    v.driver = null; v.input.throttle = 0; v.input.brake = 0; v.input.steer = 0; v.input.handbrake = false; v.input.pitch = 0;
+    this.vehicle = null; this.visible = true; this.vx = this.vz = this.vy = 0;
+    G.audio.exitCar();
+    const air = v.T.plane && !v.grounded && v.y - W.groundHeight(v.x, v.z) > 6;
+    if (air) { this.x = v.x - Math.cos(v.h) * 3; this.z = v.z + Math.sin(v.h) * 3; this.y = v.y - 1; this.state = 'foot'; this.onGround = false; this.parachute = true; G.hud.toast('🪂 Fallschirm geöffnet!'); }
+    else if (best) { this.x = best[0]; this.z = best[1]; this.y = this.gy = best[2]; this.state = 'foot'; G.hud.fadeIn(); }
+    else if (v.T.boat) { this.x = v.x + Math.cos(v.h) * (v.hw + 0.8); this.z = v.z - Math.sin(v.h) * (v.hw + 0.8); this.y = C.WATER_Y - 0.25; this.state = 'swim'; G.effects.splash(this.x, C.WATER_Y, this.z, 10); G.audio.splash(); }
+    else { this.x = v.x + Math.cos(v.h) * 2.2; this.z = v.z - Math.sin(v.h) * 2.2; this.y = this.gy = W.groundHeight(this.x, this.z); this.state = 'foot'; }
+    this.yaw = v.h;
+    if (G.missions.onExitVehicle) G.missions.onExitVehicle(v);
+  }
+
   driveUpdate(dt, I) {
     const v = this.vehicle;
     if (!v) { this.state = 'foot'; return; }
@@ -475,6 +524,7 @@ export class Player {
     inp.handbrake = I.held('handbrake');
     inp.noReverse = false;
     if (I.pressed('enter')) { this.exitVehicle(); return; }
+    nitroUpdate(v, I, dt);
     if (I.held('horn')) G.audio.horn(v.x, v.z, 0.1, true);
     if (I.pressed('radio')) G.audio.nextStation();
     if (I.pressed('weapon')) this.nextWeapon();
@@ -489,10 +539,12 @@ export class Player {
       if (I.held('fire') && v.cannonT <= 0) { v.cannonT = 1.8; G.combat.fireShell(v); }
     } else
     // Drive-by
-    if (I.held('fire') && this.fireT <= 0 && this.weapon !== 'fists' && this.ammo[this.weapon] > 0) {
-      const w = WEAPONS[this.weapon];
-      this.fireT = w.rate * 1.2;
-      this.ammo[this.weapon]--;
+    if (I.held('fire') && this.fireT <= 0 && this.weapon !== 'fists' && this.ammo[this.weapon] > 0 && this.reloadT <= 0) {
+      const w = WEAPONS[this.weapon], S = wstats(this.weapon, this.wmods[this.weapon]);
+      if (this.clipOf(this.weapon) <= 0) { this.startReload(); return; }
+      this.fireT = S.rate * 1.2;
+      this.ammo[this.weapon]--; this.clip[this.weapon] = this.clipOf(this.weapon) - 1;
+      void w;
       const t = this.findDriveByTarget(v);
       const ox = v.x + Math.cos(v.h) * (v.hw + 0.2), oy = v.y + 1.3, oz = v.z - Math.sin(v.h) * (v.hw + 0.2);
       let tx, ty, tz;

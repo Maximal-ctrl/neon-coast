@@ -627,6 +627,7 @@ function buildTank(key, color) {
 export function buildCar(key, color) {
   const T = CAR_TYPES[key];
   if (T.tank) return buildTank(key, color);
+  if (T.build) return T.build(key, color);
   const g = carGeos(key);
   const grp = new THREE.Group();
   grp.rotation.order = 'YXZ';
@@ -691,7 +692,7 @@ function plateMat() {
 // Räder für statische Modelle (Autohaus)
 let _wheelGeo = null, _wheelMat = null;
 export function addWheels(group, key) {
-  const T = CAR_TYPES[key]; if (T.tank) return; const g = carGeos(key);
+  const T = CAR_TYPES[key]; if (T.tank || T.build) return; const g = carGeos(key);
   _wheelGeo = _wheelGeo || wheelGeometry();
   _wheelMat = _wheelMat || new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.35 });
   for (const [x, y, z, front] of g.wheels) {

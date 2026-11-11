@@ -42,7 +42,7 @@ export class CameraRig {
       this.updateVectors();
       return;
     }
-    const sens = G.settings.sensitivity * (G.isTouch ? 1.6 : 1);
+    const sens = G.settings.sensitivity * (G.isTouch ? 1.6 : 1) * Math.min(1, this.fov / 60);
     // Im Fahrzeug: Blickwinkel relativ zum Fahrzeug (dreht mit), Maus verschiebt den Versatz
     const veh = P.inCar ? P.vehicle : null;
     if (veh) {
@@ -64,13 +64,13 @@ export class CameraRig {
       const v = P.vehicle;
       const sp = v.speed;
       tx = v.x; ty = v.y + 1.3 + (this.carView === 1 ? 1 : 0); tz = v.z;
-      dist = (v.T.L * 0.9 + 3.6) * (this.carView === 1 ? 1.5 : 1) + Math.min(2.5, sp * 0.05);
+      dist = (v.T.L * 0.9 + 3.6 + (v.T.plane ? 6 : v.T.yacht ? 4 : 0)) * (this.carView === 1 ? 1.5 : 1) + Math.min(2.5, sp * 0.05);
       if (this.carView === 2) { dist = 0.5; ty = v.y + v.height * 0.8 + 0.1; }
       // Versatz zurück zur Fahrtrichtung, wenn die Maus ruht
       let off = ((this.carOff || 0) + Math.PI) % (Math.PI * 2); if (off < 0) off += Math.PI * 2; off -= Math.PI;
       if (this.userT <= 0 && (sp > 1.5 || this.carView === 2)) {
         off = damp(off, 0, this.carView === 2 ? 10 : 2.2, dt);
-        this.pitch = damp(this.pitch, this.carView === 2 ? -0.05 : -0.2, 2, dt);
+        this.pitch = damp(this.pitch, this.carView === 2 ? -0.05 : v.T.plane && !v.grounded ? clamp(v.pitch * 0.8 - 0.14, -0.9, 0.8) : -0.2, v.T.plane ? 3 : 2, dt);
       }
       this.carOff = off;
       // Fahrzeugrichtung weich nachführen (kein Ruckeln bei Lenkstößen)
@@ -81,13 +81,14 @@ export class CameraRig {
     } else {
       tx = P.x; ty = P.y + 1.55; tz = P.z;
       const aiming = P.anim.aim && !G.isTouch;
-      dist = aiming ? 2.4 : (P.state === 'swim' ? 5 : 4.4);
+      dist = aiming ? 2.4 : (P.state === 'swim' ? 5 : P.state === 'ride' ? 10 : 4.4);
       if (P.state === 'dead' || P.state === 'busted') dist = 6;
       if (aiming) {
         // Schulterkamera
         const rx = -Math.cos(this.yaw), rz = Math.sin(this.yaw);
         tx += rx * 0.55; tz += rz * 0.55; ty += 0.1;
-        fovT = 55;
+        const wm = P.wmods && P.wmods[P.weapon];
+        fovT = wm && wm.scope ? 28 : 55;
       }
       const sp = Math.hypot(P.vx, P.vz);
       if (this.userT <= 0 && sp > 1 && G.isTouch) this.yaw = dampAngle(this.yaw, P.yaw, 0.9, dt);
@@ -102,7 +103,7 @@ export class CameraRig {
     if (t >= 0) d = Math.max(0.6, t - 0.35);
     if (d < this.curDist || this.snapNext) this.curDist = d; else this.curDist = damp(this.curDist, d, 3, dt);
     let px = tx - fx * this.curDist, py = ty - fy * this.curDist, pz = tz - fz * this.curDist;
-    const gy = G.world.groundHeight(px, pz);
+    const gy = G.world.groundHeight(px, pz, ty);
     if (py < gy + 0.35) py = gy + 0.35;
     if (this.snapNext) { this.pos.set(px, py, pz); this.snapNext = false; }
     else {
@@ -117,8 +118,10 @@ export class CameraRig {
     }
     this._v.set(cam.position.x + fx * 10, cam.position.y + fy * 10, cam.position.z + fz * 10);
     cam.lookAt(this._v);
+    const tr = G.trip;
+    if (tr && tr.roll) cam.rotateZ(tr.roll);
     this.fov = damp(this.fov, fovT, 4, dt);
-    cam.fov = this.fov;
+    cam.fov = this.fov + (tr ? tr.fov : 0);
     cam.updateProjectionMatrix();
     this.updateVectors();
   }

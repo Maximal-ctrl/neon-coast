@@ -159,6 +159,64 @@ select, input[type="range"] { accent-color: var(--accent); }
 .ph-sec { margin: 12px 0 4px; font-size: 12px; letter-spacing: .14em; opacity: .6; text-transform: uppercase; }
 .ph-btn2 em { font-style: normal; opacity: .7; margin-left: 6px; }
 
+/* ---------- Tuning & Nitro (3.0) ---------- */
+.tb.nitro { right: 270px; bottom: 16px; width: 60px; height: 60px; font-size: 11px; overflow: hidden; }
+.tb.nitro #nitro-bar { position: absolute; left: 0; bottom: 0; height: 4px; width: calc(var(--n, 1) * 100%); background: #4fc3ff; }
+body:not(.has-nitro) .tb.nitro { display: none !important; }
+.dl.tu .dl-list { max-height: 34vh; }
+.dl.tu .dl-list.tu-grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+.tu-opt { gap: 10px; justify-content: flex-start !important; }
+.tu-opt > div { flex: 1; }
+.dl-car .tu-sw { width: 26px; height: 26px; border-radius: 50%; background: var(--c) !important; border: 2px solid rgba(255,255,255,.35); flex: none; position: static !important; }
+.tu-tabs { flex-wrap: nowrap; overflow-x: auto; }
+.tu-extra { display: flex; gap: 8px; flex-wrap: wrap; }
+.tu-extra .st-sec { flex: 1; }
+
+/* ---------- Casino (3.0) ---------- */
+.st.cas { height: auto; max-height: 94vh; }
+.st.cas.wide { width: min(1180px, 97vw); }
+.cas-body { padding: 18px 24px 22px; overflow: auto; }
+.cas-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.cas-row .st-buy { flex: 1; min-width: 180px; }
+.cas-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.cas-chips button { width: 52px; height: 52px; border-radius: 50%; border: 3px dashed rgba(255,255,255,.55); background: radial-gradient(circle, #2b2f36 55%, #15171b 56%); color: #fff; font-family: var(--head); font-size: 15px; cursor: pointer; }
+.cas-chips button.on { background: radial-gradient(circle, var(--a) 55%, #15171b 56%); border-color: #fff; color: #111; transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,.5); }
+.cas-msg { font-size: 17px; min-height: 26px; margin-top: 10px; opacity: .92; }
+.cas-msg b.win, b.win { color: #7cff6b; text-shadow: 0 0 12px rgba(124,255,107,.6); }
+.cas-total { font-size: 15px; opacity: .85; } .cas-total b { font-family: var(--head); color: var(--cash); font-size: 20px; margin-left: 6px; }
+.rl { display: grid; grid-template-columns: 360px 1fr; gap: 22px; align-items: start; }
+.rl-left canvas { width: 100%; max-width: 360px; border-radius: 50%; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+.rl-last { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; } .rl-last span { min-width: 28px; padding: 3px 0; text-align: center; background: var(--c); border-radius: 4px; font-family: var(--head); }
+.rl-nums { display: grid; grid-template-columns: repeat(13, 1fr); gap: 3px; }
+.rl-n { position: relative; aspect-ratio: 1; border: none; border-radius: 3px; background: var(--c); color: #fff; font-family: var(--head); font-size: 15px; cursor: pointer; }
+.rl-n.z { grid-row: span 3; aspect-ratio: auto; }
+.rl-outs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 6px; }
+.rl-outs button { position: relative; padding: 10px 6px; border: 1px solid rgba(255,255,255,.15); border-radius: 3px; background: rgba(255,255,255,.05); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.rl-outs .red { background: #8f1220; } .rl-outs .black { background: #111; }
+.rl-n i, .rl-outs i { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; padding: 0 4px; border-radius: 11px; background: #ffd23f; color: #111; font-style: normal; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: 2px dashed #fff; }
+.bj { display: flex; flex-direction: column; gap: 6px; background: radial-gradient(ellipse at 50% 0%, #1f7a44, #0c3a20 70%); border-radius: 6px; padding: 18px; border: 6px solid #4a2414; }
+.bj-lbl { font-family: var(--head); letter-spacing: .1em; text-transform: uppercase; opacity: .85; } .bj-lbl b { color: #ffd23f; font-size: 22px; margin-left: 8px; }
+.bj-cards { display: flex; gap: 10px; min-height: 112px; padding: 6px 0; }
+.bj-card { width: 76px; height: 106px; border-radius: 8px; background: #fbf8f1; color: #111; position: relative; box-shadow: 0 6px 14px rgba(0,0,0,.45); animation: cardIn .35s cubic-bezier(.2,.9,.3,1.2) both; animation-delay: calc(var(--i) * .08s); }
+.bj-card.red { color: #c0182a; }
+.bj-card b { position: absolute; left: 8px; top: 6px; font-family: var(--head); font-size: 22px; } .bj-card span { position: absolute; left: 9px; top: 32px; font-size: 16px; } .bj-card em { position: absolute; right: 10px; bottom: 6px; font-style: normal; font-size: 36px; }
+.bj-card.back { background: repeating-linear-gradient(45deg, #8a1020 0 8px, #6a0c18 8px 16px); border: 4px solid #fbf8f1; }
+@keyframes cardIn { from { transform: translateY(-40px) rotate(-8deg); opacity: 0; } }
+.bj-rules { font-size: 12px; opacity: .6; letter-spacing: .05em; margin-top: 6px; }
+.fw { display: grid; grid-template-columns: 380px 1fr; gap: 26px; align-items: center; }
+.fw canvas { width: 100%; max-width: 380px; filter: drop-shadow(0 12px 30px rgba(0,0,0,.6)); }
+.fw-side { display: flex; flex-direction: column; gap: 14px; }
+.hr-track { position: relative; background: #0b3d1e; border-radius: 6px; padding: 8px 0; border: 4px solid #4a2414; }
+.hr-lane { position: relative; height: 34px; border-bottom: 1px dashed rgba(255,255,255,.15); }
+.hr-num { position: absolute; left: 6px; top: 7px; width: 20px; height: 20px; border-radius: 50%; background: #ffd23f; color: #111; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.hr-horse { position: absolute; left: 22px; top: 2px; font-size: 26px; font-style: normal; transform: scaleX(-1); transition: left .08s linear; }
+.hr-goal { position: absolute; right: 30px; top: 0; bottom: 0; width: 4px; background: repeating-linear-gradient(0deg, #fff 0 6px, #111 6px 12px); }
+.hr-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+.sl-cab { background: linear-gradient(180deg, var(--c2, #2a0f3d), #0d0812) !important; border-color: var(--fr, #ffd23f) !important; }
+.sl-top { background: linear-gradient(180deg, var(--c1, #ff2e88), var(--c2, #8a1050)) !important; }
+.sl-top span { color: var(--fr, #ffd23f) !important; }
+@media (max-width: 860px) { .rl, .fw { grid-template-columns: 1fr; } .rl-left canvas, .fw canvas { max-width: 240px; } .hr-list { grid-template-columns: repeat(2, 1fr); } }
+
 /* ---------- Läden & Autohaus (2.2) ---------- */
 .st { border-radius: 6px !important; background: linear-gradient(180deg, rgba(18,20,24,.94), rgba(8,9,11,.96)) !important; border: 1px solid rgba(255,255,255,.1); box-shadow: 0 30px 90px rgba(0,0,0,.7); backdrop-filter: blur(22px) saturate(1.2); -webkit-backdrop-filter: blur(22px) saturate(1.2); }
 .st-h { padding: 20px 26px !important; background: linear-gradient(90deg, color-mix(in srgb, var(--a) 30%, transparent), transparent 62%) !important; border-bottom: 1px solid rgba(255,255,255,.08); position: relative; }

@@ -59,7 +59,8 @@ export class Police {
     this.level = 0; this.heat = 0; this.arrestT = 0;
     for (const b of this.blocks || []) for (const v of b.cars) if (!v.removed && v !== G.player.vehicle && !G.peds.inView(v.x, v.z)) v.remove(); else v.persistent = false;
     this.blocks = [];
-    for (const v of G.vehicles) if (v.police && v.ai && !v.persistent) { v.ai.mode = 'traffic'; v.siren = false; v.ai.cruise = 13; v.ai.route = []; v.ai.pts = []; if (G.world.inHills(v.x, v.z)) { const l = G.world.netLocate(v.x, v.z); v.ai.startHill(l.edge, l.idx, 1); } else { const n = G.world.nearestNode(v.x, v.z); v.ai.startEdge(n.id, n.nbr[0]); } }
+    for (const v of G.vehicles) if (v.police && v.ai && v.T.boat) { v.ai.mode = 'cruise'; v.siren = false; }
+    for (const v of G.vehicles) if (v.police && v.ai && !v.persistent && !v.T.boat) { v.ai.mode = 'traffic'; v.siren = false; v.ai.cruise = 13; v.ai.route = []; v.ai.pts = []; if (G.world.inHills(v.x, v.z)) { const l = G.world.netLocate(v.x, v.z); v.ai.startHill(l.edge, l.idx, 1); } else { const n = G.world.nearestNode(v.x, v.z); v.ai.startEdge(n.id, n.nbr[0]); } }
     for (const p of G.peds.list) if (p.isCop && p.state === 'cop') { p.state = 'walk'; p.path = null; p.anim.gun = false; }
   }
 
@@ -88,11 +89,13 @@ export class Police {
     this.spawnT -= dt;
     if (cars.length < want && this.spawnT <= 0) {
       this.spawnT = 2.5;
-      const v = G.world.inHills(px, pz) && pz < -400 ? G.traffic.spawnHillCar(px, pz, 'police', 'police', 60, 160) : G.traffic.spawnCar(px, pz, 70, 150, 'police', 'police');
+      const onWater = (P.inCar && P.vehicle.T.boat) || P.state === 'swim';
+      const v = onWater && G.craft ? G.craft.spawnPoliceBoat(px, pz) : G.world.inHills(px, pz) && pz < -400 ? G.traffic.spawnHillCar(px, pz, 'police', 'police', 60, 160) : G.traffic.spawnCar(px, pz, 70, 150, 'police', 'police');
       if (v) { v.siren = true; v.ai.cruise = 26; v.persistent = false; }
     }
     // Streifenpolizisten steigen aus
     for (const v of cars) {
+      if (v.T.boat) continue;
       const d2 = dist2(v.x, v.z, px, pz);
       if (!v.copsOut && d2 < 22 * 22 && v.speed < 3 && (!P.inCar || P.vehicle.speed < 3)) {
         v.copsOut = true;
@@ -107,7 +110,7 @@ export class Police {
     }
     // Schüsse aus Streifenwagen ab 3 Sternen
     if (this.level >= 3) for (const v of cars) {
-      if (!v.driver || v.copsOut) continue;
+      if (!v.driver || v.copsOut || v.T.boat) continue;
       const d2 = dist2(v.x, v.z, px, pz);
       v.shootT = (v.shootT ?? rand(1, 2)) - dt;
       if (d2 < 30 * 30 && v.shootT <= 0) {

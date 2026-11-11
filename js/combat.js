@@ -6,12 +6,33 @@ import { rand, dist2, clamp } from './utils.js';
 
 export const WEAPONS = {
   fists: { name: 'Fäuste', icon: 'fist', melee: true, dmg: 18, rate: 0.42, range: 1.9 },
-  pistol: { name: 'Pistole', icon: 'pistol', dmg: 30, rate: 0.26, spread: 0.012, range: 95, price: 400, ammoPrice: 60, ammoPack: 24 },
-  smg: { name: 'Maschinenpistole', icon: 'smg', dmg: 15, rate: 0.085, spread: 0.035, range: 70, auto: true, twoHand: true, price: 1500, ammoPrice: 120, ammoPack: 90 },
-  shotgun: { name: 'Schrotflinte', icon: 'shotgun', dmg: 13, pellets: 8, rate: 0.85, spread: 0.075, range: 35, twoHand: true, price: 2200, ammoPrice: 150, ammoPack: 16 },
-  rifle: { name: 'Sturmgewehr', icon: 'rifle', dmg: 34, rate: 0.12, spread: 0.014, range: 130, auto: true, twoHand: true, price: 4500, ammoPrice: 250, ammoPack: 90 },
+  pistol: { name: 'Pistole', icon: 'pistol', dmg: 30, rate: 0.26, spread: 0.012, range: 95, price: 400, ammoPrice: 60, ammoPack: 24, mag: 12, reload: 1.3 },
+  smg: { name: 'Maschinenpistole', icon: 'smg', dmg: 15, rate: 0.085, spread: 0.035, range: 70, auto: true, twoHand: true, price: 1500, ammoPrice: 120, ammoPack: 90, mag: 30, reload: 1.7 },
+  shotgun: { name: 'Schrotflinte', icon: 'shotgun', dmg: 13, pellets: 8, rate: 0.85, spread: 0.075, range: 35, twoHand: true, price: 2200, ammoPrice: 150, ammoPack: 16, mag: 6, reload: 2.3 },
+  rifle: { name: 'Sturmgewehr', icon: 'rifle', dmg: 34, rate: 0.12, spread: 0.014, range: 130, auto: true, twoHand: true, price: 4500, ammoPrice: 250, ammoPack: 90, mag: 30, reload: 1.9 },
 };
 export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun', 'rifle'];
+
+// Waffen-Aufsätze (Waffenladen → „Aufsätze“)
+export const WMODS = {
+  mag: { name: 'Erweitertes Magazin', icon: '🧱', base: 600, desc: '+60 % Schuss pro Magazin – seltener nachladen.' },
+  scope: { name: 'Zielfernrohr', icon: '🔭', base: 900, desc: 'Starker Zoom beim Zielen, präziser, 40 % mehr Reichweite.' },
+  dmg1: { name: 'Hohlspitz-Munition', icon: '💥', base: 1200, desc: '+20 % Schaden.' },
+  dmg2: { name: 'Panzerbrechende Munition', icon: '☢️', base: 2600, req: 'dmg1', desc: '+45 % Schaden (statt +20 %). Setzt Hohlspitz voraus.' },
+  supp: { name: 'Schalldämpfer', icon: '🤫', base: 1000, desc: 'Leise: Passanten bemerken weniger, Polizei reagiert nur in der Nähe.' },
+  laser: { name: 'Laservisier', icon: '🔴', base: 500, desc: '35 % weniger Streuung.' },
+  grip: { name: 'Kompensator & Griff', icon: '✊', base: 700, desc: 'Halber Rückstoß, 12 % schnellere Schussfolge.' },
+};
+const WMUL = { pistol: 1, smg: 1.5, shotgun: 1.6, rifle: 2.2 };
+export const wmodPrice = (w, m) => Math.round((WMODS[m].base * WMUL[w]) / 50) * 50;
+export function wstats(wkey, mods) {
+  const w = WEAPONS[wkey], m = mods || {};
+  return {
+    dmg: w.dmg * (m.dmg2 ? 1.45 : m.dmg1 ? 1.2 : 1), spread: (w.spread || 0) * (m.laser ? 0.65 : 1) * (m.scope ? 0.6 : 1),
+    rate: w.rate / (m.grip ? 1.12 : 1), range: (w.range || 0) * (m.scope ? 1.4 : 1), mag: Math.round((w.mag || 1) * (m.mag ? 1.6 : 1)),
+    reload: w.reload || 1.5, quiet: !!m.supp, scope: !!m.scope, kick: m.grip ? 0.5 : 1,
+  };
+}
 
 const _b = [];
 const hit = { t: 0, type: null, obj: null, x: 0, y: 0, z: 0 };
@@ -134,29 +155,29 @@ export class Combat {
 
   // Spieler schießt von (ox,oy,oz) in Richtung (dx,dy,dz)
   playerShot(wkey, ox, oy, oz, dx, dy, dz, ignoreVeh) {
-    const w = WEAPONS[wkey];
+    const w = WEAPONS[wkey], S = wstats(wkey, G.player.wmods && G.player.wmods[wkey]);
     const pellets = w.pellets || 1;
     for (let k = 0; k < pellets; k++) {
-      let sx = dx + rand(-w.spread, w.spread), sy = dy + rand(-w.spread, w.spread) * 0.6, sz = dz + rand(-w.spread, w.spread);
+      let sx = dx + rand(-S.spread, S.spread), sy = dy + rand(-S.spread, S.spread) * 0.6, sz = dz + rand(-S.spread, S.spread);
       const L = Math.hypot(sx, sy, sz); sx /= L; sy /= L; sz /= L;
-      const h = this.raycast(ox, oy, oz, sx, sy, sz, w.range, ignoreVeh);
+      const h = this.raycast(ox, oy, oz, sx, sy, sz, S.range, ignoreVeh);
       const mh = G.mp && G.mp.online ? G.mp.rayHit(ox, oy, oz, sx, sy, sz, h.t) : null;
       if (mh) {
         // Mitspieler getroffen
         const hx = ox + sx * mh.t, hy = oy + sy * mh.t, hz = oz + sz * mh.t;
         G.effects.tracer(ox, oy, oz, hx, hy, hz);
         G.effects.impact(hx, hy, hz, 'dust');
-        G.mp.sendHit(mh.r, w.dmg * (hy > mh.r.y + 1.55 ? 2 : 1));
+        G.mp.sendHit(mh.r, S.dmg * (hy > mh.r.y + 1.55 ? 2 : 1));
         G.hud.hitMarker(false);
         continue;
       }
       G.effects.tracer(ox, oy, oz, h.x, h.y, h.z);
-      this.applyHit(h, w.dmg, 'player', sx, sz);
+      this.applyHit(h, S.dmg, 'player', sx, sz);
     }
-    G.effects.muzzle(ox, oy, oz);
-    G.audio.gun(wkey, ox, oz, true);
-    G.peds.panic(ox, oz, 45, { x: ox, z: oz });
-    G.police.crime('shoot');
+    if (!S.quiet) G.effects.muzzle(ox, oy, oz);
+    G.audio.gun(S.quiet ? 'quiet' : wkey, ox, oz, true);
+    G.peds.panic(ox, oz, S.quiet ? 10 : 45, { x: ox, z: oz });
+    if (!S.quiet || G.police.copNear(30)) G.police.crime('shoot');
     G.stats.shotsFired++;
   }
 

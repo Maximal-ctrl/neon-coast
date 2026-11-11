@@ -28,7 +28,7 @@ export const SIGN = { HOTEL: 0, MOTEL: 1, BAR: 2, CLUB: 3, DINER: 4, TACOS: 5, P
 
 
 // Gelände, Landstraßen & Orte: siehe terrain.js
-import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES } from './terrain.js';
+import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES , JUNCTIONS } from './terrain.js';
 export { HILLS, CAUSEWAY, VILLAGE, MANSION, HILL_ROAD, SUMMIT_ROAD, hillHeight };
 
 export class World {
@@ -91,11 +91,14 @@ export class World {
       }
   }
 
-  groundHeight(x, z) {
+  // yHint: aktuelle Höhe des Objekts – unter Brücken gilt dann das Tal statt der Fahrbahn
+  groundHeight(x, z, yHint) {
+    const PL = this.platforms;
+    if (PL) for (let i = 0; i < PL.length; i++) { const p = PL[i]; if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return p.y; }
     if (z < -384 && z > -492) for (const CW of C.CAUSEWAYS) if (x > CW.x0 && x < CW.x1) return lerp(0, CW.y1, (CW.z1 - z) / (CW.z1 - CW.z0));
     if (z < HILLS.z1) {
       const r = hillRoadAt(x, z);
-      if (r && r[0] < 5.2) return r[1];
+      if (r && r[0] < 5.2 && !(yHint !== undefined && yHint < r[1] - 3 && HILL_ROADS[r[2]].bridge[r[3]])) return r[1];
       return hillHeight(x, z);
     }
     for (let i = 0; i < this.rooms.length; i++) { const r = this.rooms[i]; if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return r.y; }
@@ -298,6 +301,7 @@ export class World {
     this.genPier();
     this.genHarbor();
     this.genQuay();
+    this.genDocks();
     this.genStreetProps();
     this.genRamps();
     await tick(0.62, 'Berge werden geformt …');
@@ -1105,6 +1109,8 @@ export class World {
     }
     this.villageRoads = [];
     for (const R of HILL_ROADS) this.genHillRoad(R, R === HILL_ROAD || R === SUMMIT_ROAD);
+    this.genJunctions();
+    this.genRuralHouses();
     this.hillRoad = HILL_ROAD;
     this.genVillage();
     this.genMansion();
@@ -1158,14 +1164,125 @@ export class World {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1], [nx, nz] = nrm(i);
       const hL = hillHeight(ax + nx * 16, az + nz * 16), hR = hillHeight(ax - nx * 16, az - nz * 16);
       const side = hL < hR ? 1 : -1;
-      if (R.hs[i] - Math.min(hL, hR) < 2.2 || C.townAt(ax, az, 12)) continue; // Leitplanke nur am Abhang
+      if (R.hs[i] - Math.min(hL, hR) < 2.2 || C.townAt(ax, az, 12) || (R.bridge && R.bridge[i])) continue; // Leitplanke nur am Abhang
       const o = 6.2 * side, ya = R.hs[i] - 0.1, yb = R.hs[i + 1] - 0.1;
       const p0 = [ax + nx * o, az + nz * o], p1 = [bx + nx * o, bz + nz * o];
       P.quad([p0[0], ya + 0.45, p0[1]], [p1[0], yb + 0.45, p1[1]], [p1[0], yb + 0.8, p1[1]], [p0[0], ya + 0.8, p0[1]], [0, 0, 1, 1], rgb(0xc9ccd0));
       P.quad([p1[0], yb + 0.45, p1[1]], [p0[0], ya + 0.45, p0[1]], [p0[0], ya + 0.8, p0[1]], [p1[0], yb + 0.8, p1[1]], [0, 0, 1, 1], rgb(0xc9ccd0));
       if (i % 2 === 0) P.box(p0[0] - 0.08, ya, p0[1] - 0.08, p0[0] + 0.08, ya + 0.8, p0[1] + 0.08, { col: rgb(0x77797d) });
     }
+    // Leitpfosten mit Reflektoren
+    for (let i = 3; i < n - 1; i += 6) {
+      if (R.bridge && R.bridge[i]) continue;
+      const [x, z] = pts[i], [nx, nz] = nrm(i);
+      if (C.townAt(x, z, 10)) continue;
+      for (const s of [-1, 1]) { const px = x + nx * 5.6 * s, pz = z + nz * 5.6 * s, y = R.hs[i] - 0.05; P.box(px - 0.06, y, pz - 0.06, px + 0.06, y + 1.0, pz + 0.06, { col: rgb(0xf2f2ee) }); P.box(px - 0.065, y + 0.72, pz - 0.065, px + 0.065, y + 0.88, pz + 0.065, { col: rgb(0x1a1a1a) }); this.B.accent.box(px - 0.07, y + 0.76, pz - 0.07, px + 0.07, y + 0.84, pz + 0.07, { col: s > 0 ? rgb(0xff8a3a, 1.2) : rgb(0xf2f2f2, 1.1) }); }
+    }
+    if (R.bridge) this.genBridge(R, nrm);
     this.villageRoads.push(R.pts);
+  }
+
+  // Brücke: Überbau, Brüstungen, Pfeiler, seitliche Kollision
+  genBridge(R, nrm) {
+    const P = this.B.props, pts = R.pts, n = pts.length, conc = rgb(0xbdb6aa), dark = rgb(0x8e877b), W = 6.7, T = 1.5;
+    for (let i = 0; i < n - 1; i++) {
+      if (!R.bridge[i] || !R.bridge[i + 1]) continue;
+      const [ax, az] = pts[i], [bx, bz] = pts[i + 1], na = nrm(i), nb = nrm(i + 1), ya = R.hs[i], yb = R.hs[i + 1];
+      const L = (p, q, s, y) => [p + (s > 0 ? na : na)[0] * 0, y, q];
+      void L;
+      const A = (s, w, y) => [ax + na[0] * w * s, ya + y, az + na[1] * w * s], Bp = (s, w, y) => [bx + nb[0] * w * s, yb + y, bz + nb[1] * w * s];
+      // Unterseite
+      P.quad(A(-1, W, -T), A(1, W, -T), Bp(1, W, -T), Bp(-1, W, -T), [0, 0, 1, 1], dark);
+      P.quad(Bp(-1, W, -T), Bp(1, W, -T), A(1, W, -T), A(-1, W, -T), [0, 0, 1, 1], dark);
+      for (const s of [-1, 1]) {
+        // Seitenwand des Überbaus + Brüstung (beide Seiten der Wand)
+        P.quad(A(s, W, -T), Bp(s, W, -T), Bp(s, W, 1.0), A(s, W, 1.0), [0, 0, 1, 1], conc);
+        P.quad(Bp(s, W, -T), A(s, W, -T), A(s, W, 1.0), Bp(s, W, 1.0), [0, 0, 1, 1], conc);
+        P.quad(A(s, W - 0.35, -0.1), Bp(s, W - 0.35, -0.1), Bp(s, W - 0.35, 1.0), A(s, W - 0.35, 1.0), [0, 0, 1, 1], conc);
+        P.quad(Bp(s, W - 0.35, -0.1), A(s, W - 0.35, -0.1), A(s, W - 0.35, 1.0), Bp(s, W - 0.35, 1.0), [0, 0, 1, 1], conc);
+        P.quad(A(s, W - 0.35, 1.0), A(s, W, 1.0), Bp(s, W, 1.0), Bp(s, W - 0.35, 1.0), [0, 0, 1, 1], rgb(0xd6d0c4));
+        P.quad(A(s, W, 1.0), A(s, W - 0.35, 1.0), Bp(s, W - 0.35, 1.0), Bp(s, W, 1.0), [0, 0, 1, 1], rgb(0xd6d0c4));
+        // Kollision: kleine Klötze entlang der Brüstung (nur auf Brückenhöhe)
+        for (let t = 0; t < 1; t += 0.5) { const px = ax + (bx - ax) * t + na[0] * (W - 0.2) * s, pz = az + (bz - az) * t + na[1] * (W - 0.2) * s, y = ya + (yb - ya) * t; this.addBox(px - 0.45, pz - 0.45, px + 0.45, pz + 0.45, y - 0.4, y + 1.1, 'rail'); }
+      }
+      // Pfeiler
+      if (i % 6 === 3) {
+        const g = hillHeight(ax, az);
+        if (ya - g > 3.5) {
+          for (const s of [-1, 1]) { const px = ax + na[0] * 3.2 * s, pz = az + na[1] * 3.2 * s; P.box(px - 0.9, g - 2, pz - 0.9, px + 0.9, ya - T, pz + 0.9, { col: conc }); this.addBox(px - 0.9, pz - 0.9, px + 0.9, pz + 0.9, g - 2, ya - T - 0.2, 'bld'); }
+          P.box(ax - 1.4 - Math.abs(na[0]) * 4.2, ya - T - 0.6, az - 1.4 - Math.abs(na[1]) * 4.2, ax + 1.4 + Math.abs(na[0]) * 4.2, ya - T, az + 1.4 + Math.abs(na[1]) * 4.2, { col: dark });
+        }
+      }
+    }
+  }
+
+  // Kreuzungen: ebene Asphaltfläche, Haltelinie, Wegweiser zu den Orten
+  genJunctions() {
+    const P = this.B.props;
+    for (const J of JUNCTIONS) {
+      this.B.asph.addGeometry(new THREE.CircleGeometry(9.2, 28).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(J.x, J.y + 0.035, J.z));
+      P.addGeometry(new THREE.CircleGeometry(11.2, 28).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(J.x, J.y - 0.05, J.z), rgb(0x8c8573));
+      // Wegweiser: für jede abgehende Straße der nächste Ort
+      const signs = [];
+      for (const ei of J.edges) {
+        const e = NET.edges[ei], fwd = e.a === J.id, P1 = fwd ? e.pts[Math.min(4, e.pts.length - 1)] : e.pts[Math.max(0, e.pts.length - 5)];
+        const dx = P1[0] - J.x, dz = P1[1] - J.z, l = Math.hypot(dx, dz) || 1;
+        const dest = this.nearestPlaceAlong(J, ei);
+        if (dest) signs.push({ dx: dx / l, dz: dz / l, name: dest.name, km: dest.km });
+      }
+      signs.slice(0, 3).forEach((s, k) => {
+        const px = J.x + s.dx * 11 - s.dz * 7.5, pz = J.z + s.dz * 11 + s.dx * 7.5;
+        P.box(px - 0.07, J.y, pz - 0.07, px + 0.07, J.y + 2.8, pz + 0.07, { col: rgb(0x9aa0a6) });
+        this.textSign(`${s.name.toUpperCase()}  ${s.km} KM`, px, J.y + 2.5, pz, Math.atan2(-s.dx, -s.dz), '#ffffff', 3.6, 'rgba(20,90,50,0.95)');
+        void k;
+      });
+    }
+  }
+  nearestPlaceAlong(J, ei) {
+    // Breitensuche über das Netz in Richtung der Kante: erster Ort / Damm
+    const seen = new Set([J.id]);
+    let frontier = [[NET.edges[ei].a === J.id ? NET.edges[ei].b : NET.edges[ei].a, NET.edges[ei].len]];
+    for (let it = 0; it < 60 && frontier.length; it++) {
+      frontier.sort((a, b) => a[1] - b[1]);
+      const [u, d] = frontier.shift();
+      if (seen.has(u)) continue; seen.add(u);
+      const node = NET.nodes[u];
+      if (node.town) { const t = C.TOWNS.find((q) => q.key === node.town); return { name: t ? t.name : 'Monte Solera', km: (d / 1000).toFixed(1).replace('.', ',') }; }
+      if (node.gate) return { name: 'Port Solera', km: (d / 1000).toFixed(1).replace('.', ',') };
+      for (const e2 of node.edges) { const e = NET.edges[e2], v = e.a === u ? e.b : e.a; if (!seen.has(v)) frontier.push([v, d + e.len]); }
+    }
+    return null;
+  }
+
+  // Landhäuser & Höfe entlang der Landstraßen
+  genRuralHouses() {
+    const rnd = mulberry32(31337), placed = [];
+    for (const R of HILL_ROADS) {
+      const pts = R.pts;
+      for (let i = 10; i < pts.length - 10; i += 10) {
+        if (rnd() > 0.6 || (R.bridge && R.bridge[i])) continue;
+        const [x, z] = pts[i], a = pts[i - 1], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l;
+        const s = rnd() < 0.5 ? 1 : -1, off = 24 + rnd() * 10, cx = x + nx * off * s, cz = z + nz * off * s;
+        if (C.townAt(cx, cz, 45) || Math.hypot(cx - VILLAGE.x, cz - VILLAGE.z) < VILLAGE.r + 40 || Math.hypot(cx - MANSION.x, cz - MANSION.z) < MANSION.r + 50) continue;
+        if (cx > AIRFIELD.x0 - 40 && cx < AIRFIELD.x1 + 40 && cz > AIRFIELD.z0 - 40 && cz < AIRFIELD.z1 + 40) continue;
+        if (placed.some(([px, pz]) => Math.hypot(px - cx, pz - cz) < 30)) continue;
+        const rr = hillRoadAt(cx, cz); if (rr && rr[0] < 13) continue;
+        const w = 15 + rnd() * 5, d = 14 + rnd() * 4, x0 = cx - w / 2, z0 = cz - d / 2, x1 = cx + w / 2, z1 = cz + d / 2;
+        const hs = [[x0, z0], [x1, z0], [x0, z1], [x1, z1], [cx, cz]].map(([qx, qz]) => hillHeight(qx, qz));
+        const lo = Math.min(...hs), hi = Math.max(...hs);
+        if (hi - lo > 7 || lo < 1.5) continue;
+        placed.push([cx, cz]);
+        this.B.concrete.box(x0 - 0.5, lo - 1.5, z0 - 0.5, x1 + 0.5, hi + 0.15, z1 + 0.5, { col: rgb(0xb7ad9c), topScale: 2.6, uw: 2.6, vh: 2.6 });
+        this.raised(hi + 0.15, () => {
+          if (rnd() < 0.3) { this.warehouse(x0 + 1, z0 + 1, x1 - 1, z1 - 1, rnd); } else this.house(x0, z0, x1, z1, rnd);
+        });
+        // Zufahrt (Schotter)
+        const ex = x + nx * 6.5 * s, ez = z + nz * 6.5 * s, fx = cx - nx * (d / 2) * s, fz = cz - nz * (d / 2) * s;
+        const gl = Math.hypot(fx - ex, fz - ez) || 1, gx = -(fz - ez) / gl * 1.6, gz = (fx - ex) / gl * 1.6;
+        this.B.props.quad([ex - gx, R.hs[i] - 0.03, ez - gz], [ex + gx, R.hs[i] - 0.03, ez + gz], [fx + gx, hi + 0.12, fz + gz], [fx - gx, hi + 0.12, fz - gz], [0, 0, 1, 1], rgb(0x9b927f));
+      }
+    }
+    this.ruralCount = placed.length; this.ruralPos = placed;
   }
 
   // ---------------------------------------------------------- Orte im Umland
@@ -1218,14 +1335,22 @@ export class World {
         for (let i = 0; i <= t.nx; i++) for (let j = 0; j <= t.nz; j++) this.pierLamps.push([r.x0 + i * CS + HW + 0.8, r.z0 + j * CS + HW + 0.8, Math.PI * 1.25]);
         const special = {
           valverde: { '1,1': 'plaza', '2,1': 'hall', '0,2': 'gas', '3,0': 'park', '1,2': 'shops', '2,2': 'shops2', '2,0': 'apt', '1,0': 'apt' },
-          bahia: { '0,1': 'hotel', '1,1': 'shops', '2,1': 'hotel', '3,1': 'shops2', '0,0': 'gas', '2,0': 'park' },
+          bahia: { '0,1': 'hotel', '1,1': 'shops', '2,1': 'hotel', '3,1': 'shops2', '0,0': 'gas', '2,0': 'park', '3,0': 'casino' },
           ranchos: { '1,1': 'shops', '0,0': 'gas', '2,0': 'hangar', '2,1': 'shops2', '0,1': 'trailer' },
+          santacruz: { '1,1': 'shops', '2,1': 'plaza', '0,0': 'gas', '3,1': 'hotel', '1,0': 'shops2', '3,0': 'apt' },
+          lagoverde: { '1,0': 'plaza', '0,1': 'shops', '2,1': 'shops2', '0,0': 'gas', '2,0': 'park' },
+          pinar: { '1,1': 'shops', '0,0': 'hall', '2,0': 'gas', '1,0': 'park' },
+          sanlucar: { '1,1': 'shops', '0,1': 'gas', '2,0': 'hangar', '0,0': 'trailer', '2,1': 'shops2' },
         }[t.key];
         const doorSets = {
           valverde: { shops: [{ id: 'v_diner', kind: 'diner', name: 'DINER VALVERDE', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'v_gun', kind: 'gunshop', name: 'WAFFEN', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, { id: 'v_bar', kind: 'bar', name: 'CANTINA VERDE', col: '#7cff6b', label: '🍺', awning: 0x1f5a3a }, null], shops2: [{ id: 'v_moda', kind: 'boutique', name: 'MODA VALVERDE', col: '#ff6fb0', label: 'M', awning: 0x2b2d42 }, null, { id: 'v_house', kind: 'house', name: 'WOHNUNG', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null], gas: { id: 'v_shop', kind: 'shop', name: '24/7 VALVERDE', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
           bahia: { shops: [{ id: 'b_bar', kind: 'bar', name: 'BAR AZUL', col: '#19e6ff', label: '🍺', awning: 0x1d4e89 }, { id: 'b_moda', kind: 'boutique', name: 'SURF & STYLE', col: '#ff6fb0', label: 'M', awning: 0xff8fab }, null, { id: 'b_diner', kind: 'diner', name: 'FISH & GRILL', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }], shops2: [{ id: 'b_house', kind: 'house', name: 'STRANDWOHNUNG', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null, null, null], gas: { id: 'b_shop', kind: 'shop', name: '24/7 BAHÍA', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
           ranchos: { shops: [{ id: 'r_diner', kind: 'diner', name: 'ROUTE 7 DINER', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'r_bar', kind: 'bar', name: 'SALOON SECA', col: '#ffb35c', label: '🍺', awning: 0x6b3a1f }, null, null], shops2: [{ id: 'r_gun', kind: 'gunshop', name: 'AMMO RANCH', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, { id: 'r_house', kind: 'house', name: 'RANCHHAUS', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null, null], gas: { id: 'r_shop', kind: 'shop', name: '24/7 LOS RANCHOS', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
-        }[t.key];
+          santacruz: { shops: [{ id: 'sc_diner', kind: 'diner', name: 'MARISQUERÍA', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'sc_bar', kind: 'bar', name: 'BAR LA OLA', col: '#19e6ff', label: '🍺', awning: 0x1d4e89 }, null, { id: 'sc_moda', kind: 'boutique', name: 'BOUTIQUE MAR', col: '#ff6fb0', label: 'M', awning: 0x2b2d42 }], shops2: [{ id: 'sc_house', kind: 'house', name: 'CASA DEL MAR', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, { id: 'sc_gun', kind: 'gunshop', name: 'ARMERÍA COSTA', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, null, null], gas: { id: 'sc_shop', kind: 'shop', name: '24/7 SANTA CRUZ', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+          lagoverde: { shops: [{ id: 'lv_bar', kind: 'bar', name: 'TABERNA DEL LAGO', col: '#7cff6b', label: '🍺', awning: 0x1f5a3a }, { id: 'lv_diner', kind: 'diner', name: 'LAKESIDE GRILL', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, null], shops2: [{ id: 'lv_house', kind: 'house', name: 'SEEHAUS', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, { id: 'lv_moda', kind: 'boutique', name: 'LAGO MODA', col: '#ff6fb0', label: 'M', awning: 0x2b2d42 }, null], gas: { id: 'lv_shop', kind: 'shop', name: '24/7 LAGO VERDE', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+          pinar: { shops: [{ id: 'pa_bar', kind: 'bar', name: 'HÜTTE PINAR', col: '#ffb35c', label: '🍺', awning: 0x6b3a1f }, { id: 'pa_diner', kind: 'diner', name: 'BERGSTUBE', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'pa_gun', kind: 'gunshop', name: 'JAGDBEDARF', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, null], gas: { id: 'pa_shop', kind: 'shop', name: '24/7 PINAR ALTO', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+          sanlucar: { shops: [{ id: 'sl_diner', kind: 'diner', name: 'TACO LÚCAR', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'sl_bar', kind: 'bar', name: 'CANTINA DEL SOL', col: '#ffb35c', label: '🍺', awning: 0x6b3a1f }, null], shops2: [{ id: 'sl_gun', kind: 'gunshop', name: 'ARMAS LÚCAR', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, { id: 'sl_house', kind: 'house', name: 'CASITA', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null], gas: { id: 'sl_shop', kind: 'shop', name: '24/7 SAN LÚCAR', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+        }[t.key] || { shops: [], shops2: [], gas: null };
         for (let i = 0; i < t.nx; i++) for (let j = 0; j < t.nz; j++) {
           const bx0 = r.x0 + i * CS + HW, bz0 = r.z0 + j * CS + HW, bx1 = bx0 + CS - 2 * HW, bz1 = bz0 + CS - 2 * HW;
           this.B.walk.box(bx0, 0.02, bz0, bx1, 0.2, bz1, { topScale: 1, uw: 2.6, vh: 2.6 });
@@ -1250,11 +1375,12 @@ export class World {
               P.box(cx - 15, 8, Z0 + 26, cx + 15, 9, Z0 + 29, { col: rgb(0xe9e2d4) });
               this.collider(cx - 16, Z0 + 6, cx + 16, Z0 + 26, 14);
               this.textSign(t.name.toUpperCase() + ' RATHAUS', cx, t.y + 10.4, Z0 + 29.1, 0, '#e9d8a6', 9);
+              this.pois[t.key + '_hall'] = { x: cx + 3, z: Z0 + 31.5 };
               for (let k = 0; k < 4; k++) this.addPalm(X0 + 3 + k * ((X1 - X0 - 6) / 3), Z1 - 3, rnd);
-            } else if (kind === 'gas') this.gasStation(X0, Z0, X1, Z1, rnd, doorSets.gas, t.y + 0.2);
+            } else if (kind === 'gas' && doorSets.gas) this.gasStation(X0, Z0, X1, Z1, rnd, doorSets.gas, t.y + 0.2);
             else if (kind === 'park') this.genPark(X0, Z0, X1, Z1, rnd);
             else if (kind === 'shops' || kind === 'shops2') {
-              this.shopRow(X0, Z0, X1, Z1, rnd, doorSets[kind], t.y + 0.2, tints);
+              this.shopRow(X0, Z0, X1, Z1, rnd, doorSets[kind] || [], t.y + 0.2, tints);
               this.grid2(X0, Z0, X1, Z1 - 16, 2, 1, 3, (a, b, c2, e) => { if (e - b > 13) this.house(a, b, c2, e, rnd); });
             } else if (kind === 'apt') {
               this.grid2(X0, Z0, X1, Z1, 2, 2, 4, (a, b, c2, e) => this.tower(a, b, c2, e, 12 + rnd() * 12, 'apt', rnd, { tint: tints[Math.floor(rnd() * tints.length)], store: rnd() < 0.5 }));
@@ -1264,6 +1390,27 @@ export class World {
               this.B.concrete.box(X0 + 6, 0, Z0 + 28, X1 - 6, 0.15, Z1 - 4, { col: rgb(0xeee8dc), topScale: 2, uw: 2, vh: 2 });
               this.B.poolw.box(X0 + 10, 0.15, Z0 + 32, X1 - 10, 0.17, Z1 - 8, { sides: false });
               for (let k = 0; k < 5; k++) this.addPalm(X0 + 4 + rnd() * (X1 - X0 - 8), Z0 + 25 + rnd() * 3, rnd);
+            } else if (kind === 'casino') {
+              // GRAN CASINO: goldene Glasfassade, Hotelturm, Vordach, Brunnen
+              const cx = (X0 + X1) / 2, fz = Z0 + 30;
+              this.facadeBox('glass', cx - 22, Z0 + 2, cx + 22, fz, 0, 15, { rnd, tint: 0xe8c77a });
+              this.tower(cx - 11, Z0 + 3, cx + 11, Z0 + 16, 52, 'glass', rnd, { tint: 0xd9b25c, crown: true, crownColor: 0xffd23f, store: false });
+              this.collider(cx - 22, Z0 + 2, cx + 22, fz, 16);
+              const goldC = rgb(0xd4a017);
+              P.box(cx - 13, 6.4, fz, cx + 13, 7.1, fz + 7, { col: goldC });
+              this.B.accent.box(cx - 13.05, 6.4, fz + 6.95, cx + 13.05, 6.7, fz + 7.05, { col: rgb(0xffd23f, 1.6) });
+              for (const sx of [-12, -4, 4, 12]) { P.addGeometry(new THREE.CylinderGeometry(0.35, 0.4, 6.4, 12), new THREE.Matrix4().makeTranslation(cx + sx, 3.2, fz + 6.4), rgb(0xf4ead2)); this.addCircle(cx + sx, fz + 6.4, 0.45, 6, 'pillar'); }
+              for (const y of [15.05, 0.3]) this.B.accent.box(cx - 22.05, y, fz - 0.05, cx + 22.05, y + 0.35, fz + 0.05, { col: rgb(0xffd23f, 1.4) });
+              for (let k = 0; k < 9; k++) this.B.accent.box(cx - 20 + k * 5, 1, fz + 0.06, cx - 19.8 + k * 5, 14.5, fz + 0.1, { col: rgb(0xffc94a, 1.2) });
+              this.textSign('GRAN CASINO', cx, t.y + 11.2, fz + 0.15, 0, '#ffd23f', 16);
+              // Brunnen & Palmen auf dem Vorplatz
+              const fcz = fz + 16;
+              P.addGeometry(new THREE.CylinderGeometry(5.2, 5.5, 0.8, 32), new THREE.Matrix4().makeTranslation(cx, 0.4, fcz), rgb(0xe9dcc0));
+              this.B.poolw.addGeometry(new THREE.CircleGeometry(4.8, 32).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(cx, 0.72, fcz));
+              P.addGeometry(new THREE.CylinderGeometry(0.5, 0.9, 3.4, 12), new THREE.Matrix4().makeTranslation(cx, 1.7, fcz), rgb(0xd4a017));
+              this.addCircle(cx, fcz, 5.4, 1, 'fountain');
+              for (const sx of [-18, -10, 10, 18]) this.addPalm(cx + sx, fz + 12, rnd);
+              this.townDoors.push({ id: 'casino', kind: 'casino', name: 'GRAN CASINO', col: '#ffd23f', label: '♠', awning: 0x8a1020, x: cx, z: fz + 1.6, nx: 0, nz: 1, y0: t.y + 0.2 });
             } else if (kind === 'hangar') {
               this.warehouse(X0, Z0, X1, Z0 + 22, rnd);
               this.warehouse(X0, Z0 + 28, X0 + 26, Z1, rnd);
@@ -1538,11 +1685,46 @@ export class World {
     const L = C.LAND, Pr = this.B.props, c = rgb(0xb9b5ad);
     const wall = (x0, z0, x1, z1) => { Pr.box(x0, -0.02, z0, x1, 0.9, z1, { col: c }); this.addBox(x0, z0, x1, z1, -1, 0.9, 'quay'); };
     { const cws = [...C.CAUSEWAYS].sort((a, b) => a.x0 - b.x0); let x = L.minX; for (const cw of cws) { wall(x, L.minZ, cw.x0 - 1, L.minZ + 0.5); x = cw.x1 + 1; } wall(x, L.minZ, L.maxX, L.minZ + 0.5); }
-    wall(L.minX, L.maxZ - 0.5, L.maxX, L.maxZ);
-    wall(L.minX, L.minZ, L.minX + 0.5, L.maxZ);
+    // Süd- und Westmauer mit Lücken für die Bootsstege
+    const split = (side, a0, a1, mk) => { let a = a0; for (const D of C.DOCKS.filter((d) => d.side === side && d.gap).sort((p, q) => p.gap[0] - q.gap[0])) { mk(a, D.gap[0]); a = D.gap[1]; } mk(a, a1); };
+    split('S', L.minX, L.maxX, (a, b) => wall(a, L.maxZ - 0.5, b, L.maxZ));
+    split('W', L.minZ, L.maxZ, (a, b) => wall(L.minX, a, L.minX + 0.5, b));
     // Poller
     for (let x = L.minX + 10; x < L.maxX; x += 20) {
       Pr.addGeometry(new THREE.CylinderGeometry(0.25, 0.3, 0.8, 8), new THREE.Matrix4().makeTranslation(x, 0.4, L.maxZ - 1.5), rgb(0x2b2b2b));
+    }
+  }
+
+  // Bootsstege: Holzplanken auf Pfählen, Poller, Laternen, Bootshaus
+  genDocks() {
+    this.platforms = [];
+    const Pr = this.B.props, Wd = this.B.wood;
+    const pile = new THREE.CylinderGeometry(0.16, 0.18, 1, 7);
+    for (const D of C.DOCKS) {
+      for (const [x0, z0, x1, z1] of D.rects) {
+        Wd.box(x0, D.y - 0.22, z0, x1, D.y, z1, { uw: 1.6 });
+        this.platforms.push({ x0, z0, x1, z1, y: D.y });
+        const alongX = x1 - x0 > z1 - z0, len = alongX ? x1 - x0 : z1 - z0, n = Math.max(1, Math.round(len / 4));
+        for (let k = 0; k <= n; k++) {
+          const t = k / n;
+          for (const e of [0, 1]) {
+            const px = alongX ? x0 + t * (x1 - x0) : (e ? x1 - 0.3 : x0 + 0.3), pz = alongX ? (e ? z1 - 0.3 : z0 + 0.3) : z0 + t * (z1 - z0);
+            Pr.addGeometry(pile, new THREE.Matrix4().makeTranslation(px, D.y - 2.4, pz).multiply(new THREE.Matrix4().makeScale(1, 5, 1)), rgb(0x4a3a2a));
+            if (k % 2 === 0) Pr.addGeometry(new THREE.CylinderGeometry(0.14, 0.17, 0.5, 8), new THREE.Matrix4().makeTranslation(px, D.y + 0.25, pz), rgb(0x2b2b2b));
+            if (k % 3 === 1 && e === 0) {
+              Pr.box(px - 0.06, D.y, pz - 0.06, px + 0.06, D.y + 2.4, pz + 0.06, { col: rgb(0x333333) });
+              this.B.accent.box(px - 0.16, D.y + 2.4, pz - 0.16, px + 0.16, D.y + 2.75, pz + 0.16, { col: [1.0, 0.85, 0.55] });
+            }
+          }
+        }
+      }
+      // Bootshaus mit Schild
+      const [sx, sz] = D.shop, gy = this.groundHeight(sx, sz);
+      const hx = D.side === 'S' ? sx + 9 : D.side === 'E' ? sx - 1 : sx + 3, hz = D.side === 'S' ? sz : D.side === 'E' ? sz + 9 : sz + 6;
+      Pr.box(hx - 2.6, gy, hz - 2.2, hx + 2.6, gy + 3.0, hz + 2.2, { col: rgb(0xe8e2d4) });
+      Pr.box(hx - 3.0, gy + 3.0, hz - 2.6, hx + 3.0, gy + 3.25, hz + 2.6, { col: rgb(0x1d4e89) });
+      this.B.accent.box(hx - 2.0, gy + 2.2, hz - 2.25, hx + 2.0, gy + 2.8, hz + 2.25, { col: [0.1, 0.55, 0.95] });
+      this.collider(hx - 2.6, hz - 2.2, hx + 2.6, hz + 2.2, gy + 3.2);
     }
   }
 
@@ -1791,7 +1973,7 @@ export class World {
       this.lamps.push({ x, z, yaw, y, fall: 0, dir: 0, broken: false, timer: 0 });
     });
     for (const im of [this.lampIM, this.lampGlowIM, this.poolIM]) { im.computeBoundingSphere(); scene.add(im); }
-    this.lampIM.castShadow = true;
+    this.lampIM.castShadow = !G.isTouch && this.q !== 'low';
 
     // Ampeln
     const sb = new GeoBuilder(true), sd = rgb(0x22252a);
@@ -1799,14 +1981,14 @@ export class World {
     sb.box(-0.22, 4.3, -0.18, 0.22, 5.6, 0.14, { col: sd });
     sb.box(-0.3, 4.25, -0.2, 0.3, 5.65, -0.16, { col: rgb(0x111111) });
     const sigIM = new THREE.InstancedMesh(sb.build(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), this.signalPos.length);
-    const lampSph = (y) => new THREE.SphereGeometry(0.12, 8, 6).translate(0, y, 0.15);
+    const lampSph = (y) => new THREE.IcosahedronGeometry(0.12, 0).translate(0, y, 0.15); // 20 statt 80 Dreiecke
     this.sigLamps = [lampSph(5.35), lampSph(4.95), lampSph(4.55)].map((g) => new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff }), this.signalPos.length));
     const dim = new THREE.Color(0.08, 0.08, 0.08);
     this.signalPos.forEach(([x, z, yaw], i) => {
       setM(sigIM, i, x, 0, z, yaw);
       for (const L of this.sigLamps) { setM(L, i, x, 0, z, yaw); L.setColorAt(i, dim); }
     });
-    sigIM.computeBoundingSphere(); sigIM.castShadow = true; scene.add(sigIM);
+    sigIM.computeBoundingSphere(); sigIM.castShadow = !G.isTouch && this.q !== 'low'; scene.add(sigIM);
     for (const L of this.sigLamps) { L.computeBoundingSphere(); scene.add(L); }
     this.sigIM = sigIM;
     this.signals = this.signalPos.map(([x, z, yaw]) => ({ x, z, yaw, y: 0, fall: 0, broken: false, timer: 0 }));
@@ -1876,8 +2058,16 @@ export class World {
       this.addBox(cx + ox - 0.6, cz + sz * 14 - 1, cx + ox + 0.6, cz + sz * 14 + 1, C.PIER.y - 0.5, cy, 'post');
     }
     // Gondeln
-    const gondG = new THREE.BoxGeometry(2.6, 2.2, 2.4).translate(0, -1.6, 0);
-    this.gondolas = new THREE.InstancedMesh(gondG, new THREE.MeshStandardMaterial({ roughness: 0.5 }), 16);
+    // offene Kabinen: Dach, Boden, Eckpfosten, Brüstung (Fahrgäste sind sichtbar)
+    const gb = new GeoBuilder();
+    gb.box(-0.08, -1.0, -0.08, 0.08, 0, 0.08);
+    gb.box(-1.45, -1.05, -1.35, 1.45, -0.8, 1.35, { bottom: true });
+    gb.box(-1.35, -3.2, -1.25, 1.35, -3.0, 1.25, { bottom: true });
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) gb.box(sx * 1.3 - 0.06, -3.0, sz * 1.2 - 0.06, sx * 1.3 + 0.06, -1.0, sz * 1.2 + 0.06);
+    for (const sx of [-1, 1]) gb.box(sx * 1.3 - 0.05, -3.0, -1.2, sx * 1.3 + 0.05, -2.15, 1.2);
+    for (const sz of [-1, 1]) gb.box(-1.3, -3.0, sz * 1.2 - 0.05, 1.3, -2.15, sz * 1.2 + 0.05);
+    const gondG = gb.build ? gb.build() : gb.geometry();
+    this.gondolas = new THREE.InstancedMesh(gondG, new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.2, side: THREE.DoubleSide }), 16);
     const cols = [0xff4d6d, 0x3ec1d3, 0xffd166, 0x9b5de5];
     for (let k = 0; k < 16; k++) this.gondolas.setColorAt(k, new THREE.Color(cols[k % 4]));
     this.gondolas.frustumCulled = false;
@@ -2015,6 +2205,8 @@ export class World {
     rect(C.PIER_PLAT.x0, C.PIER_PLAT.z0, C.PIER_PLAT.x1, C.PIER_PLAT.z1, '#a88b62', 4);
     g.save(); g.strokeStyle = '#6d6a64'; g.lineWidth = 3;
     g.beginPath(); g.arc(sx(632), sz(40), 24 * sc, 0, 7); g.stroke(); g.restore();
+    // Bootsstege
+    for (const D of C.DOCKS) for (const r of D.rects) rect(r[0], r[1], r[2], r[3], '#a88b62', 2);
     // Hafen: Schiff & Kräne
     rect(-330, 398, -92, 426, '#5d6b78', 6);
     for (const cx of [-330, -250, -170, -90]) rect(cx - 6, 372, cx + 6, 384, '#d9a520');
@@ -2157,11 +2349,12 @@ export class World {
 
     // Riesenrad
     if (this.wheel) {
-      this.wheel.rotation.x += dt * 0.06;
+      this.wheel.rotation.x += dt * 0.1;
       const mm = new THREE.Matrix4();
       for (let k = 0; k < 16; k++) {
         const a = (k / 16) * Math.PI * 2 + this.wheel.rotation.x;
-        mm.makeTranslation(0, Math.sin(a) * this.wheelR, Math.cos(a) * this.wheelR);
+        // gleiche Drehrichtung wie Speichen und Rad (Speiche k zeigt auf (cos a, sin a))
+        mm.makeTranslation(0, Math.cos(a) * this.wheelR, Math.sin(a) * this.wheelR);
         this.gondolas.setMatrixAt(k, mm);
       }
       this.gondolas.instanceMatrix.needsUpdate = true;

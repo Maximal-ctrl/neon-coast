@@ -33,7 +33,10 @@ export class AudioSys {
     this.master = ctx.createGain(); this.master.gain.value = 0.9;
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 4;
-    this.master.connect(comp); comp.connect(ctx.destination);
+    // Effektkette für Rauschzustände (Tiefpass + Bass)
+    this.fxLP = ctx.createBiquadFilter(); this.fxLP.type = 'lowpass'; this.fxLP.frequency.value = 22000;
+    this.fxBass = ctx.createBiquadFilter(); this.fxBass.type = 'lowshelf'; this.fxBass.frequency.value = 160; this.fxBass.gain.value = 0;
+    this.master.connect(this.fxLP); this.fxLP.connect(this.fxBass); this.fxBass.connect(comp); comp.connect(ctx.destination);
     this.sfx = ctx.createGain(); this.sfx.connect(this.master);
     this.music = ctx.createGain(); this.duckG = ctx.createGain(); this.music.connect(this.duckG); this.duckG.connect(this.master);
     this.musicBus = ctx.createGain(); this.musicBus.gain.value = 0; this.musicBus.connect(this.music);
@@ -156,6 +159,7 @@ export class AudioSys {
   // ------------------------------------------------------------ Effekte
   gun(kind, x, z, player) {
     const v = player ? 1 : this.vol(x, z);
+    if (kind === 'quiet') { this.noiseHit(0.07, 'highpass', 2600, 0.22 * v); return; }
     const big = kind === 'shotgun' ? 1.6 : kind === 'rifle' ? 1.25 : 1;
     this.noiseHit(0.18 * big, 'highpass', 900, 0.55 * v * big);
     this.noiseHit(0.32 * big, 'lowpass', 1200, 0.5 * v * big, 120);

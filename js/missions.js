@@ -7,6 +7,7 @@ import { AIDriver } from './traffic.js';
 import { WEAPONS } from './combat.js';
 import { randomLook, OUTFITS, CAR_TYPES } from './models.js';
 import { clamp, rand, dist2, pick, chance } from './utils.js';
+import { MISSIONS3, CONTACTS3, TALK3, registerPois } from './missions3.js';
 
 const N = (i, j) => C.nodeId(i, j);
 const NP = (x, z) => C.nodeId(Math.round((x + C.HALF) / C.CELL), Math.round((z + C.HALF) / C.CELL));
@@ -124,6 +125,7 @@ export class Missions {
 
   init() {
     pickupMeshes();
+    registerPois(G.world);
     const W = G.world, poi = W.pois;
     // Dienste
     this.serviceMarkers = [
@@ -254,8 +256,10 @@ export class Missions {
   grantRewards(silent = false) {
     const P = G.player;
     for (const def of MISSIONS) {
-      if (!def.rewardCar || !this.done.has(def.id) || this.rewards.has(def.id)) continue;
+      if ((!def.rewardCar && !def.rewardBoat && !def.rewardPlane) || !this.done.has(def.id) || this.rewards.has(def.id)) continue;
       this.rewards.add(def.id);
+      if (def.rewardBoat) { P.boats = P.boats || []; P.boats.push({ key: def.rewardBoat[0], color: def.rewardBoat[1], id: Date.now() + Math.floor(Math.random() * 1000) }); if (!silent) G.hud.toast('⚓ Neues Boot – am Bootssteg (⚓) unter „Meine Boote“'); continue; }
+      if (def.rewardPlane) { P.planes = P.planes || []; P.planes.push({ key: def.rewardPlane[0], color: def.rewardPlane[1], id: Date.now() }); if (!silent) G.hud.toast('✈️ Eigenes Flugzeug – am Flugfeld Los Ranchos abholen'); continue; }
       const [key, color] = def.rewardCar;
       P.garage.push({ key, color, id: Date.now() + Math.floor(Math.random() * 1000) });
       if (!silent) setTimeout(() => G.hud.bigToast('NEUES AUTO IN DER GARAGE', `${CAR_TYPES[key].name} – im Handy unter „Garage“ abrufbar`), 4200);
@@ -280,6 +284,7 @@ export class Missions {
       out.push({ x: poi.police.x, z: poi.police.z, col: '#4d8bff', label: 'P' });
       out.push({ x: poi.pier.x, z: poi.pier.z, col: '#ff9f1c', label: '★' });
     }
+    if (G.blipFns) for (const f of G.blipFns) for (const b of f(full)) out.push(b);
     for (const m of this.markers) if (m.blip) out.push({ x: m.x, z: m.z, col: m.blipCol || '#ffd60a', edge: true, r: 0.045 });
     return out;
   }
@@ -400,6 +405,7 @@ export class Missions {
     } else if (reason) G.hud.toast(reason);
   }
   onEvaded() {}
+  onCasino(net) { this.casinoPlays = (this.casinoPlays || 0) + 1; this.casinoNet = (this.casinoNet || 0) + net; }
   onEnterVehicle(v) {}
   onExitVehicle(v) {}
 
@@ -464,7 +470,7 @@ export class Missions {
     if (P.state === 'foot') { P.state = 'cutscene'; P.vx = P.vz = 0; if (other) P.yaw = Math.atan2(other.x - P.x, other.z - P.z); }
     if (other) other.yaw = Math.atan2(P.x - other.x, P.z - other.z);
     for (let [who, text] of lines) {
-      const col = { Leo: '#7cff6b', Rosa: '#ff8fab', Dex: '#ffd23f', Val: '#b26bff', Marco: '#ff9f1c', Sami: '#ffd23f', 'Inés': '#ffb35c', Brandt: '#19e6ff', Aurelio: '#e9d8a6', Schläger: '#ff3b5c' }[who] || '#19e6ff';
+      const col = { Leo: '#7cff6b', Rosa: '#ff8fab', Dex: '#ffd23f', Val: '#b26bff', Marco: '#ff9f1c', Sami: '#ffd23f', 'Inés': '#ffb35c', Brandt: '#19e6ff', Aurelio: '#e9d8a6', Schläger: '#ff3b5c' }[who] || TALK3[who] || '#19e6ff';
       const nm = G.player.name || 'Leo';
       text = text.replace(/\bLeo\b/g, nm);
       G.hud.subtitle(who === 'Leo' ? nm : who, text, col);
@@ -589,6 +595,7 @@ export const CONTACT_INFO = {
   brandt: { name: 'Kapitän Brandt', role: 'Hafenbüro', inside: [1504, 1198], door: 'harbor', col: '#19e6ff', auto: true },
   aurelio: { name: 'Don Aurelio', role: 'Villa · Monte Solera', inside: [1505.5, 1047.4], door: 'villa', col: '#e9d8a6', auto: true },
 };
+Object.assign(CONTACT_INFO, CONTACTS3);
 
 // Ped läuft eine Route ab (Schleife)
 function runRoute(p, pts, speed, k = 0) {
@@ -1279,6 +1286,7 @@ const MISSIONS = [
     },
   },
   ...NEW_MISSIONS,
+  ...MISSIONS3,
 ];
 
 // Taxi-Nebenjob

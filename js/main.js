@@ -10,15 +10,16 @@ import { loadPBR } from './realism.js';
 
 // Farbkorrektur im Kino-Look: leichte S-Kurve, Sättigung, Split-Toning, Vignette
 const GRADE_SHADER = {
-  uniforms: { tDiffuse: { value: null }, sat: { value: 1.1 }, contrast: { value: 1.07 }, vig: { value: 0.85 } },
+  uniforms: { tDiffuse: { value: null }, sat: { value: 1.1 }, contrast: { value: 1.07 }, vig: { value: 0.85 }, trip: { value: 0 }, tripK: { value: 0 }, ttime: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: `uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform float vig; varying vec2 vUv;
-    void main(){
-      vec3 c = texture2D(tDiffuse, vUv).rgb;
+    ${TRIP_GLSL.uniforms}
+    void main(){${TRIP_GLSL.sample}
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       c = mix(vec3(l), c, sat);
       c = mix(c, c * c * (3.0 - 2.0 * c), contrast - 1.0);
       c += vec3(0.018, 0.006, -0.02) * smoothstep(0.45, 1.0, l) + vec3(-0.004, 0.002, 0.006) * (1.0 - smoothstep(0.0, 0.4, l));
+${TRIP_GLSL.post}
       vec2 d = vUv - 0.5;
       c *= 1.0 - dot(d, d) * vig * 0.55;
       gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
@@ -43,18 +44,27 @@ import { WeaponWheel } from './wheel.js';
 import { RandomEvents } from './events.js';
 import { Dealer } from './dealer.js';
 import { Missions, shopItems, CONTACT_INFO } from './missions.js';
+import { PHONE3 } from './missions3.js';
 import { Save } from './save.js';
 import { Interiors } from './interiors.js';
 import { Multiplayer } from './multiplayer.js';
 import { UI, Inventory, ITEMS } from './ui.js';
 import { CAR_TYPES, CAR_SHOP } from './models.js';
 import { fmtTime } from './utils.js';
+import { Trip, TRIP_GLSL } from './drugs.js';
+import { Attractions, setupAttractions } from './attractions.js';
+import { chunkScene, DynRes } from './perf.js';
+import { Craft } from './craft.js';
+import { applyTune, openTuning } from './tuning.js';
+import { buildCasino } from './casino.js';
+import { buildGarage, setupGarageEntrances } from './garage3.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 let composer = null, bloom = null;
 let last = performance.now();
 let fpsWatch = { t: 0, n: 0, acc: 0, done: false };
+let frameNo = 0;
 
 function detectQuality() {
   const s = G.settings.quality;
@@ -73,6 +83,7 @@ function setLoad(p, msg) { $('load-fill').style.width = Math.round(p * 100) + '%
 async function boot() {
   Save.readSettings();
   G.save = Save;
+  G.trip = Trip;
   G.isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   document.body.classList.toggle('touch', G.isTouch);
   const q = G.quality = detectQuality();
@@ -105,6 +116,10 @@ async function boot() {
   G.crowd = new CrowdRenderer(scene, 180);
   for (const k in G.crowd.im) env.noReflect(G.crowd.im[k]);
   if (q !== 'high') for (const c of world.vegChunks || []) env.noReflect(c.im);
+  // Leistung: Bäume werfen auf Tablets keine Schatten, große Meshes werden in Kacheln geteilt
+  if (G.isTouch || q === 'low') for (const c of world.vegChunks || []) c.im.castShadow = false;
+  G.chunkInfo = chunkScene(scene);
+  camera.far = q === 'high' ? 2800 : G.isTouch || q === 'low' ? 1600 : 2200; camera.updateProjectionMatrix();
   G.crowd.setShadows(q === 'high');
   G.effects = new Effects(scene);
   G.vm = new VehicleManager(scene);
@@ -123,11 +138,12 @@ async function boot() {
   G.wheel = new WeaponWheel(ICONS);
   G.events = new RandomEvents();
   G.dealer = new Dealer();
+  G.craft = new Craft();
   G.missions = new Missions();
 
   // Nachbearbeitung (Leuchteffekte)
   if (q !== 'low') {
-    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: q === 'high' ? 4 : 2 });
+    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: q === 'high' ? 4 : G.isTouch ? 0 : 2 });
     composer = new EffectComposer(renderer, rt);
     composer.setPixelRatio(pixelRatio(q));
     composer.addPass(new RenderPass(scene, camera));
@@ -188,13 +204,19 @@ function prepareWorld(d) {
   const P = G.player;
   for (const v of [...G.vehicles]) v.remove();
   for (const p of [...G.peds.list]) G.peds.remove(p);
-  P.contacts = new Set(); P.name = 'Leo'; P.inventory = {}; P.garage = [];
+  P.contacts = new Set(); P.name = 'Leo'; P.inventory = {}; P.garage = []; P.boats = []; P.planes = []; P.wmods = {}; P.props = []; P.clip = {}; P.reloadT = 0; P.casinoStats = null;
   G.missions.done = new Set(); G.missions.rewards = new Set();
   if (d) Save.apply(d);
   else { P.money = 250; G.timeOfDay = 16.5; G.applyLook(DEFAULT_LOOK); }
   if (!d || !d.look) applyOutfit(P.outfit || 0, !d);
   if (!G.missionsReady) { G.missions.init(); G.missionsReady = true; } else { G.missions.grantRewards(true); G.missions.updateGivers(true); }
-  if (!G.interiors) G.interiors = new Interiors(G.scene);
+  if (!G.interiors) { G.interiors = new Interiors(G.scene); buildCasino(G.interiors); buildGarage(G.interiors); const cd = (G.world.entrances || []).find((e) => e.id === 'casino'); if (cd) G.blipFns.push(() => [{ x: cd.x, z: cd.z, col: '#ffd23f', label: '♠', r: 0.04, name: 'Gran Casino' }]); }
+  if (!G.attr) { G.attr = new Attractions(); setupAttractions(G.attr); G.craft.setup(G.attr); setupGarageEntrances(G.attr, G.interiors);
+    const gp = G.world.pois.garage; G.attr.add({ x: 80, z: 267, color: 0xffb703, label: '🔧', r: 2.6, car: true, onEnter: () => openTuning(G.player.vehicle) });
+    G.blipFns.push(() => [{ x: 80, z: 267, col: '#ffb703', label: '🔧', r: 0.035, name: "Dex' Tuning" }]); void gp; }
+  P.boats = P.boats || []; P.planes = P.planes || []; P.wmods = P.wmods || {}; P.props = P.props || [];
+  if (G.attr.ride) G.attr.ride = null;
+  G.trip.stop();
   P.state = 'foot'; P.visible = true;
   G.traffic.initParked();
   const sc = G.world.pois.safehouseCar;
@@ -516,6 +538,7 @@ const CONTACTS = [
   { id: 'ines', need: 'ines', name: 'Inés', role: 'Café Vieja · Altstadt', col: '#ffb35c', lines: ['¡Hola Leo! Der Kaffee geht heute aufs Haus.', 'Die Altstadt ist ruhiger, seit du da bist.'] },
   { id: 'brandt', need: 'brandt', name: 'Kapitän Brandt', role: 'Hafenbüro', col: '#19e6ff', lines: ['Brandt hier. Hafen ist ruhig. Noch.', 'Wenn die Tiburones wieder auftauchen, ruf ich dich.'] },
   { id: 'aurelio', need: 'aurelio', name: 'Don Aurelio', role: 'Villa · Monte Solera', col: '#e9d8a6', lines: ['Leo. Die Aussicht hier oben ist heute besonders klar.', 'Ein guter Wein braucht Zeit. Gute Freunde auch.'] },
+  ...PHONE3,
   { id: 'anwalt', name: 'Kessler', role: 'Anwalt', col: '#8e9aaf', lines: ['Kessler & Partner. Wir lösen Probleme mit der Polizei.'] },
   { id: 'club', name: 'Club Velvet', role: 'Nachtclub', col: '#ff2e88', lines: ['Heute Nacht: DJ-Set & Show! Eingang am Club Velvet, Midtown-Ost.'] },
 ];
@@ -596,7 +619,7 @@ function phoneMessages() {
 function phoneJobs() {
   const M = G.missions, all = M.list;
   const byId = Object.fromEntries(all.map((d) => [d.id, d]));
-  const order = ['rosa', 'dex', 'sami', 'val', 'ines', 'brandt', 'aurelio'];
+  const order = ['rosa', 'dex', 'sami', 'val', 'ines', 'brandt', 'aurelio', 'nina', 'marisol', 'paco', 'luna', 'ortiz', 'benito'];
   let html = `<div class="jb-sum"><b>${M.done.size}/${all.length}</b><span>Aufträge erledigt</span><i style="--p:${(M.done.size / all.length) * 100}%"></i></div>`;
   let hidden = 0;
   for (const cid of order) {
@@ -610,7 +633,7 @@ function phoneJobs() {
       const done = M.done.has(d.id), av = M.isAvailable(d);
       const need = d.req.filter((r) => !M.done.has(r)).map((r) => (byId[r] ? `${M.isTeased(byId[r]) ? byId[r].title : '???'} (${CONTACT_INFO[byId[r].contact].name})` : r));
       if (d.needContact && !(G.player.contacts && G.player.contacts.has(d.needContact))) need.push(`${CONTACT_INFO[d.needContact].name} kennenlernen`);
-      const reward = `$${d.reward.toLocaleString('de-DE')}${d.rewardCar ? ' + 🚗 ' + CAR_TYPES[d.rewardCar[0]].name : ''}`;
+      const reward = `$${d.reward.toLocaleString('de-DE')}${d.rewardCar ? ' + 🚗 ' + CAR_TYPES[d.rewardCar[0]].name : ''}${d.rewardBoat ? ' + ⚓ ' + CAR_TYPES[d.rewardBoat[0]].name : ''}${d.rewardPlane ? ' + ✈️ ' + CAR_TYPES[d.rewardPlane[0]].name : ''}`;
       html += `<div class="jb-node ${done ? 'done' : av ? 'av' : 'lock'}"><i>${done ? '✓' : av ? '★' : '🔒'}</i><div><b>${done || av ? d.title : '???'}</b>`
         + `<span>${done || av ? d.desc || '' : 'Erfordert: ' + need.join(' + ')}</span>${done || av ? `<small>${reward}</small>` : ''}</div>`
         + (av && !M.active ? `<button class="ph-btn2 small" data-nav="${d.id}">📍</button>` : '') + '</div>';
@@ -671,6 +694,7 @@ function phoneGarage() {
     const v = G.vm.spawn(c.key, n.x + dx * 22 - dz * 6, n.z + dz * 22 + dx * 6, Math.atan2(dx, dz), c.color);
     if (v) {
       v.parked = true; v.ownedByPlayer = true; v.persistent = true; v.missionCar = true; P.lastVehicle = v; lastDelivered = v;
+      v.garageId = c.id; if (c.tune) applyTune(v, c.tune);
       setTimeout(() => { v.missionCar = false; }, 60000);
       G.hud.toast(`🚗 Dein ${v.T.name} wurde geliefert – blauer Punkt auf der Karte.`);
     }
@@ -857,6 +881,7 @@ function setupUI() {
   // Audio auf iOS erst nach Berührung freischalten
   const unlock = () => { if (G.audio.ready) G.audio.resume(); };
   window.addEventListener('touchend', unlock, { passive: true });
+  G.dynRes = new DynRes(G.renderer, composer, onResize, G.isTouch ? 0.6 : 0.7, pixelRatio(G.quality));
   window.addEventListener('click', unlock);
   $('title').addEventListener('pointerdown', () => { if (!G.audio.ready) G.audio.init(); }, { once: true });
 }
@@ -865,9 +890,10 @@ function setupUI() {
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000;
+  if (G.state === 'playing' && G.dynRes) G.dynRes.frame(now - last);
   last = now;
   if (dt > 0.1) dt = 0.1;
-  const step = Math.min(dt, 1 / 30) * (G.slowmo || 1);
+  const step = Math.min(dt, 1 / 30) * (G.slowmo || 1) * (G.state === 'playing' ? Trip.time : 1);
   G.dt = step;
   const I = G.input;
   I.update();
@@ -881,6 +907,8 @@ function frame(now) {
     try {
       G.vm.render();
       G.peds.render();
+      // Tablets: Schattenkarte nur jedes zweite Bild neu zeichnen
+      if (G.isTouch && G.renderer.shadowMap.enabled) { G.renderer.shadowMap.autoUpdate = false; G.renderer.shadowMap.needsUpdate = (frameNo++ & 1) === 0; }
       if (composer) {
         bloom.strength = 0.22 + G.world.env.night * 0.18;
         composer.render();
@@ -918,7 +946,7 @@ function update(now, step, I) {
     G.wheel.update(I);
     if (G.combat.updateShells) G.combat.updateShells(step);
     try { G.events.update(step); G.dealer.update(step); } catch (e) { reportError(e); }
-    if (G.gradePass) { const hk = Math.min(1, Math.max(0, (G.highT || 0) / 10)); if (G.highT > 0) G.highT -= step; const u = G.gradePass.uniforms; u.sat.value = 1.1 + hk * 0.7 + Math.sin(G.time * 1.3) * 0.15 * hk; u.vig.value = 0.85 + hk * 0.8; }
+    Trip.update(step);
     G.time += step;
     G.stats.playTime += step;
     { const h = G.timeOfDay, day = h > 5.5 && h < 20.5; G.timeOfDay = (h + step / (day ? 80 : 30)) % 24; }
@@ -927,6 +955,7 @@ function update(now, step, I) {
       const v = G.player.vehicle;
       if (v) { v.input.throttle = 0; v.input.brake = 1; v.input.handbrake = true; v.input.steer = 0; }
     } else G.player.update(step);
+    G.craft.update(step);
     G.traffic.update(step);
     G.police.update(step);
     // Physik in Teilschritten für Stabilität
@@ -935,6 +964,7 @@ function update(now, step, I) {
     G.peds.update(step);
     G.missions.update(step);
     if (G.interiors) G.interiors.update(step);
+    if (G.attr) G.attr.update(step);
     if (G.mp) G.mp.update(step);
     G.world.update(step);
     G.effects.update(step);
@@ -944,7 +974,6 @@ function update(now, step, I) {
     G.audio.update(step);
     G.hud.update(step);
     skids();
-    autoQuality(step);
   } else if (G.state === 'creator') {
     const P = G.player;
     P.anim.t += step; P.anim.amp = 0; P.yaw += step * 0.45;
@@ -1006,7 +1035,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '2.2.0 Beta';
+export const GAME_VERSION = '3.0 Beta';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

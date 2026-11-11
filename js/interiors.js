@@ -973,7 +973,7 @@ export class Interiors {
     if (kind === 'dealer' && this.delivery) {
       const { key, color } = this.delivery; this.delivery = null;
       const v = G.vm.spawn(key, 162, 30.5, -Math.PI / 2, color);
-      if (v) { v.parked = true; v.ownedByPlayer = true; v.missionCar = true; G.player.lastVehicle = v; setTimeout(() => { v.missionCar = false; }, 60000); G.hud.toast(`Dein neuer ${v.T.name} steht an der Straße vor dem Autohaus!`); }
+      if (v) { const ge = G.player.garage[G.player.garage.length - 1]; if (ge && ge.key === key) v.garageId = ge.id; v.parked = true; v.ownedByPlayer = true; v.missionCar = true; G.player.lastVehicle = v; setTimeout(() => { v.missionCar = false; }, 60000); G.hud.toast(`Dein neuer ${v.T.name} steht an der Straße vor dem Autohaus!`); }
     }
     P.x = d.out.x; P.z = d.out.z; P.y = G.world.groundHeight(d.out.x, d.out.z); P.yaw = d.out.yaw;
     G.cam.yaw = d.out.yaw; G.cam.pitch = -0.2; G.cam.snap();
@@ -1034,6 +1034,7 @@ export class Interiors {
     else if (G.interior.kind === 'diner') { if (on(R.counter, 1.1)) this.dinerMenu(); }
     else if (G.interior.kind === 'bar') { if (on(R.bar, 1.1)) G.ui.bar(); }
     else if (G.interior.kind === 'gunshop') { if (on(R.counter, 1.1)) G.ui.gunshop(); }
+    else if (this.ext && this.ext[G.interior.kind]) this.ext[G.interior.kind](dt, R, on);
     else if (G.interior.kind === 'house') { if (on(R.bed, 1.1)) this.houseBed(); if (on(R.fridge, 1.0)) { G.player.health = Math.min(100, G.player.health + 25); G.hud.toast('🥪 Snack aus dem Kühlschrank: +25 Gesundheit'); } }
   }
   cafeMenu() {

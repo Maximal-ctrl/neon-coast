@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import { CAR_TYPES, CAR_SHOP } from './models.js';
-import { WEAPONS } from './combat.js';
+import { WEAPONS, WMODS, wmodPrice } from './combat.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
@@ -18,8 +18,8 @@ export const ITEMS = {
   cig: { name: 'Zigaretten', icon: '🚬', price: 9, pack: 10, desc: 'Schachtel mit 10 Stück. Entspannt kurz – gesund ist es nicht.', anim: 'smoke', dur: 7.5, prop: 0xf5f5f5 },
   beer: { name: 'Dosenbier', icon: '🍺', price: 4, desc: 'Kühles Bier. +5 Gesundheit, die Welt schwankt ein wenig.', anim: 'drink', dur: 2.6, heal: 5, drunk: 14, prop: 0xd9a520 },
   whiskey: { name: 'Whiskey (Flachmann)', icon: '🥃', price: 12, desc: 'Hochprozentig. Ordentlich Schwindel für eine Weile.', anim: 'drink', dur: 2.4, heal: 3, drunk: 32, prop: 0x8a4b2a },
-  joint: { name: 'Joint', icon: '🌿', price: 15, desc: 'Entspannt, +25 Gesundheit, Farben werden weicher.', anim: 'smoke', dur: 7, heal: 25, high: 40, prop: 0x9fcf6f },
-  pills: { name: 'Party-Pillen', icon: '💊', price: 40, desc: '60 Sekunden schneller sprinten, Farben knallen.', anim: 'eat', dur: 1.6, boost: 60, high: 60, prop: 0xff6fb0 },
+  joint: { name: 'Joint', icon: '🌿', price: 15, desc: 'Entspannt: Zeit läuft langsamer, Bild wird weich und warm, Ton dumpf. +25 Gesundheit und langsame Heilung.', anim: 'smoke', dur: 7, heal: 25, high: 50, trip: 'joint', prop: 0x9fcf6f },
+  pills: { name: 'Party-Pillen', icon: '💊', price: 40, desc: '60 Sekunden Sprint-Boost, Farben wechseln im Takt, Extra-Bass.', anim: 'eat', dur: 1.6, boost: 60, high: 60, trip: 'pills', prop: 0xff6fb0 },
   cigd: { name: 'Zigaretten (lose)', icon: '🚬', price: 5, pack: 10, desc: '10 Stück, billiger als im Laden. Frag nicht, woher.', anim: 'smoke', dur: 7.5, prop: 0xf5f5f5 },
   scratch: { name: 'Glücksregen', icon: '🎟️', price: 5, desc: 'Rubbellos: 3 gleiche Beträge gewinnen. Bis zu $500.', use: 'scratch', tier: 1 },
   scratchgold: { name: 'Goldrausch', icon: '🎫', price: 20, desc: 'Premium-Rubbellos: bessere Chancen, bis zu $5.000.', use: 'scratch', tier: 2 },
@@ -81,15 +81,15 @@ function store(cfg) {
         <div class="st-money" id="st-money">${money(G.player.money)}</div><button class="st-x" data-x>✕</button></header>
       <nav class="st-tabs">${cfg.categories.map((k, i) => `<button class="${i === cat ? 'on' : ''}" data-cat="${i}">${k.icon || ''} ${k.name}</button>`).join('')}</nav>
       <div class="st-body">
-        <div class="st-grid">${c.items.map((i) => { const o = cfg.owned ? cfg.owned(i) : ''; return `<button class="st-card ${i.id === sel ? 'on' : ''} ${i.disabled ? 'dis' : ''}" data-it="${i.id}"><span class="st-ic">${i.icon}</span><b>${esc(i.name)}</b><em>${i.price ? money(i.price) : 'gratis'}</em>${o ? `<i class="st-own">${o}</i>` : ''}</button>`; }).join('')}</div>
+        <div class="st-grid">${c.items.map((i) => { const o = cfg.owned ? cfg.owned(i) : ''; return `<button class="st-card ${i.id === sel ? 'on' : ''} ${i.disabled ? 'dis' : ''}" data-it="${i.id}"><span class="st-ic">${i.icon}</span><b>${esc(i.name)}</b><em>${i.priceText || (i.price ? money(i.price) : 'gratis')}</em>${o ? `<i class="st-own">${o}</i>` : ''}</button>`; }).join('')}</div>
         <aside class="st-detail">
           <div class="st-big">${it.icon}</div>
           <h3>${esc(it.name)}</h3>
           <p>${esc(it.desc || '')}</p>
           ${owned ? `<div class="st-tag">${owned}</div>` : ''}
           ${canQty ? `<div class="st-qty"><button data-q="-1">−</button><b>${qty}</b><button data-q="1">+</button></div>` : ''}
-          <div class="st-total"><span>Gesamt</span><b>${it.price ? money(total) : 'gratis'}</b></div>
-          <button class="st-buy" id="st-buy" ${it.disabled ? 'disabled' : ''}>${it.disabled || (cfg.buyLabel || 'Kaufen')}</button>
+          <div class="st-total"><span>Gesamt</span><b>${it.priceText || (it.price ? money(total) : 'gratis')}</b></div>
+          <button class="st-buy" id="st-buy" ${it.disabled ? 'disabled' : ''}>${it.disabled || it.label || cfg.buyLabel || 'Kaufen'}</button>
           ${cfg.extra ? cfg.extra(it) : ''}
         </aside>
       </div></div>`;
@@ -156,15 +156,18 @@ function gunshop() {
   const P = G.player;
   const w = (k) => ({ id: k, name: WEAPONS[k].name, icon: { pistol: '🔫', smg: '🔫', shotgun: '💥', rifle: '🎯' }[k], price: WEAPONS[k].price, desc: `Schaden ${WEAPONS[k].dmg}${WEAPONS[k].pellets ? ' ×' + WEAPONS[k].pellets : ''} · inkl. ${WEAPONS[k].ammoPack} Schuss`, disabled: P.ammo[k] > 0 ? 'Bereits im Besitz' : null });
   const a = (k) => ({ id: 'ammo_' + k, w: k, name: `${WEAPONS[k].name}-Munition`, icon: '📦', price: WEAPONS[k].ammoPrice, desc: `+${WEAPONS[k].ammoPack} Schuss`, multi: true, disabled: P.ammo[k] > 0 ? null : 'Erst Waffe kaufen' });
+  const MI = modItems();
   store({
     title: 'WAFFENLADEN', subtitle: 'Ausrüstung für harte Zeiten', accent: '#ff7b39', logo: '🎯',
     categories: [
       { name: 'Waffen', icon: '🔫', items: ['pistol', 'smg', 'shotgun', 'rifle'].map(w) },
       { name: 'Munition', icon: '📦', items: ['pistol', 'smg', 'shotgun', 'rifle'].map(a) },
       { name: 'Ausrüstung', icon: '🦺', items: [{ id: 'armor', name: 'Schutzweste', icon: '🦺', price: 300, desc: 'Fängt 70 % des Schadens ab.' }, { id: 'medkit', name: 'Erste-Hilfe-Set', icon: '🩹', price: 120, desc: 'Sofort volle Gesundheit.' }] },
+      { name: 'Aufsätze', icon: '🔧', items: MI },
     ],
-    owned: (i) => (i.w ? `Munition: ${P.ammo[i.w] || 0}` : WEAPONS[i.id] ? (P.ammo[i.id] > 0 ? `Munition: ${P.ammo[i.id]}` : '') : i.id === 'armor' ? `Weste: ${Math.round(P.armor)} %` : ''),
+    owned: (i) => (i.mod ? (P.wmods[i.w] && P.wmods[i.w][i.mod] ? 'Eingebaut' : '') : i.w ? `Munition: ${P.ammo[i.w] || 0}` : WEAPONS[i.id] ? (P.ammo[i.id] > 0 ? `Munition: ${P.ammo[i.id]}` : '') : i.id === 'armor' ? `Weste: ${Math.round(P.armor)} %` : ''),
     onBuy: (i, n) => {
+      if (i.mod) { if (!pay(i.price)) return false; P.wmods[i.w] = { ...(P.wmods[i.w] || {}), [i.mod]: 1 }; i.disabled = 'Eingebaut'; for (const x of MI) if (x.w === i.w && WMODS[x.mod].req === i.mod && !P.wmods[x.w][x.mod]) x.disabled = null; if (i.mod === 'mag') P.clip[i.w] = undefined; G.hud.toast(`🔧 ${WEAPONS[i.w].name}: ${WMODS[i.mod].name} eingebaut`); G.hud.weapon(); return true; }
       if (!pay(i.price * n)) return false;
       if (WEAPONS[i.id]) P.giveWeapon(i.id, WEAPONS[i.id].ammoPack);
       else if (i.w) P.giveWeapon(i.w, WEAPONS[i.w].ammoPack * n);
@@ -174,6 +177,16 @@ function gunshop() {
       return true;
     },
   });
+}
+
+function modItems() {
+  const P = G.player, out = [];
+  for (const w of ['pistol', 'smg', 'shotgun', 'rifle']) for (const m of Object.keys(WMODS)) {
+    const M = WMODS[m], has = P.wmods[w] && P.wmods[w][m];
+    const dis = has ? 'Eingebaut' : !(P.ammo[w] > 0) ? 'Erst Waffe kaufen' : M.req && !(P.wmods[w] && P.wmods[w][M.req]) ? 'Erst ' + WMODS[M.req].name : null;
+    out.push({ id: `mod_${w}_${m}`, w, mod: m, name: `${WEAPONS[w].name}: ${M.name}`, icon: M.icon, price: wmodPrice(w, m), desc: M.desc, disabled: dis });
+  }
+  return out;
 }
 
 // ------------------------------------------------------------ Club-Bar
@@ -492,4 +505,5 @@ function dealer() {
   };
 }
 
-export const UI = { store, kiosk, street, gunshop, bar, inventory, slots, scratch, dealer, close, isOpen: false };
+const setOnClose = (f) => { onClose = f; };
+export const UI = { store, kiosk, street, gunshop, bar, inventory, slots, scratch, dealer, close, open, setOnClose, money, isOpen: false };

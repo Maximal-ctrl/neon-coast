@@ -463,7 +463,7 @@ export class PedManager {
         p.vy -= 20 * dt;
         p.x += p.vx * dt; p.z += p.vz * dt; p.y += p.vy * dt;
         p.spinX += dt * 6;
-        p.gy = W.groundHeight(p.x, p.z);
+        p.gy = W.groundHeight(p.x, p.z, p.y);
         if (p.y <= p.gy) { p.y = p.gy; p.vy = 0; p.vx *= 0.4; p.vz *= 0.4; if (Math.abs(p.vx) + Math.abs(p.vz) < 0.3) { p.vx = 0; p.vz = 0; } }
         this.collide(p);
       }
@@ -500,7 +500,7 @@ export class PedManager {
       p.y = C.WATER_Y - 0.25; A.swim = true; A.tilt = 1.35; A.lift = 0;
     } else {
       A.swim = false;
-      p.gy = W.groundHeight(p.x, p.z);
+      p.gy = W.groundHeight(p.x, p.z, p.y);
       p.y = damp(p.y, p.gy, 20, dt);
       if (p.gy < C.WATER_Y - 1.0 && p.alive) { p.state = 'swim'; }
       A.tilt = -p.lie * Math.PI / 2; A.lift = p.lie * 0.14 + (p.seatLift || 0);

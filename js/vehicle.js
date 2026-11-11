@@ -56,6 +56,8 @@ export class Vehicle {
       this.pitch = damp(this.pitch, 0.25, 1, dt);
       return;
     }
+    if (T.boat) { this.updateBoat(dt); return; }
+    if (T.plane) { this.updatePlane(dt); return; }
     let fx = Math.sin(this.h), fz = Math.cos(this.h);
     let lx = fz, lz = -fx;
     let vf = this.vx * fx + this.vz * fz;
@@ -112,7 +114,7 @@ export class Vehicle {
     this.x += this.vx * dt; this.z += this.vz * dt;
 
     // Vertikal
-    const gh = W.groundHeight(this.x, this.z);
+    const gh = W.groundHeight(this.x, this.z, this.y);
     if (this.grounded) {
       if (gh < this.y - 0.4) {
         this.grounded = false; this.airTime = 0;
@@ -140,7 +142,7 @@ export class Vehicle {
     // Neigung
     if (this.grounded) {
       const wb = this.geo.wheelbase / 2;
-      const ghF = W.groundHeight(this.x + fx * wb, this.z + fz * wb), ghR = W.groundHeight(this.x - fx * wb, this.z - fz * wb);
+      const ghF = W.groundHeight(this.x + fx * wb, this.z + fz * wb, this.y), ghR = W.groundHeight(this.x - fx * wb, this.z - fz * wb, this.y);
       const slope = Math.atan2(ghF - ghR, wb * 2);
       this.pitch = damp(this.pitch, slope + clamp(-accel * 0.004, -0.05, 0.05), 10, dt);
       this.roll = damp(this.roll, clamp(this.yawRate * vf * 0.01, -0.07, 0.07), 6, dt);
@@ -269,6 +271,7 @@ export class VehicleManager {
     this.headIM.frustumCulled = false; this.headIM.renderOrder = 3;
     scene.add(this.headIM);
     this._m = new THREE.Matrix4(); this._w = new THREE.Matrix4(); this._r = new THREE.Matrix4(); this._s = new THREE.Matrix4();
+    this._rc = new THREE.Color();
     this._q = new THREE.Quaternion(); this._p = new THREE.Vector3(); this._sc = new THREE.Vector3(); this._e = new THREE.Euler();
   }
 
@@ -291,6 +294,7 @@ export class VehicleManager {
         if (v.y >= b.y1 - 0.05 || v.y + v.height <= b.y0) continue;
         const r = vehVsBox(v, b);
         if (!r) continue;
+        if (v.T.plane && !v.grounded && v.alive && v.speed > 12) { v.damage(99999, null); v.explode(); break; }
         this.resolveStatic(v, r.nx, r.nz, r.depth);
       }
       for (const c of _c) {
@@ -384,7 +388,8 @@ export class VehicleManager {
     for (const v of vs) {
       v.group.updateMatrixWorld();
       const g = v.geo;
-      for (let k = 0; k < 4; k++) {
+      const craft = v.T.boat || v.T.plane;
+      if (!craft) for (let k = 0; k < 4; k++) {
         const [x, y, z, front] = g.wheels[k];
         const wr = v.T.wheelR;
         m.makeTranslation(x, y, z);
@@ -392,9 +397,11 @@ export class VehicleManager {
         if (front) { r.makeRotationY(v.steer * -1); w.multiply(r); }
         r.makeRotationX(v.spin); w.multiply(r);
         s.makeScale(0.26, wr, wr); w.multiply(s);
+        W.setColorAt(wi, this._rc.setHex(v.rimCol ?? 0xffffff));
         W.setMatrixAt(wi++, w);
       }
       // Schatten
+      if (v.T.boat) continue;
       this._p.set(v.x, G.world.groundHeight(v.x, v.z) + 0.03, v.z);
       this._q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, v.h);
       const fade = clamp(1 - (v.y - this._p.y) / 8, 0.2, 1);
@@ -402,7 +409,7 @@ export class VehicleManager {
       m.compose(this._p, this._q, this._sc);
       this.blobIM.setMatrixAt(bi++, m);
       // Scheinwerferkegel
-      if (night > 0.05 && v.alive && !v.sinking) {
+      if (night > 0.05 && v.alive && !v.sinking && !craft) {
         const fx = Math.sin(v.h), fz = Math.cos(v.h);
         this._p.set(v.x + fx * (v.hl + 5), G.world.groundHeight(v.x + fx * (v.hl + 5), v.z + fz * (v.hl + 5)) + 0.05, v.z + fz * (v.hl + 5));
         this._sc.set(5.5, 1, 11);
@@ -410,7 +417,7 @@ export class VehicleManager {
         this.headIM.setMatrixAt(hi++, m);
       }
     }
-    W.count = wi; W.instanceMatrix.needsUpdate = true;
+    W.count = wi; W.instanceMatrix.needsUpdate = true; if (W.instanceColor) W.instanceColor.needsUpdate = true;
     // Figurenschatten
     for (const c of G.peds.blobList()) {
       if (bi >= this.blobIM.instanceMatrix.count) break;

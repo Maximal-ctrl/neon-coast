@@ -86,6 +86,10 @@ export const DISTRICT_NAMES = {
   valverde: 'Valverde',
   bahia: 'Bahía Blanca',
   ranchos: 'Los Ranchos',
+  santacruz: 'Santa Cruz',
+  lagoverde: 'Lago Verde',
+  pinar: 'Pinar Alto',
+  sanlucar: 'San Lúcar',
   club: 'Club Velvet',
   bank: 'Solera Bank',
 };
@@ -126,6 +130,10 @@ export const TOWNS = [
   { key: 'valverde', name: 'Valverde', cx: 300, cz: -1900, nx: 4, nz: 3, style: 'town' },
   { key: 'bahia', name: 'Bahía Blanca', cx: 1450, cz: -650, nx: 4, nz: 2, style: 'coast', y: 5 },
   { key: 'ranchos', name: 'Los Ranchos', cx: -1250, cz: -1250, nx: 3, nz: 2, style: 'desert' },
+  { key: 'santacruz', name: 'Santa Cruz', cx: -1000, cz: -640, nx: 4, nz: 2, style: 'coast' },
+  { key: 'lagoverde', name: 'Lago Verde', cx: 600, cz: -1450, nx: 3, nz: 2, style: 'town' },
+  { key: 'pinar', name: 'Pinar Alto', cx: -400, cz: -2480, nx: 3, nz: 2, style: 'town', y: 62 },
+  { key: 'sanlucar', name: 'San Lúcar', cx: 1530, cz: -1030, nx: 3, nz: 2, style: 'desert' },
 ];
 export const townNode = (t, i, j) => [t.cx + (i - t.nx / 2) * TOWN_CS, t.cz + (j - t.nz / 2) * TOWN_CS];
 export const townRect = (t, m = 0) => ({ x0: t.cx - (t.nx / 2) * TOWN_CS - m, x1: t.cx + (t.nx / 2) * TOWN_CS + m, z0: t.cz - (t.nz / 2) * TOWN_CS - m, z1: t.cz + (t.nz / 2) * TOWN_CS + m });
@@ -133,3 +141,17 @@ export function townAt(x, z, m = 30) {
   for (const t of TOWNS) { const r = townRect(t, m); if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return t; }
   return null;
 }
+
+// ------------------------------------------------------------ Bootsstege (Docks)
+// rects: begehbare Stegflächen [x0, z0, x1, z1]; gap: Lücke in der Kaimauer; slips: Liegeplätze [x, z, Richtung]
+export const DOCKS = [
+  { key: 'marina', name: 'Solera Marina', side: 'S', gap: [85.5, 94.5], y: 0.35,
+    rects: [[86, 383.8, 94, 440], [84, 440, 96, 452]],
+    shop: [90, 378.5], slips: [[99.4, 404, 0], [99.4, 420, 0], [99.4, 434, 0], [80.6, 410, 0], [80.6, 428, 0]] },
+  { key: 'strand', name: 'Strandsteg', side: 'E', y: 0.4,
+    rects: [[417, -203, 498, -197], [490, -208, 502, -192]],
+    shop: [413.5, -200], slips: [[468, -206.4, Math.PI / 2], [484, -206.4, Math.PI / 2], [470, -193.6, Math.PI / 2], [485, -193.6, Math.PI / 2]] },
+  { key: 'altstadt', name: 'Altstadt-Kai', side: 'W', gap: [-4.5, 4.5], y: 0.35,
+    rects: [[-680, -4, -623.8, 4], [-692, -12, -680, 12]],
+    shop: [-618.5, 8], slips: [[-650, -6.6, -Math.PI / 2], [-668, -6.6, -Math.PI / 2], [-656, 6.6, -Math.PI / 2]] },
+];
