@@ -28,7 +28,7 @@ export const SIGN = { HOTEL: 0, MOTEL: 1, BAR: 2, CLUB: 3, DINER: 4, TACOS: 5, P
 
 
 // Gelände, Landstraßen & Orte: siehe terrain.js
-import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES , JUNCTIONS, ESTATE2, FARM, PEAK } from './terrain.js';
+import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES , JUNCTIONS, ESTATE2, FARM, PEAK, RURAL } from './terrain.js';
 export { HILLS, CAUSEWAY, VILLAGE, MANSION, HILL_ROAD, SUMMIT_ROAD, hillHeight };
 
 export class World {
@@ -97,6 +97,11 @@ export class World {
     if (PL) for (let i = 0; i < PL.length; i++) { const p = PL[i]; if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return p.y; }
     if (z < -384 && z > -492) for (const CW of C.CAUSEWAYS) if (x > CW.x0 && x < CW.x1) return lerp(0, CW.y1, (CW.z1 - z) / (CW.z1 - CW.z0));
     if (z < HILLS.z1) {
+      // Kreuzungsflächen (in der Ebene der durchgehenden Straße)
+      for (let i = 0; i < JUNCTIONS.length; i++) {
+        const J = JUNCTIONS[i], dx = x - J.x, dz = z - J.z;
+        if (dx > -9.4 && dx < 9.4 && dz > -9.4 && dz < 9.4 && dx * dx + dz * dz < 88.4 && !(yHint !== undefined && yHint < J.y - 3)) return J.y + (J.g || 0) * (dx * (J.tx || 0) + dz * (J.tz || 0));
+      }
       const r = hillRoadAt(x, z);
       if (r) {
         const br = HILL_ROADS[r[2]].bridge[r[3]];
@@ -721,7 +726,7 @@ export class World {
       }
     }
     // Garten
-    if (rnd() < 0.7) this.addPalm(a + 1.5 + rnd() * 2, e - 1.5 - rnd() * 2, rnd);
+    if (rnd() < 0.7) { if (this._rural) this.addTree(a + 1.5 + rnd() * 2, e - 1.5 - rnd() * 2, rnd); else this.addPalm(a + 1.5 + rnd() * 2, e - 1.5 - rnd() * 2, rnd); }
     if (rnd() < 0.4) this.addTree(c - 2.5, b + 2.5, rnd);
     // Hecke
     if (rnd() < 0.5) P.box(a, 0, e - 0.6, c, 1.1, e, { col: rgb(0x2f6b2a) });
@@ -1155,9 +1160,11 @@ export class World {
     const P = this.B.props, pts = R.pts, n = pts.length;
     const asph = rgb(0x323439), shoulder = rgb(0x8c8573), wh = rgb(0xe9e9e4), ye = rgb(0xe7b923);
     const nrm = (i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1; return [-dz / l, dx / l]; };
+    const inJ = pts.map(([x, z]) => JUNCTIONS.some((J) => Math.hypot(x - J.x, z - J.z) < 9.2));
     const strip = (o0, o1, dy, col, every = 0) => {
       for (let i = 0; i < n - 1; i++) {
         if (every && i % every >= every / 2) continue;
+        if (inJ[i] && inJ[i + 1]) continue; // in der Kreuzungsfläche nur die Scheibe
         const [ax, az] = pts[i], [bx, bz] = pts[i + 1], na = nrm(i), nb = nrm(i + 1), ya = R.hs[i] + dy, yb = R.hs[i + 1] + dy;
         (col ? P : this.B.asph).quad([ax + na[0] * o0, ya, az + na[1] * o0], [ax + na[0] * o1, ya, az + na[1] * o1], [bx + nb[0] * o1, yb, bz + nb[1] * o1], [bx + nb[0] * o0, yb, bz + nb[1] * o0], [0, 0, 1, 1], col);
       }
@@ -1176,7 +1183,7 @@ export class World {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1], [nx, nz] = nrm(i);
       const hL = hillHeight(ax + nx * 16, az + nz * 16), hR = hillHeight(ax - nx * 16, az - nz * 16);
       const side = hL < hR ? 1 : -1;
-      if (R.hs[i] - Math.min(hL, hR) < 2.2 || C.townAt(ax, az, 12) || (R.bridge && R.bridge[i])) continue; // Leitplanke nur am Abhang
+      if (R.hs[i] - Math.min(hL, hR) < 2.2 || C.townAt(ax, az, 12) || (R.bridge && R.bridge[i]) || JUNCTIONS.some((J) => Math.hypot(ax - J.x, az - J.z) < 22)) continue; // Leitplanke nur am Abhang, nicht in Einmündungen
       const o = 6.2 * side, ya = R.hs[i] - 0.1, yb = R.hs[i + 1] - 0.1;
       const p0 = [ax + nx * o, az + nz * o], p1 = [bx + nx * o, bz + nz * o];
       P.quad([p0[0], ya + 0.45, p0[1]], [p1[0], yb + 0.45, p1[1]], [p1[0], yb + 0.8, p1[1]], [p0[0], ya + 0.8, p0[1]], [0, 0, 1, 1], rgb(0xc9ccd0));
@@ -1187,7 +1194,7 @@ export class World {
     for (let i = 3; i < n - 1; i += 6) {
       if (R.bridge && R.bridge[i]) continue;
       const [x, z] = pts[i], [nx, nz] = nrm(i);
-      if (C.townAt(x, z, 10)) continue;
+      if (C.townAt(x, z, 10) || JUNCTIONS.some((J) => Math.hypot(x - J.x, z - J.z) < 18)) continue;
       for (const s of [-1, 1]) { const px = x + nx * 5.6 * s, pz = z + nz * 5.6 * s, y = R.hs[i] - 0.05; P.box(px - 0.06, y, pz - 0.06, px + 0.06, y + 1.0, pz + 0.06, { col: rgb(0xf2f2ee) }); P.box(px - 0.065, y + 0.72, pz - 0.065, px + 0.065, y + 0.88, pz + 0.065, { col: rgb(0x1a1a1a) }); this.B.accent.box(px - 0.07, y + 0.76, pz - 0.07, px + 0.07, y + 0.84, pz + 0.07, { col: s > 0 ? rgb(0xff8a3a, 1.2) : rgb(0xf2f2f2, 1.1) }); }
     }
     if (R.bridge) this.genBridge(R, nrm);
@@ -1262,8 +1269,11 @@ export class World {
   genJunctions() {
     const P = this.B.props;
     for (const J of JUNCTIONS) {
-      this.B.asph.addGeometry(new THREE.CircleGeometry(9.2, 28).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(J.x, J.y + 0.035, J.z));
-      P.addGeometry(new THREE.CircleGeometry(11.2, 28).rotateX(-Math.PI / 2), new THREE.Matrix4().makeTranslation(J.x, J.y - 0.05, J.z), rgb(0x8c8573));
+      // Kreuzungsfläche in der Ebene der durchgehenden Straße (gleiche Steigung)
+      const disk = (r, dy) => { const g = new THREE.CircleGeometry(r, 36).rotateX(-Math.PI / 2), a = g.attributes.position; for (let k = 0; k < a.count; k++) a.setY(k, dy + (J.g || 0) * (a.getX(k) * (J.tx || 0) + a.getZ(k) * (J.tz || 0))); return g; };
+      const at = new THREE.Matrix4().makeTranslation(J.x, J.y, J.z);
+      this.B.asph.addGeometry(disk(9.4, 0.012), at);
+      P.addGeometry(disk(11.4, -0.045), at, rgb(0x8c8573));
       // Wegweiser: für jede abgehende Straße der nächste Ort
       const signs = [];
       for (const ei of J.edges) {
@@ -1274,8 +1284,9 @@ export class World {
       }
       signs.slice(0, 3).forEach((s, k) => {
         const px = J.x + s.dx * 11 - s.dz * 7.5, pz = J.z + s.dz * 11 + s.dx * 7.5;
-        P.box(px - 0.07, J.y, pz - 0.07, px + 0.07, J.y + 2.8, pz + 0.07, { col: rgb(0x9aa0a6) });
-        this.textSign(`${s.name.toUpperCase()}  ${s.km} KM`, px, J.y + 2.5, pz, Math.atan2(-s.dx, -s.dz), '#ffffff', 3.6, 'rgba(20,90,50,0.95)');
+        const gy = Math.max(hillHeight(px, pz), J.y + (J.g || 0) * ((px - J.x) * (J.tx || 0) + (pz - J.z) * (J.tz || 0))) - 0.2;
+        P.box(px - 0.07, gy, pz - 0.07, px + 0.07, gy + 2.8, pz + 0.07, { col: rgb(0x9aa0a6) });
+        this.textSign(`${s.name.toUpperCase()}  ${s.km} KM`, px, gy + 2.5, pz, Math.atan2(-s.dx, -s.dz), '#ffffff', 3.6, 'rgba(20,90,50,0.95)');
         void k;
       });
     }
@@ -1296,32 +1307,30 @@ export class World {
     return null;
   }
 
-  // Landhäuser & Höfe entlang der Landstraßen
+  // Landhäuser & Höfe entlang der Landstraßen (3.2: ebene Bauplätze aus terrain.js, Zufahrt folgt dem Gelände)
   genRuralHouses() {
-    const rnd = mulberry32(31337), placed = [];
-    for (const R of HILL_ROADS) {
-      const pts = R.pts;
-      for (let i = 10; i < pts.length - 10; i += 10) {
-        if (rnd() > 0.6 || (R.bridge && R.bridge[i])) continue;
-        const [x, z] = pts[i], a = pts[i - 1], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l;
-        const s = rnd() < 0.5 ? 1 : -1, off = 24 + rnd() * 10, cx = x + nx * off * s, cz = z + nz * off * s;
-        if (C.townAt(cx, cz, 45) || Math.hypot(cx - VILLAGE.x, cz - VILLAGE.z) < VILLAGE.r + 40 || Math.hypot(cx - MANSION.x, cz - MANSION.z) < MANSION.r + 50) continue;
-        if (cx > AIRFIELD.x0 - 40 && cx < AIRFIELD.x1 + 40 && cz > AIRFIELD.z0 - 40 && cz < AIRFIELD.z1 + 40) continue;
-        if (placed.some(([px, pz]) => Math.hypot(px - cx, pz - cz) < 30)) continue;
-        const rr = hillRoadAt(cx, cz); if (rr && rr[0] < 13) continue;
-        const w = 15 + rnd() * 5, d = 14 + rnd() * 4, x0 = cx - w / 2, z0 = cz - d / 2, x1 = cx + w / 2, z1 = cz + d / 2;
-        const hs = [[x0, z0], [x1, z0], [x0, z1], [x1, z1], [cx, cz]].map(([qx, qz]) => hillHeight(qx, qz));
-        const lo = Math.min(...hs), hi = Math.max(...hs);
-        if (hi - lo > 7 || lo < 1.5) continue;
-        placed.push([cx, cz]);
-        this.B.concrete.box(x0 - 0.5, lo - 1.5, z0 - 0.5, x1 + 0.5, hi + 0.15, z1 + 0.5, { col: rgb(0xb7ad9c), topScale: 2.6, uw: 2.6, vh: 2.6 });
-        this.raised(hi + 0.15, () => {
-          if (rnd() < 0.3) { this.warehouse(x0 + 1, z0 + 1, x1 - 1, z1 - 1, rnd); } else this.house(x0, z0, x1, z1, rnd);
-        });
-        // Zufahrt (Schotter)
-        const ex = x + nx * 6.5 * s, ez = z + nz * 6.5 * s, fx = cx - nx * (d / 2) * s, fz = cz - nz * (d / 2) * s;
-        const gl = Math.hypot(fx - ex, fz - ez) || 1, gx = -(fz - ez) / gl * 1.6, gz = (fx - ex) / gl * 1.6;
-        this.B.props.quad([ex - gx, R.hs[i] - 0.03, ez - gz], [ex + gx, R.hs[i] - 0.03, ez + gz], [fx + gx, hi + 0.12, fz + gz], [fx - gx, hi + 0.12, fz - gz], [0, 0, 1, 1], rgb(0x9b927f));
+    const placed = [];
+    for (const p of RURAL) {
+      const rnd = mulberry32(p.seed), Rd = HILL_ROADS[p.road], [x, z] = Rd.pts[p.i];
+      placed.push([p.cx, p.cz]);
+      // flacher Sockel (nur als saubere Kante, das Gelände ist bereits eben)
+      this.B.props.box(p.x0 - 0.4, p.y - 0.8, p.z0 - 0.4, p.x1 + 0.4, p.y + 0.16, p.z1 + 0.4, { col: rgb(0x8f877a) });
+      this._rural = true;
+      this.raised(p.y + 0.18, () => {
+        if (rnd() < 0.25) this.warehouse(p.x0 + 1, p.z0 + 1, p.x1 - 1, p.z1 - 1, rnd); else this.house(p.x0, p.z0, p.x1, p.z1, rnd);
+      });
+      this._rural = false;
+      // Zufahrt (Schotter): vom Straßenrand bis zum Grundstück, folgt dem Gelände
+      const ex = x + p.nx * 7.4 * p.s, ez = z + p.nz * 7.4 * p.s, fx = p.cx - p.nx * (p.d / 2 + 0.4) * p.s, fz = p.cz - p.nz * (p.d / 2 + 0.4) * p.s;
+      const gl = Math.hypot(fx - ex, fz - ez) || 1, gx = -(fz - ez) / gl * 1.7, gz = (fx - ex) / gl * 1.7;
+      const n = Math.max(2, Math.ceil(gl / 1.5)), col = rgb(0x9b927f);
+      const yAt = (t) => { const qx = ex + (fx - ex) * t, qz = ez + (fz - ez) * t; return Math.max(this.groundHeight(qx, qz), hillHeight(qx, qz)) + 0.07; };
+      let yp = yAt(0);
+      for (let k = 0; k < n; k++) {
+        const t0 = k / n, t1 = (k + 1) / n, y1 = yAt(t1);
+        const ax = ex + (fx - ex) * t0, az = ez + (fz - ez) * t0, bx = ex + (fx - ex) * t1, bz = ez + (fz - ez) * t1;
+        this.B.props.quad([ax - gx, yp, az - gz], [ax + gx, yp, az + gz], [bx + gx, y1, bz + gz], [bx - gx, y1, bz - gz], [0, 0, 1, 1], col);
+        yp = y1;
       }
     }
     this.ruralCount = placed.length; this.ruralPos = placed;

@@ -1,6 +1,6 @@
 // Solera County: Gelände (Höhenfeld), Landstraßennetz und Orte im Umland
 import * as C from './config.js';
-import { lerp, smoothstep } from './utils.js';
+import { lerp, smoothstep, mulberry32 } from './utils.js';
 
 const { REGION, CAUSEWAYS, TOWNS, TOWN_CS } = C;
 
@@ -124,8 +124,9 @@ export const HILL_ROAD = (() => {
   const pts = spline([[40, -490], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]]);
   const vfix = ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null);
   _pts = pts; _slope = 0.11;
-  const hs = smoothHs(profile(pts, 0.9, 0.11, vfix), pts.map((p, i) => i === 0 || vfix(p) != null));
-  return { name: 'Bergstraße', pts, hs, bb: bbox(pts) };
+  const fx = pts.map((p, i) => i === 0 || vfix(p) != null);
+  const hs = smoothHs(profile(pts, 0.9, 0.11, vfix), fx);
+  return { name: 'Bergstraße', pts, hs, bb: bbox(pts), fx: [...fx], slope: 0.11 };
 })();
 const nearestIdx = (R, x, z) => { let b = 0, bd = 1e18; R.pts.forEach((p, i) => { const d = (p[0] - x) ** 2 + (p[1] - z) ** 2; if (d < bd) { bd = d; b = i; } }); return b; };
 export const SUMMIT_JOIN = nearestIdx(HILL_ROAD, 34, -585);
@@ -139,8 +140,9 @@ export const SUMMIT_ROAD = (() => {
   for (let i = pts.length - 1; i >= 0; i--) if (Math.hypot(pts[i][0] - end[0], pts[i][1] - end[1]) < 16) hs[i] = my;
   for (let i = pts.length - 2; i > 0; i--) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); hs[i] = Math.max(hs[i], hs[i + 1] - d * 0.17); }
   _pts = pts; _slope = 0.17;
-  smoothHs(hs, pts.map((p, i) => i === 0 || Math.hypot(p[0] - end[0], p[1] - end[1]) < 16));
-  return { name: 'Gipfelstraße', pts, hs, bb: bbox(pts) };
+  const fx = pts.map((p, i) => i === 0 || Math.hypot(p[0] - end[0], p[1] - end[1]) < 16);
+  smoothHs(hs, fx);
+  return { name: 'Gipfelstraße', pts, hs, bb: bbox(pts), fx: [...fx], slope: 0.17 };
 })();
 export const MANSION = (() => { const e = SUMMIT_ROAD.pts[SUMMIT_ROAD.pts.length - 1]; return { x: e[0], z: e[1] - 40, r: 58, y: SUMMIT_ROAD.hs[SUMMIT_ROAD.hs.length - 1] }; })();
 export const LOOKOUT = { x: 330, z: -2790, r: 34, y: 0 };
@@ -155,8 +157,9 @@ function road(name, ctrl, o = {}) {
   const n = pts.length;
   const fx = (p, i) => { if (i === n - 1 && endY != null) return endY; for (const f of o.fixed || []) { const y = f(p); if (y != null) return y; } return null; };
   _pts = pts; _slope = o.slope || 0.1;
-  const hs = smoothHs(profile(pts, startY, o.slope || 0.1, fx, 14, true), pts.map((p, i) => i === 0 || fx(p, i) != null));
-  return { name, pts, hs, bb: bbox(pts) };
+  const mask = pts.map((p, i) => i === 0 || fx(p, i) != null);
+  const hs = smoothHs(profile(pts, startY, o.slope || 0.1, fx, 14, true), mask);
+  return { name, pts, hs, bb: bbox(pts), fx: [...mask], slope: o.slope || 0.1 };
 }
 const V = TOWNS[0], B = TOWNS[1], Rn = TOWNS[2];
 const vill = ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null);
@@ -203,11 +206,38 @@ export const ESTATE2 = { x: PEAK.x, z: PEAK.z, r: 58, y: PEAK.top };
 
 export const HILL_ROADS = [HILL_ROAD, SUMMIT_ROAD, WEST_ROAD, COAST_W, COAST_E, NORTH_E, VALLEY, PASS, SIERRA, CRUZ_E, CRUZ_N, LAGO_W, LAGO_N, PINAR_R, LUCAR_R, CANYON, PEAK_R, FARM_R];
 
+// Einmündungen (3.2): Straßenenden, die auf eine andere (durchgehende) Straße treffen.
+// Die Kreuzungsfläche liegt in der Ebene der durchgehenden Straße (gleiche Steigung), damit nichts übersteht.
+export const JPTS = [];
+HILL_ROADS.forEach((R, ri) => {
+  for (const ei of [0, R.pts.length - 1]) {
+    const e = R.pts[ei];
+    HILL_ROADS.forEach((O, oi) => {
+      if (oi === ri) return;
+      const i = nearestIdx(O, e[0], e[1]);
+      if (Math.hypot(O.pts[i][0] - e[0], O.pts[i][1] - e[1]) >= 3 || JPTS.some((j) => Math.hypot(j.x - e[0], j.z - e[1]) < 6)) return;
+      const a = Math.max(0, i - 3), b = Math.min(O.pts.length - 1, i + 3);
+      const dx = O.pts[b][0] - O.pts[a][0], dz = O.pts[b][1] - O.pts[a][1], l = Math.hypot(dx, dz) || 1;
+      JPTS.push({ x: O.pts[i][0], z: O.pts[i][1], y: O.hs[i], g: (O.hs[b] - O.hs[a]) / l, tx: dx / l, tz: dz / l, through: oi });
+    });
+  }
+});
+export const jPlane = (J, x, z) => J.y + (J.g || 0) * ((x - J.x) * (J.tx || 0) + (z - J.z) * (J.tz || 0));
+// alle Straßen im Kreuzungsbereich exakt in die Kreuzungsebene legen, danach weich auslaufen lassen
+const JFLAT = 13;
+HILL_ROADS.forEach((R, ri) => {
+  const fx = R.fx || R.pts.map((p, i) => i === 0);
+  let touched = false, gmax = 0;
+  R.pts.forEach(([x, z], i) => { for (const J of JPTS) if (Math.hypot(x - J.x, z - J.z) < JFLAT) { R.hs[i] = jPlane(J, x, z); fx[i] = true; if (J.through !== ri) { fx[i] = true; touched = true; gmax = Math.max(gmax, Math.abs(J.g)); } } });
+  if (touched) { _pts = R.pts; _slope = Math.max(R.slope || 0.12, gmax + 0.02); smoothHs(R.hs, fx); }
+});
+const nearJ = (x, z, r) => JPTS.some((J) => Math.hypot(x - J.x, z - J.z) < r);
+
 // Brücken: Abschnitte, die hoch über dem natürlichen Gelände verlaufen (keine Aufschüttung, Brückenbau)
 for (const R of HILL_ROADS) {
   const n = R.pts.length, hi = new Uint8Array(n), br = new Uint8Array(n);
   if (R.noBridge) { R.bridge = new Uint8Array(R.pts.length); continue; }
-  R.pts.forEach(([x, z], i) => { if (!C.townAt(x, z, 40) && Math.hypot(x - VILLAGE.x, z - VILLAGE.z) > VILLAGE.r + 30 && R.hs[i] - rawHill(x, z)[0] > 7.5) hi[i] = 1; });
+  R.pts.forEach(([x, z], i) => { if (!C.townAt(x, z, 40) && Math.hypot(x - VILLAGE.x, z - VILLAGE.z) > VILLAGE.r + 30 && !nearJ(x, z, 30) && R.hs[i] - rawHill(x, z)[0] > 7.5) hi[i] = 1; });
   for (let i = 0; i < n;) {
     if (!hi[i]) { i++; continue; }
     let j = i; while (j < n && hi[j]) j++;
@@ -302,8 +332,13 @@ export function terrainExact(x, z) {
     const dx = Math.max(p.x0 - x, 0, x - p.x1), dz = Math.max(p.z0 - z, 0, z - p.z1), d = Math.hypot(dx, dz);
     if (d < p.fall) h = lerp(h, p.y, 1 - smoothstep(0, p.fall, d));
   }
+  // Hausplätze an den Landstraßen (eben, mit weicher Böschung)
+  if (ruralOn) for (const p of RURAL) {
+    const dx = Math.max(p.fx0 - x, 0, x - p.fx1), dz = Math.max(p.fz0 - z, 0, z - p.fz1);
+    if (dx < 18 && dz < 18) { const d = Math.hypot(dx, dz); if (d < 18) h = lerp(h, p.y, 1 - smoothstep(0, 18, d)); }
+  }
   // Kreuzungen eben
-  for (const J of JUNCTIONS) { const d = Math.hypot(x - J.x, z - J.z); if (d < 34) h = lerp(h, J.y - 0.2, 1 - smoothstep(12, 34, d)); }
+  for (const J of JUNCTIONS) { const d = Math.hypot(x - J.x, z - J.z); if (d < 34) h = lerp(h, jPlane(J, x, z) - 0.2, 1 - smoothstep(12, 34, d)); }
   // Straße einschneiden / aufschütten – breite, sanfte Böschungen bei großen Höhenunterschieden
   const r = roadNear(x, z);
   if (r) {
@@ -321,6 +356,7 @@ export const GW = Math.round((REGION.x1 - REGION.x0) / GRID) + 1, GD = Math.roun
 let HM = null;
 export function buildHeightmap() {
   if (HM) return HM;
+  if (!ruralOn) { computeRural(); ruralOn = true; }
   const a = new Float32Array(GW * GD);
   for (let j = 0; j < GD; j++) for (let i = 0; i < GW; i++) a[j * GW + i] = terrainExact(REGION.x0 + i * GRID, REGION.z0 + j * GRID);
   HM = a;
@@ -433,3 +469,48 @@ export function netLocate(x, z) {
 export const GATES = NET.nodes.filter((n) => n.gate);
 // Einmündungen außerhalb der Orte (für ebene Kreuzungsflächen)
 export const JUNCTIONS = NET.nodes.filter((n) => !n.town && !n.gate && n.edges.length >= 2 && !(n.edges.length === 2 && NET.edges[n.edges[0]].road === NET.edges[n.edges[1]].road));
+for (const J of JUNCTIONS) {
+  const q = JPTS.find((j) => Math.hypot(j.x - J.x, j.z - J.z) < 6);
+  if (q) { J.g = q.g; J.tx = q.tx; J.tz = q.tz; J.y = jPlane(q, J.x, J.z); continue; }
+  // Anschluss an einen Damm: Ebene entlang der Landstraße
+  const e = J.edges.map((k) => NET.edges[k]).find((q2) => q2.road != null);
+  if (!e) continue;
+  const fwd = e.a === J.id, k = fwd ? Math.min(3, e.pts.length - 1) : Math.max(0, e.pts.length - 4), P = e.pts[k];
+  const dx = P[0] - J.x, dz = P[1] - J.z, l = Math.hypot(dx, dz) || 1;
+  J.g = (e.hs[k] - J.y) / l; J.tx = dx / l; J.tz = dz / l;
+}
+
+// ---------------------------------------------------------------- Landhäuser (3.2)
+// Bauplätze werden vor dem Höhenfeld bestimmt und dann eben ins Gelände eingearbeitet
+export const RURAL = [];
+let ruralOn = false;
+function computeRural() {
+  const rnd = mulberry32(31337);
+  HILL_ROADS.forEach((R, ri) => {
+    if (R.canyon || R === PEAK_R) return;
+    const pts = R.pts;
+    for (let i = 10; i < pts.length - 10; i += 10) {
+      if (rnd() > 0.6 || R.bridge[i] || R.bridge[i - 4] || R.bridge[i + 4]) continue;
+      const [x, z] = pts[i], a = pts[i - 1], b = pts[i + 1], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l;
+      const s = rnd() < 0.5 ? 1 : -1, off = 26 + rnd() * 8, cx = x + nx * off * s, cz = z + nz * off * s;
+      const w = 15 + rnd() * 5, d = 14 + rnd() * 4;
+      if (C.townAt(cx, cz, 45) || Math.hypot(cx - VILLAGE.x, cz - VILLAGE.z) < VILLAGE.r + 40 || Math.hypot(cx - MANSION.x, cz - MANSION.z) < MANSION.r + 50) continue;
+      if (Math.hypot(cx - PEAK.x, cz - PEAK.z) < 330 || Math.hypot(cx - LOOKOUT.x, cz - LOOKOUT.z) < LOOKOUT.r + 60) continue;
+      if (cx > AIRFIELD.x0 - 40 && cx < AIRFIELD.x1 + 40 && cz > AIRFIELD.z0 - 40 && cz < AIRFIELD.z1 + 40) continue;
+      if (cx > FARM.x0 - 50 && cx < FARM.x1 + 50 && cz > FARM.z0 - 50 && cz < FARM.z1 + 50) continue;
+      if (nearJ(cx, cz, 70) || RURAL.some((p) => Math.hypot(p.cx - cx, p.cz - cz) < 34)) continue;
+      const x0 = cx - w / 2, z0 = cz - d / 2, x1 = cx + w / 2, z1 = cz + d / 2;
+      // keine Straße auf dem Grundstück (alle Ecken weit genug weg)
+      let clash = false;
+      for (const [qx, qz] of [[x0 - 4, z0 - 4], [x1 + 4, z0 - 4], [x0 - 4, z1 + 4], [x1 + 4, z1 + 4], [cx, cz]]) { const rr = hillRoadAt(qx, qz); if (rr && rr[0] < 13) { clash = true; break; } }
+      if (clash) continue;
+      const hs = [[x0, z0], [x1, z0], [x0, z1], [x1, z1], [cx, cz]].map(([qx, qz]) => hillHeight(qx, qz));
+      const lo = Math.min(...hs), hi = Math.max(...hs);
+      if (hi - lo > 6 || lo < 1.5) continue;
+      const y = hs.reduce((q, v) => q + v, 0) / hs.length;
+      if (Math.abs(y - R.hs[i]) > 4.5) continue; // Zufahrt nicht zu steil
+      const m = 7; // ebener Rand ums Haus
+      RURAL.push({ cx, cz, x0, z0, x1, z1, fx0: x0 - m, fz0: z0 - m, fx1: x1 + m, fz1: z1 + m, y, road: ri, i, nx, nz, s, d, w, seed: Math.floor(rnd() * 1e9) });
+    }
+  });
+}
