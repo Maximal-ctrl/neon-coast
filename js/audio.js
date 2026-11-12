@@ -244,8 +244,9 @@ export class AudioSys {
     // Radio
     const st = STATIONS[this.station];
     const clubMusic = playing && !v && G.interior && G.interior.kind === 'club';
-    const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic;
-    const userOn = !!(v && playing && st.style === 'user' && !clubMusic && this.tracks.length);
+    const pv = this.preview && G.state === 'menu'; // Vorschau in der Radio-App
+    const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic || (pv && st.style !== 'off');
+    const userOn = !!(((v && playing) || pv) && st.style === 'user' && !clubMusic && this.tracks.length);
     if (this.userGain) this.userGain.gain.setTargetAtTime(userOn ? 1.6 : 0, t, 0.3);
     this.musicBus.gain.setTargetAtTime(wantMusic && !userOn ? (G.state === 'title' ? 0.7 : 1) : 0, t, 0.4);
     if (wantMusic && !userOn) this.schedule();

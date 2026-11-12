@@ -145,7 +145,7 @@ function street() {
       { name: 'Tabak', icon: '🚬', items: [it('cigd')] },
     ],
     owned: (i) => (Inventory.count(i.id) ? `Im Inventar: ${Inventory.count(i.id)}` : ''),
-    onBuy: (i, n) => { if (!pay(i.price * n)) return false; Inventory.add(i.id, n * (i.pack || 1)); G.hud.toast(`${i.icon} ${n}× ${i.name} → Inventar`); if (G.dealer) G.dealer.sold(); return true; },
+    onBuy: (i, n) => { if (!pay(i.price * n)) return false; Inventory.add(i.id, n * (i.pack || 1)); G.hud.toast(`${i.icon} ${n}× ${i.name} → Inventar`); if (G.dealer) G.dealer.sold(); const P = G.player; if (P.contacts && !P.contacts.has('dealer')) { P.contacts.add('dealer'); setTimeout(() => G.hud.bigToast('NEUER KONTAKT', 'Fuego (Straßenhändler) – er hat einen Job für dich'), 1200); } return true; },
     extra: (i) => (ITEMS[i.id].anim && Inventory.count(i.id) ? '<button class="st-sec" data-act="use">Sofort benutzen</button>' : ''),
     action: (a, i) => { if (a === 'use') Inventory.use(i.id); },
   });
@@ -154,14 +154,14 @@ function street() {
 // ------------------------------------------------------------ Waffenladen
 function gunshop() {
   const P = G.player;
-  const w = (k) => ({ id: k, name: WEAPONS[k].name, icon: { pistol: '🔫', smg: '🔫', shotgun: '💥', rifle: '🎯' }[k], price: WEAPONS[k].price, desc: `Schaden ${WEAPONS[k].dmg}${WEAPONS[k].pellets ? ' ×' + WEAPONS[k].pellets : ''} · inkl. ${WEAPONS[k].ammoPack} Schuss`, disabled: P.ammo[k] > 0 ? 'Bereits im Besitz' : null });
+  const w = (k) => ({ id: k, name: WEAPONS[k].name, icon: { pistol: '🔫', smg: '🔫', shotgun: '💥', rifle: '🎯', sniper: '🔭', grenade: '💣' }[k], price: WEAPONS[k].price, desc: `Schaden ${WEAPONS[k].dmg}${WEAPONS[k].pellets ? ' ×' + WEAPONS[k].pellets : ''} · inkl. ${WEAPONS[k].ammoPack} Schuss`, disabled: P.ammo[k] > 0 ? 'Bereits im Besitz' : null });
   const a = (k) => ({ id: 'ammo_' + k, w: k, name: `${WEAPONS[k].name}-Munition`, icon: '📦', price: WEAPONS[k].ammoPrice, desc: `+${WEAPONS[k].ammoPack} Schuss`, multi: true, disabled: P.ammo[k] > 0 ? null : 'Erst Waffe kaufen' });
   const MI = modItems();
   store({
     title: 'WAFFENLADEN', subtitle: 'Ausrüstung für harte Zeiten', accent: '#ff7b39', logo: '🎯',
     categories: [
-      { name: 'Waffen', icon: '🔫', items: ['pistol', 'smg', 'shotgun', 'rifle'].map(w) },
-      { name: 'Munition', icon: '📦', items: ['pistol', 'smg', 'shotgun', 'rifle'].map(a) },
+      { name: 'Waffen', icon: '🔫', items: ['pistol', 'smg', 'shotgun', 'rifle', 'sniper', 'grenade'].map(w) },
+      { name: 'Munition', icon: '📦', items: ['pistol', 'smg', 'shotgun', 'rifle', 'sniper', 'grenade'].map(a) },
       { name: 'Ausrüstung', icon: '🦺', items: [{ id: 'armor', name: 'Schutzweste', icon: '🦺', price: 300, desc: 'Fängt 70 % des Schadens ab.' }, { id: 'medkit', name: 'Erste-Hilfe-Set', icon: '🩹', price: 120, desc: 'Sofort volle Gesundheit.' }] },
       { name: 'Aufsätze', icon: '🔧', items: MI },
     ],
@@ -181,7 +181,7 @@ function gunshop() {
 
 function modItems() {
   const P = G.player, out = [];
-  for (const w of ['pistol', 'smg', 'shotgun', 'rifle']) for (const m of Object.keys(WMODS)) {
+  for (const w of ['pistol', 'smg', 'shotgun', 'rifle', 'sniper']) for (const m of Object.keys(WMODS)) {
     const M = WMODS[m], has = P.wmods[w] && P.wmods[w][m];
     const dis = has ? 'Eingebaut' : !(P.ammo[w] > 0) ? 'Erst Waffe kaufen' : M.req && !(P.wmods[w] && P.wmods[w][M.req]) ? 'Erst ' + WMODS[M.req].name : null;
     out.push({ id: `mod_${w}_${m}`, w, mod: m, name: `${WEAPONS[w].name}: ${M.name}`, icon: M.icon, price: wmodPrice(w, m), desc: M.desc, disabled: dis });
@@ -442,7 +442,7 @@ const PAINTS = [0xe63946, 0xffb703, 0x00b4d8, 0x111111, 0xf8f9fa, 0xf72585, 0x7c
 function dealer() {
   const I = G.interiors;
   const keys = Object.keys(CAR_SHOP);
-  const cats = [['Alle', () => true], ['Sport', (k) => ['zephyra', 'vortex', 'brutus'].includes(k)], ['Alltag', (k) => ['kiwi', 'marina', 'atlas'].includes(k)], ['Nutz', (k) => ['coyote', 'hauler'].includes(k)], ['Extrem', (k) => ['brecher', 'tank'].includes(k)]];
+  const cats = [['Alle', () => true], ['Sport', (k) => ['zephyra', 'vortex', 'brutus'].includes(k)], ['Alltag', (k) => ['kiwi', 'marina', 'atlas'].includes(k)], ['Gepanzert', (k) => ['kodiak', 'marshal', 'tank'].includes(k)], ['Nutz', (k) => ['coyote', 'hauler'].includes(k)], ['Extrem', (k) => ['brecher', 'tank'].includes(k)]];
   let cat = 0, sel = I.previewKey && CAR_SHOP[I.previewKey] ? I.previewKey : 'zephyra', col = I.previewCol || PAINTS[0], first = true;
   const stat = (v, max) => Math.max(6, Math.min(100, (v / max) * 100));
   const render = () => {

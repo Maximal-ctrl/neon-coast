@@ -296,6 +296,8 @@ export const CAR_TYPES = {
   taxi: { name: 'Taxi', profile: 'sedan', L: 4.7, W: 1.86, wheelR: 0.34, maxSpeed: 48, accel: 10.5, brake: 24, grip: 9.6, steer: 0.56, mass: 1400, hp: 950, colors: [0xf6c90e], taxi: true },
   brecher: { name: 'Brecher 4x4', profile: 'suv', L: 5.0, W: 2.35, wheelR: 0.72, maxSpeed: 44, accel: 11, brake: 22, grip: 8.6, steer: 0.5, mass: 3200, hp: 2400, colors: [0xff5a1f, 0x111111, 0x2a9d8f, 0xffd60a, 0x7b2cbf] },
   tank: { name: 'Titan (Panzer)', profile: 'tank', tank: true, L: 7.2, W: 3.5, wheelR: 0.36, maxSpeed: 17, accel: 5.5, brake: 14, grip: 14, steer: 0.75, mass: 28000, hp: 7000, colors: [0x4b5320, 0x6b6b4f, 0x8a7f5a] },
+  kodiak: { name: 'Kodiak (gepanzert)', profile: 'suv', L: 5.0, W: 2.15, wheelR: 0.46, maxSpeed: 44, accel: 10, brake: 22, grip: 8.6, steer: 0.5, mass: 3600, hp: 4200, colors: [0x2b2f2a, 0x1d1f22, 0x4b5320], mg: true, armored: true },
+  marshal: { name: 'Marshal (MG-Pick-up)', profile: 'pickup', L: 5.3, W: 2.05, wheelR: 0.44, maxSpeed: 47, accel: 10.5, brake: 22, grip: 8.5, steer: 0.5, mass: 2600, hp: 2600, colors: [0xd9b48a, 0x4b5320, 0x111111], mg: true, armored: true },
   police: { name: 'Streifenwagen', profile: 'sedan', L: 4.8, W: 1.9, wheelR: 0.35, maxSpeed: 58, accel: 14, brake: 28, grip: 10.5, steer: 0.56, mass: 1600, hp: 1300, colors: [0xf2f2f2], police: true },
 };
 // Häufigkeit im Verkehr
@@ -309,6 +311,8 @@ export const CAR_SHOP = {
   zephyra: { price: 72000, cls: 'Sportwagen', desc: 'Präzise Lenkung, starke Beschleunigung.' },
   vortex: { price: 160000, cls: 'Supersportwagen', desc: 'Das Schnellste, was Port Solera zu bieten hat.' },
   brecher: { price: 55000, cls: 'Monster-Truck', desc: 'Riesige Räder, Hubraum ohne Ende. Rollt über alles.' },
+  kodiak: { price: 145000, cls: 'Gepanzert', desc: 'Panzerglas, verstärkte Karosserie und ein Dach-MG. Feuer: Maustaste / FEUER – braucht keine Munition.' },
+  marshal: { price: 68000, cls: 'Militär-Pick-up', desc: 'Geländegängiger Pick-up mit schwenkbarem Maschinengewehr auf der Ladefläche.' },
   tank: { price: 450000, cls: 'Militär', desc: 'Ausgemusterter Kampfpanzer mit funktionierender Kanone. Fragen Sie nicht.' },
 };
 export const TRAFFIC_MIX = ['kiwi', 'kiwi', 'kiwi', 'marina', 'marina', 'marina', 'marina', 'taxi', 'taxi', 'atlas', 'atlas', 'coyote', 'hauler', 'brutus', 'zephyra', 'vortex'];
@@ -663,6 +667,16 @@ export function buildCar(key, color) {
   }
   if (g.stripe) mk(g.stripe, T.police ? CAR_MATS.stripePol : CAR_MATS.stripeTaxi);
   if (g.taxiSign) mk(g.taxiSign, CAR_MATS.taxiSign);
+  if (T.mg) {
+    // schwenkbares Maschinengewehr auf dem Dach / der Ladefläche
+    const gun = new THREE.Group(); gun.position.set(0, g.height + 0.02, T.profile === 'pickup' ? -T.L * 0.28 : -0.25);
+    const dark = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.5, metalness: 0.6 });
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.48, 0.18, 14), dark); ring.position.y = 0.09; gun.add(ring);
+    const shield = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.08), dark); shield.position.set(0, 0.5, 0.45); gun.add(shield);
+    const body2 = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.7), dark); body2.position.set(0, 0.42, 0.25); gun.add(body2);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 1.1, 8).rotateX(Math.PI / 2), dark); barrel.position.set(0, 0.42, 1.05); gun.add(barrel);
+    grp.add(gun); parts.mg = gun;
+  }
   return { group: grp, parts, geo: g };
 }
 

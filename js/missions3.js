@@ -17,10 +17,11 @@ export const LOOKS3 = {
   paco: () => ({ ...base(0x8d5524), shirt: c(0x6b4423), sleeve: c(0x6b4423), pants: c(0x4a5a3a), legs: c(0x4a5a3a), hair: c(0x111111), hat: c(0x3a2a1a), scale: 1.02 }),
   luna: () => ({ ...base(0xf1c27d), shirt: c(0x8a1020), sleeve: c(0x8a1020), pants: c(0x111111), legs: c(0xf1c27d), hair: c(0x111111), scale: 0.92 }),
   ortiz: () => ({ ...base(0xe0ac69), shirt: c(0xf4f1ea), sleeve: c(0x2b2d42), pants: c(0x2b2d42), legs: c(0x2b2d42), hair: c(0x8a8a8a), scale: 1.0 }),
+  val: () => ({ ...base(0xf1c27d), shirt: c(0x5a189a), sleeve: c(0x5a189a), pants: c(0x240046), legs: c(0x240046), hair: c(0x1b1b1b), scale: 0.94 }),
   benito: () => ({ ...base(0xb07a4a), shirt: c(0xc0392b), sleeve: c(0xc0392b), pants: c(0x3b5a7a), legs: c(0x3b5a7a), hair: c(0xd9d9d9), hat: c(0xd9b48a), scale: 1.0 }),
   gang: (col = 0x2b2b2b) => { const l = randomLook(); return { ...l, shirt: c(col), sleeve: Math.random() < 0.5 ? l.skin : c(col), pants: c(0x1b1b1f), legs: c(0x1b1b1f), hat: Math.random() < 0.6 ? c(0x111111) : null }; },
 };
-export const TALK3 = { Nina: '#ff2e88', Marisol: '#4fc3ff', Paco: '#9ad1ff', Luna: '#ffd23f', Ortiz: '#e9d8a6', Benito: '#ffb35c', Rico: '#ff3b5c', Cuervo: '#ff3b5c' };
+export const TALK3 = { Fuego: '#b26bff', Bauer: '#7cff6b', Kunde: '#cccccc', Nina: '#ff2e88', Marisol: '#4fc3ff', Paco: '#9ad1ff', Luna: '#ffd23f', Ortiz: '#e9d8a6', Benito: '#ffb35c', Rico: '#ff3b5c', Cuervo: '#ff3b5c' };
 export const CONTACTS3 = {
   nina: { name: 'Nina „Nitro“ Cruz', role: "Straßenrennen · Dex' Tuning", poi: 'g_nina', col: '#ff2e88', auto: true },
   marisol: { name: 'Marisol Vega', role: 'Hafenmeisterin · Solera Marina', poi: 'g_marisol', col: '#4fc3ff', auto: true },
@@ -28,6 +29,7 @@ export const CONTACTS3 = {
   luna: { name: 'Luna Ferrer', role: 'Gran Casino · Bahía Blanca', inside: [1508, 1995], door: 'casino', col: '#ffd23f', auto: true },
   ortiz: { name: 'Bürgermeister Ortiz', role: 'Rathaus Valverde', poi: 'g_ortiz', col: '#e9d8a6', auto: true },
   benito: { name: 'Tío Benito', role: 'Rancher · Los Ranchos', poi: 'g_benito', col: '#ffb35c', auto: true },
+  dealer: { name: 'Fuego', role: 'Straßenhändler', poi: null, col: '#b26bff' },
 };
 export const PHONE3 = [
   { id: 'nina', need: 'nina', name: 'Nina', role: 'Straßenrennen', col: '#ff2e88', lines: ['Nitro an, Hirn aus? Nein. Nitro an, Hirn AN.', 'Die Pinienstraße fährt sich bei Nacht am besten.'] },
@@ -35,6 +37,7 @@ export const PHONE3 = [
   { id: 'paco', need: 'paco', name: 'Paco Reyes', role: 'Flugfeld Los Ranchos', col: '#9ad1ff', lines: ['Der Albatros ist vollgetankt. Komm vorbei!', 'Unter Brücken durchfliegen ist illegal. Und großartig.'] },
   { id: 'luna', need: 'luna', name: 'Luna Ferrer', role: 'Gran Casino', col: '#ffd23f', lines: ['Das Haus gewinnt immer, Leo. Außer, du arbeitest für das Haus.', 'Heute Abend Gala im Casino. Dresscode: Gold.'] },
   { id: 'ortiz', need: 'ortiz', name: 'Bürgermeister Ortiz', role: 'Rathaus Valverde', col: '#e9d8a6', lines: ['Valverde braucht Leute wie dich.', 'Die Wahl ist erst gewonnen, wenn die Stimmen gezählt sind.'] },
+  { id: 'dealer', need: 'dealer', name: 'Fuego', role: 'Straßenhändler', col: '#b26bff', lines: ['Psst … ich bin immer irgendwo in der Stadt. Halt die Augen offen.', 'Die Finca hat wieder Ware. Komm vorbei, wenn du Arbeit willst.'] },
   { id: 'benito', need: 'benito', name: 'Tío Benito', role: 'Los Ranchos', col: '#ffb35c', lines: ['Die Kojoten werden frech, muchacho.', 'Komm zum Grillen vorbei, wenn die Sonne untergeht.'] },
 ];
 
@@ -84,24 +87,48 @@ function chaser(m, key, x, z, col) {
 const carDown = (v) => !v || !v.alive || v.onFire || v.sinking || !v.driver || !v.driver.isPed;
 // GPS-Länge zwischen zwei Punkten
 function routeLen(ax, az, bx, bz) { const p = G.world.gpsPath(ax, az, bx, bz) || []; let L = 0; for (let i = 1; i < p.length; i++) L += Math.hypot((p[i].x ?? p[i][0]) - (p[i - 1].x ?? p[i - 1][0]), (p[i].z ?? p[i][1]) - (p[i - 1].z ?? p[i - 1][1])); return L || Math.hypot(bx - ax, bz - az) * 1.3; }
-function routePts(ax, az, bx, bz, step = 140) { const p = G.world.gpsPath(ax, az, bx, bz) || []; const out = []; let acc = 0; for (let i = 1; i < p.length; i++) { const x = p[i].x ?? p[i][0], z = p[i].z ?? p[i][1]; acc += Math.hypot(x - (p[i - 1].x ?? p[i - 1][0]), z - (p[i - 1].z ?? p[i - 1][1])); if (acc > step) { out.push([x, z]); acc = 0; } } out.push([bx, bz]); return out; }
+export function routePts(ax, az, bx, bz, step = 140) { const p = G.world.gpsPath(ax, az, bx, bz) || []; const out = []; let acc = 0; for (let i = 1; i < p.length; i++) { const x = p[i].x ?? p[i][0], z = p[i].z ?? p[i][1]; acc += Math.hypot(x - (p[i - 1].x ?? p[i - 1][0]), z - (p[i - 1].z ?? p[i - 1][1])); if (acc > step) { out.push([x, z]); acc = 0; } } out.push([bx, bz]); return out; }
 function* drivePts(m, pts, opts = {}) {
   for (let i = 0; i < pts.length; i++) {
     const [x, z] = pts[i], last = i === pts.length - 1;
+    const gd = !last ? cpGuide(m, x, G.world.groundHeight(x, z), z, pts[i + 1][0], G.world.groundHeight(pts[i + 1][0], pts[i + 1][1]), pts[i + 1][1]) : null;
     yield* m.goTo(x, z, opts.text ? opts.text(i, pts.length) : `Checkpoint ${i + 1}/${pts.length}`, { r: opts.r || 9, car: true, vehicle: opts.vehicle, color: last ? 0xffd23f : 0xff2e88 });
+    if (gd) m.removeMarker(gd);
     G.audio.checkpoint();
     if (opts.bonus && m.timerLeft != null) m.timerLeft += opts.bonus;
   }
 }
+// Wegweiser: Pfeil über dem aktuellen Checkpoint zeigt zum nächsten, schwacher Ring zeigt den nächsten
+let ARROW_GEO = null;
+export function cpGuide(m, x, y, z, nx, ny, nz) {
+  if (!ARROW_GEO) {
+    const sh = new THREE.Shape([[0, 2.2], [1.6, 0.2], [0.6, 0.2], [0.6, -1.8], [-0.6, -1.8], [-0.6, 0.2], [-1.6, 0.2]].map(([a, b]) => new THREE.Vector2(a, b)));
+    ARROW_GEO = new THREE.ShapeGeometry(sh).rotateX(Math.PI / 2);
+  }
+  const g = new THREE.Group();
+  const arrow = new THREE.Mesh(ARROW_GEO, new THREE.MeshBasicMaterial({ color: 0xffe14d, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false }));
+  arrow.position.set(x, y + 5.5, z); arrow.rotation.order = 'YXZ'; arrow.rotation.y = Math.atan2(nx - x, nz - z); arrow.rotation.x = -0.35;
+  arrow.renderOrder = 9; g.add(arrow);
+  const prev = new THREE.Mesh(new THREE.TorusGeometry(4, 0.35, 6, 28), new THREE.MeshBasicMaterial({ color: 0xff2e88, transparent: true, opacity: 0.35, depthWrite: false }));
+  prev.position.set(nx, ny + 0.3, nz); prev.rotation.x = Math.PI / 2; g.add(prev);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, y + 4.2, z), new THREE.Vector3(nx, ny + 3, nz)]), new THREE.LineDashedMaterial({ color: 0xffe14d, dashSize: 3, gapSize: 2, transparent: true, opacity: 0.6 }));
+  line.computeLineDistances(); g.add(line);
+  G.scene.add(g);
+  const o = { x, z, blip: false, t: 0, update(dt) { this.t += dt; arrow.position.y = y + 5.5 + Math.sin(this.t * 3) * 0.4; prev.scale.setScalar(1 + 0.1 * Math.sin(this.t * 4)); }, remove() { G.scene.remove(g); } };
+  m.markers.push(o);
+  return o;
+}
+
 // Meer: nächster Punkt mit genug Wassertiefe
 function seaPt(x, z) { for (let k = 0; k < 40; k++) { if (isWater(x, z, 2.5)) return [x, z]; const l = Math.hypot(x, z) || 1; x += (x / l) * 15; z += (z / l) * 15; } return [x, z]; }
 function* waterCps(m, pts, opts = {}) {
   for (let i = 0; i < pts.length; i++) {
     const [x, z] = pts[i], last = i === pts.length - 1;
     const mk = m.marker(x, z, last ? 0xffd23f : 0x4fc3ff, { r: opts.r || 10, h: 5, y: C.WATER_Y, blipCol: last ? '#ffd23f' : '#4fc3ff' });
+    const gd = !last ? cpGuide(m, x, C.WATER_Y, z, pts[i + 1][0], C.WATER_Y, pts[i + 1][1]) : null;
     m.objective(opts.text ? opts.text(i, pts.length) : `Boje ${i + 1}/${pts.length}`);
     yield* m.until(() => { const v = pos(); return dist2(v.x, v.z, x, z) < (opts.r || 10) ** 2 && (!opts.vehicle || P().vehicle === opts.vehicle); });
-    m.removeMarker(mk); G.audio.checkpoint();
+    m.removeMarker(mk); if (gd) m.removeMarker(gd); G.audio.checkpoint();
     if (opts.passed) opts.passed(i);
   }
   m.objective('');
@@ -120,9 +147,10 @@ function* airRings(m, pts, opts = {}) {
   for (let i = 0; i < pts.length; i++) {
     const [x, y, z, r = 22, face] = pts[i], nx = pts[i + 1] || pts[i - 1] || [x, y, z + 1];
     const o = ring(m, x, y, z, r, i === pts.length - 1 ? 0xffd23f : 0xff2e88, face || nx);
+    const nn = pts[i + 1], gd = nn ? cpGuide(m, x, y + r * 0.6 - 5.5, z, nn[0], nn[1] - 0.3, nn[2]) : null;
     m.objective(opts.text ? opts.text(i, pts.length) : `Ring ${i + 1}/${pts.length}`);
     yield* m.until(() => { const v = pos(); return Math.hypot(v.x - x, (v.y || 0) + 1.5 - y, v.z - z) < r * 1.05; });
-    m.removeMarker(o); G.audio.checkpoint();
+    m.removeMarker(o); if (gd) m.removeMarker(gd); G.audio.checkpoint();
     if (opts.bonus && m.timerLeft != null) m.timerLeft += opts.bonus;
   }
   m.objective('');
@@ -785,6 +813,173 @@ add({ id: 'tb6', title: 'Die alte Mine', sub: 'Benito', contact: 'benito', req: 
     for (let k = 0; k < 2; k++) chaser(m, 'atlas', L.x + 200 + k * 30, L.z + 300, 0x111111);
     yield* m.goTo(...side('ranchos', 1, 1), 'Bring das Gold zu <b>Benito</b> nach Los Ranchos.', { r: 5 });
     void r;
+  } });
+
+
+// ======================================================================
+//  3.1 – neue Aufträge
+// ======================================================================
+const holdTime = (m, h) => m.failIf(() => { G.timeOfDay = h; return false; }, '');
+function landingZone(m, x0, z0, x1, z1, plane, text) {
+  const mk = m.marker((x0 + x1) / 2, (z0 + z1) / 2, 0xffd23f, { r: 8, h: 3, blipCol: '#ffd23f' });
+  m.objective(text);
+  return (function* () {
+    yield* m.until(() => { if (Math.random() < 0.05) m.clearArea((x0 + x1) / 2, (z0 + z1) / 2, 220); return P().vehicle === plane && plane.grounded && plane.speed < 4 && plane.x > x0 && plane.x < x1 && plane.z > z0 && plane.z < z1; });
+    m.removeMarker(mk); m.objective('');
+  })();
+}
+
+// ---------------------------------------------------------------- Straßenhändler „Fuego“
+add({ id: 'dz1', title: 'Grüne Ernte', sub: 'Fuego', contact: 'dealer', needContact: 'dealer', req: [], label: '$', reward: 1500, desc: 'Auf einer abgelegenen Finca ernten – und die Ware in der Stadt verkaufen.',
+  *run(m) {
+    const d = G.dealer && G.dealer.p && !G.dealer.p.removed ? G.dealer.p : m.npc(pos().x + 1.6, pos().z + 1.6, LOOKS3.gang(0x5a189a));
+    yield* m.talk([['Fuego', 'Du kaufst öfter bei mir. Gefällt mir. Ich hätte da was Größeres.'], ['Fuego', 'Freunde von mir haben eine Finca. Tief in den Solera Hills, weit weg von allem – keine Nachbarn, keine Polizei.'], ['Fuego', 'Erntezeit. Hilf ihnen, bring die Ware in die Stadt und verteil sie an meine Kunden. Bezahlt wird in Munition. Viel Munition.']], d, d);
+    yield* m.getInCar();
+    const F = G.world.pois.finca;
+    yield* m.goTo(F.x, F.z, 'Fahr zur <b>Finca Escondida</b> tief in den Solera Hills (Feldweg ab der Talstraße).', { r: 12 });
+    const farmer = m.npc(F.x + 3, F.z + 2, { ...LOOKS3.benito(), shirt: c(0x3f7d2c), hat: c(0x6b4423) });
+    yield* m.talk([['Bauer', 'Fuego schickt dich? Gut. Die Pflanzen sind reif – schneid sie, bevor der Regen kommt.'], ['Bauer', 'Hier oben hört dich keiner. Aber trödel nicht.']], { x: F.x, z: F.z }, farmer);
+    const Fm = G.world.pois.fincaStrip, zc = Fm.z;
+    const spots = [];
+    for (let k = 0; k < 8; k++) spots.push([Fm.x + 20 + k * 30 + rand(-6, 6), zc + (k % 2 ? 22 : -22) + rand(-6, 6)]);
+    for (let i = 0; i < spots.length; i++) {
+      const [x, z] = spots[i];
+      const mk = m.marker(x, z, 0x7cff6b, { r: 1.2, label: '🌿', blipCol: '#7cff6b' });
+      let t = 0;
+      yield* m.until(() => {
+        const inside = P().state === 'foot' && dist2(P().x, P().z, x, z) < 1.6 * 1.6;
+        t = inside ? t + G.dt : Math.max(0, t - G.dt);
+        m.objective(`Ernte die Pflanzen <b>${i + 1}/${spots.length}</b> ${inside ? '· ' + '▮'.repeat(Math.ceil(t / 0.3)) + '▯'.repeat(Math.max(0, 5 - Math.ceil(t / 0.3))) : '(zu Fuß in den Marker stellen)'}`);
+        return t > 1.5;
+      });
+      m.removeMarker(mk); G.audio.pickup();
+    }
+    const van = provideCar(m, 'coyote', [F.x - 10, F.z + 8], 0x283618, Math.PI / 2);
+    m.failIf(() => !van.alive || van.sinking, 'Der Pick-up mit der Ware ist hinüber.');
+    yield* enterIt(m, van, 'Lade die Ernte in den <b>Pick-up</b> und steig ein.');
+    const buyers = [[-252, 12], [148, 172], [-480, 210], [392, 82]];
+    for (let i = 0; i < buyers.length; i++) {
+      const [x, z] = buyers[i];
+      yield* m.goTo(x, z, `Verkauf ${i + 1}/4: Fahr zum <b>Kunden</b> in der Stadt.`, { r: 6, vehicle: van, stop: true, color: 0xb26bff });
+      const b = m.npc(x + 2.5, z + 2, randomLook());
+      yield* m.talk([['Kunde', pick(['Fuego schickt dich? Perfekt.', 'Endlich! Hier, das Geld.', 'Schnell, bevor jemand guckt.'])]], { x, z }, b);
+      const cash = 300 + Math.round(rand(0, 200));
+      P().addMoney(cash, `💸 Verkauft ${i + 1}/4 · +$${cash}`);
+      if (i === 2) { G.police.setLevel(2); G.police.spotted(); G.hud.toast('🚨 Ein Zivilfahnder hat dich beobachtet!'); m.objective('Häng die <b>Polizei</b> ab, bevor du weiterverkaufst.'); yield* m.until(() => G.police.level === 0); }
+    }
+    const p = P();
+    p.giveWeapon('pistol', 150); p.giveWeapon('smg', 360); p.giveWeapon('shotgun', 64); p.giveWeapon('rifle', 240); p.giveWeapon('grenade', 6);
+    G.hud.bigToast('MUNITION ERHALTEN', 'Pistole, MP, Schrotflinte, Gewehr & Granaten');
+  } });
+add({ id: 'dz2', title: 'Fracht für das Schiff', sub: 'Fuego', contact: 'dealer', needContact: 'dealer', req: ['dz1'], label: '$', reward: 6000, desc: 'Von der Finca mit dem Flugzeug zum Hafen – und die Ware aufs große Schiff bringen.',
+  *run(m) {
+    const d = G.dealer && G.dealer.p && !G.dealer.p.removed ? G.dealer.p : m.npc(pos().x + 1.6, pos().z + 1.6, LOOKS3.gang(0x5a189a));
+    yield* m.talk([['Fuego', 'Die große Lieferung muss heute Nacht aufs Frachtschiff im Hafen.'], ['Fuego', 'Auf den Straßen stehen überall Kontrollen. Also fliegst du: Auf der Finca wartet ein Flieger auf der Piste.'], ['Fuego', 'Lande am Hafen auf der Kaistraße. Und Leo … die Cuervos wissen Bescheid. Sei bewaffnet.']], d, d);
+    yield* m.getInCar();
+    const S = G.world.pois.fincaStrip;
+    yield* m.goTo(S.x, S.z, 'Fahr zur <b>Landepiste der Finca</b>.', { r: 14 });
+    holdTime(m, 21.5);
+    if (P().inCar) P().exitVehicle(true);
+    const plane = m.spawnCar('albatros', S.x + 10, S.z, S.h, 0x111111); plane.y = S.y; plane.grounded = true;
+    m.failIf(() => !plane.alive && P().vehicle !== plane && P().state !== 'foot', 'Das Flugzeug ist abgestürzt.');
+    plane.mk = m.marker(0, 0, 0x19e6ff, { follow: plane, arrow: true, blipCol: '#19e6ff' });
+    yield* enterIt(m, plane, 'Steig in den <b>Schmuggelflieger</b> und starte von der Piste.');
+    m.objective('Flieg zum <b>Hafen</b> von Port Solera (Süden der Stadt).');
+    const ring1 = ring(m, -200, 70, 300, 30, 0xff2e88, [-200, 70, 400]);
+    yield* m.until(() => Math.hypot(plane.x + 200, plane.z - 300) < 140 && plane.y < 160);
+    m.removeMarker(ring1);
+    yield* landingZone(m, -330, 352, -40, 368, plane, 'Lande auf der <b>Kaistraße</b> am Hafen (gerade Strecke, langsam aufsetzen).');
+    G.police.locked = true;
+    m.fails = []; holdTime(m, 21.5);
+    if (P().inCar) P().exitVehicle(true);
+    const g = m.gang(-210, 392, 8, { gun: true, hp: 60, col: 0x111111, aggro: 90 });
+    const g2 = m.gang(-120, 330, 6, { gun: true, hp: 60, col: 0x111111, aggro: 90 });
+    yield* m.talk([['Cuervo', 'Da ist er! Holt euch die Ware!']], { x: -200, z: 380 }, null);
+    const gw = m.marker(-210, 381, 0xb26bff, { r: 1.4, label: '📦', blipCol: '#b26bff' });
+    m.objective('Bring die Ware zur <b>Gangway</b> des Frachtschiffs – die Cuervos greifen an!');
+    yield* m.until(() => { m.aliveGang(g); m.aliveGang(g2); return P().state === 'foot' && dist2(P().x, P().z, -210, 381) < 2.2 * 2.2; });
+    m.removeMarker(gw); G.audio.pickup(); G.hud.toast('📦 Ware an Bord!');
+    m.objective('Schalte die restlichen <b>Cuervos</b> aus.');
+    yield* m.until(() => m.aliveGang(g) + m.aliveGang(g2) === 0);
+    G.police.locked = false;
+    P().giveWeapon('rifle', 240); P().giveWeapon('grenade', 8); P().giveWeapon('sniper', 30);
+    G.hud.bigToast('LIEFERUNG ERFOLGREICH', 'Fuego legt noch Munition & ein Scharfschützengewehr drauf');
+  } });
+
+// ---------------------------------------------------------------- Paco: Häuserschlucht
+add({ id: 'pp7', title: 'Häuserschlucht', sub: 'Paco', contact: 'paco', req: ['pp6'], label: '✈', reward: 9000, desc: 'Im Tiefflug zwischen den Wolkenkratzern von Downtown hindurch.',
+  *run(m) {
+    const n = yield* meet(m, this, 'paco');
+    yield* m.talk([['Paco', 'Ein Werbespot für den Albatros! Die Kamera hängt auf dem Bank-Tower.'], ['Paco', 'Du fliegst zweimal durch die Häuserschluchten von Downtown – unter den Dächern, zwischen den Türmen. Nicht kratzen!']], n, n);
+    const plane = yield* getPlane(m);
+    const pts = [[40, 90, -420, 30], [40, 40, -200, 13], [40, 36, -80, 12], [40, 36, 40, 12], [40, 38, 160, 13], [40, 70, 470, 30], [-120, 80, 520, 30], [-120, 42, 200, 13], [-120, 38, 80, 12], [-120, 38, -40, 12], [-120, 42, -160, 13], [10, 170, 26, 26]];
+    yield* airRings(m, pts, { text: (i, k) => `Häuserschlucht: Ring ${i + 1}/${k}` });
+    G.hud.bigToast('IM KASTEN!', 'Paco: „Das wird der beste Werbespot aller Zeiten!“');
+  } });
+
+// ---------------------------------------------------------------- Val: Staatsfeind
+add({ id: 'vk1', title: 'Staatsfeind', sub: 'Val', contact: 'val', req: ['m4'], label: 'V', reward: 15000, desc: '30 Polizisten ausschalten, ohne die Fahndungssterne zu verlieren.',
+  *run(m) {
+    const n = yield* meet(m, this, 'val');
+    yield* m.talk([['Val', 'Die Bullen haben gestern den Club auseinandergenommen. Vor meinen Gästen.'], ['Val', 'Ich will, dass die ganze Stadt sieht, wer hier das Sagen hat. Dreißig von denen. Und lass dich nicht abhängen – die sollen kommen.']], n, n);
+    if (G.interior) G.interiors.exit();
+    const p = P(); p.giveWeapon('rifle', 300); p.giveWeapon('grenade', 6); p.armor = 100;
+    const base = G.stats.copsKilled || 0;
+    G.police.setLevel(2); G.police.spotted();
+    m.failIf(() => G.police.level === 0, 'Du hast die Fahndungssterne verloren.');
+    yield* m.until(() => { const k = (G.stats.copsKilled || 0) - base; m.objective(`Polizisten ausgeschaltet: <b>${k}/30</b> · Sterne nicht verlieren!`); return k >= 30; });
+    m.fails = [];
+    m.objective('Geschafft! Jetzt <b>häng die Polizei ab</b>.');
+    yield* m.until(() => G.police.level === 0);
+  } });
+
+// ---------------------------------------------------------------- Marisol: neue Bootsaufträge
+add({ id: 'mb7', title: 'Bootsklau', sub: 'Marisol', contact: 'marisol', req: ['mb2'], label: '⚓', reward: 3500, desc: 'Ein Rennboot von einem Angeber entern und zum Yachthafen bringen.',
+  *run(m) {
+    const n = yield* meet(m, this, 'marisol');
+    yield* m.talk([['Marisol', 'Ein Typ fährt mit einem gestohlenen Rennboot vor der Küste herum – angeblich gehört es einem Freund von mir.'], ['Marisol', 'Fahr ran, spring rüber (F neben dem Boot) und bring es zum neuen Yachthafen Südwest.']], n, n);
+    yield* m.until(() => P().inCar && P().vehicle.T.boat || (m.objective('Steig in ein <b>Boot</b> oder schwimm hinaus.'), false));
+    const [x, z] = seaPt(300, 500);
+    const t = G.craft.spawnBoat('speeder', x, z, 0, 0xff2e88); m.track(t); t.persistent = true;
+    t.driver = { isPed: true, look: randomLook(true) }; t.ai = new BoatAI(t, 'cruise'); t.ai.wp = 6; t.ai.cruise = 9;
+    m.failIf(() => !t.alive || t.sinking, 'Das Boot ist gesunken.');
+    const mk = m.marker(0, 0, 0xff3b5c, { follow: t, arrow: true, blipCol: '#ff3b5c' });
+    m.objective('Fahr zum <b>pinken Rennboot</b> und entere es (F).');
+    yield* m.until(() => P().vehicle === t);
+    m.removeMarker(mk);
+    const D = C.DOCKS.find((q) => q.key === 'suedwest'), s = D.slips[0];
+    yield* m.goTo(s[0], s[1], 'Bring das Boot zum <b>Yachthafen Südwest</b>.', { r: 9, vehicle: t });
+  } });
+add({ id: 'mb8', title: 'Wassertaxi', sub: 'Marisol', contact: 'marisol', req: ['mb7'], label: '⚓', reward: 4500, desc: 'Fahrgäste von drei Stegen zur Marina bringen.',
+  *run(m) {
+    const n = yield* meet(m, this, 'marisol');
+    yield* m.talk([['Marisol', 'Die Fähre ist kaputt und an drei Stegen warten Leute. Du bist heute das Wassertaxi!']], n, n);
+    yield* m.until(() => P().inCar && P().vehicle.T.boat || (m.objective('Steig in ein <b>Boot</b>.'), false));
+    m.timerLeft = 300;
+    for (const key of ['strand', 'altstadt', 'suedwest']) {
+      const D = C.DOCKS.find((q) => q.key === key), s = D.slips[0];
+      const ped = m.npc(D.rects[0][0] + 2, (D.rects[0][1] + D.rects[0][3]) / 2, randomLook(true));
+      yield* m.goTo(s[0], s[1], `Hol den Fahrgast am <b>${D.name}</b> ab.`, { r: 10, stop: true, color: 0x7cff6b });
+      G.peds.remove(ped); G.audio.door(); G.hud.toast('🧍 Fahrgast an Bord');
+      const M0 = C.DOCKS[0].slips[2];
+      yield* m.goTo(M0[0], M0[1], 'Bring ihn zur <b>Solera Marina</b>.', { r: 10, stop: true });
+      P().addMoney(150, '⛴️ Fahrgeld +$150');
+    }
+    m.timerLeft = null; G.hud.timer(null);
+  } });
+add({ id: 'mb9', title: 'Hetzjagd auf See', sub: 'Marisol', contact: 'marisol', req: ['mb8'], label: '⚓', reward: 7000, desc: 'Mit drei Sternen auf dem Wasser zwei Minuten überleben.',
+  *run(m) {
+    const n = yield* meet(m, this, 'marisol');
+    yield* m.talk([['Marisol', 'Die Küstenwache will mir den Hafen dichtmachen. Ich brauche Ablenkung.'], ['Marisol', 'Mach sie auf dich aufmerksam und halt sie zwei Minuten auf dem Wasser beschäftigt. Dann bist du raus.']], n, n);
+    yield* m.until(() => P().inCar && P().vehicle.T.boat || (m.objective('Steig in ein <b>Boot</b>.'), false));
+    G.police.setLevel(3); G.police.spotted();
+    m.timerLeft = 120;
+    m.failIf(() => !P().inCar || !P().vehicle.T.boat, 'Du hast das Wasser verlassen.');
+    m.objective('Bleib auf dem Wasser und überlebe die <b>Küstenwache</b>!');
+    yield* m.until(() => { if (G.police.level < 2) { G.police.setLevel(3); G.police.spotted(); } return m.timerLeft < 0.5; });
+    m.fails = []; m.timerLeft = null; G.hud.timer(null);
+    m.objective('Jetzt <b>abhängen</b>!');
+    yield* m.until(() => G.police.level === 0);
   } });
 
 export const MISSIONS3 = MS;

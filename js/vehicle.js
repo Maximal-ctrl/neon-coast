@@ -79,9 +79,10 @@ export class Vehicle {
         else if (!inp.noReverse) { if (vf > -top * 0.3) vf -= T.accel * 0.6 * brk * dt; }
         else { vf = damp(vf, 0, 8, dt); this.braking = true; }
       }
-      if (thr === 0 && brk === 0) vf -= Math.sign(vf) * Math.min(Math.abs(vf), (1.2 + Math.abs(vf) * 0.15) * dt);
-      if (vf > top) vf = damp(vf, top, 2, dt);
-      let grip = T.grip * (sand ? 0.65 : 1);
+      if (thr === 0 && brk === 0) vf -= Math.sign(vf) * Math.min(Math.abs(vf), (0.45 + Math.abs(vf) * 0.035) * dt); // rollen lassen
+      const capTop = top * (this.pitch < -0.03 ? 1.3 : 1); // bergab darf er schneller werden
+      if (vf > capTop) vf = damp(vf, capTop, 2, dt);
+      let grip = T.grip * 0.78 * (sand ? 0.65 : 1);
       if (inp.handbrake) {
         grip *= 0.16;
         vf -= Math.sign(vf) * Math.min(Math.abs(vf), 5 * dt);
@@ -103,7 +104,7 @@ export class Vehicle {
       this.h += this.yawRate * dt * 0.3;
     }
     // Hangabtrieb: bergauf langsamer, bergab schneller
-    if (this.grounded && Math.abs(this.pitch) > 0.02) vf -= 9.8 * Math.sin(this.pitch) * dt * 0.9;
+    if (this.grounded && Math.abs(this.pitch) > 0.02) vf -= 9.8 * Math.sin(this.pitch) * dt * 1.05;
     if (this.grounded) {
       fx = Math.sin(this.h); fz = Math.cos(this.h); lx = fz; lz = -fx;
       this.vx = fx * vf + lx * vl;
@@ -181,6 +182,7 @@ export class Vehicle {
 
   damage(amount, source) {
     if (!this.alive || amount <= 0) return;
+    if (this.T.armored && amount < 220) amount *= 0.35; // Panzerung schluckt Kugeln
     if (source) this.lastHitBy = source;
     this.health -= amount;
     if (this.health <= 0) {

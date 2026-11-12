@@ -36,7 +36,7 @@ export const Save = {
       outfit: P.outfit || 0,
       progress: M.done.size, done: [...M.done], rewards: [...M.rewards], shells: [...M.shells], stunts: [...P.stuntsDone], taxi: M.taxiFares,
       stats: G.stats, time: G.timeOfDay,
-      x3: { boats: P.boats || [], planes: P.planes || [], wmods: P.wmods || {}, props: P.props || [], casino: P.casinoStats || null },
+      x3: { boats: P.boats || [], planes: P.planes || [], wmods: P.wmods || {}, props: P.props || [], casino: P.casinoStats || null, ach: P.ach || [] },
     };
     try { s.setItem(key(this.slot), JSON.stringify(data)); return true; } catch (e) { return false; }
   },
@@ -62,7 +62,7 @@ export const Save = {
     P.inventory = { ...(d.inventory || {}) };
     P.garage = [...(d.garage || [])];
     const x3 = d.x3 || {};
-    P.boats = [...(x3.boats || [])]; P.planes = [...(x3.planes || [])]; P.wmods = { ...(x3.wmods || {}) }; P.props = [...(x3.props || [])]; P.casinoStats = x3.casino || null;
+    P.boats = [...(x3.boats || [])]; P.planes = [...(x3.planes || [])]; P.wmods = { ...(x3.wmods || {}) }; P.props = [...(x3.props || [])]; P.casinoStats = x3.casino || null; P.ach = [...(x3.ach || [])];
     if (d.look) G.applyLook(d.look);
   },
 };

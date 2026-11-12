@@ -10,8 +10,11 @@ export const WEAPONS = {
   smg: { name: 'Maschinenpistole', icon: 'smg', dmg: 15, rate: 0.085, spread: 0.035, range: 70, auto: true, twoHand: true, price: 1500, ammoPrice: 120, ammoPack: 90, mag: 30, reload: 1.7 },
   shotgun: { name: 'Schrotflinte', icon: 'shotgun', dmg: 13, pellets: 8, rate: 0.85, spread: 0.075, range: 35, twoHand: true, price: 2200, ammoPrice: 150, ammoPack: 16, mag: 6, reload: 2.3 },
   rifle: { name: 'Sturmgewehr', icon: 'rifle', dmg: 34, rate: 0.12, spread: 0.014, range: 130, auto: true, twoHand: true, price: 4500, ammoPrice: 250, ammoPack: 90, mag: 30, reload: 1.9 },
+  sniper: { name: 'Scharfschützengewehr', icon: 'sniper', dmg: 130, rate: 1.25, spread: 0.0015, range: 340, twoHand: true, price: 7500, ammoPrice: 300, ammoPack: 20, mag: 5, reload: 2.4, zoom: 14 },
+  grenade: { name: 'Granate', icon: 'grenade', throw: true, dmg: 0, rate: 0.9, price: 900, ammoPrice: 600, ammoPack: 5 },
+  mg: { name: 'Bord-MG', icon: 'rifle', dmg: 24, rate: 0.085, spread: 0.022, range: 150, hidden: true },
 };
-export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun', 'rifle'];
+export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun', 'rifle', 'sniper', 'grenade'];
 
 // Waffen-Aufsätze (Waffenladen → „Aufsätze“)
 export const WMODS = {
@@ -23,7 +26,7 @@ export const WMODS = {
   laser: { name: 'Laservisier', icon: '🔴', base: 500, desc: '35 % weniger Streuung.' },
   grip: { name: 'Kompensator & Griff', icon: '✊', base: 700, desc: 'Halber Rückstoß, 12 % schnellere Schussfolge.' },
 };
-const WMUL = { pistol: 1, smg: 1.5, shotgun: 1.6, rifle: 2.2 };
+const WMUL = { pistol: 1, smg: 1.5, shotgun: 1.6, rifle: 2.2, sniper: 2.6 };
 export const wmodPrice = (w, m) => Math.round((WMODS[m].base * WMUL[w]) / 50) * 50;
 export function wstats(wkey, mods) {
   const w = WEAPONS[wkey], m = mods || {};
@@ -38,6 +41,8 @@ const _b = [];
 const hit = { t: 0, type: null, obj: null, x: 0, y: 0, z: 0 };
 
 const SHELL_GEO = new THREE.SphereGeometry(0.18, 8, 6);
+const NADE_GEO = new THREE.SphereGeometry(0.11, 10, 8).scale(1, 1.25, 1);
+const NADE_MAT = new THREE.MeshStandardMaterial({ color: 0x3d4a2a, roughness: 0.55, metalness: 0.35 });
 const SHELL_MAT = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 2, 1) });
 const _qb = [], _qc = [];
 
@@ -120,7 +125,55 @@ export class Combat {
     if (v.driver === 'player') { G.cam.shake(0.6); G.police.crime('shoot'); }
     v.vx -= Math.sin(v.h) * 0.6; v.vz -= Math.cos(v.h) * 0.6;
   }
+  // ---------------------------------------------------------- Granaten
+  throwGrenade(ox, oy, oz, vx, vy, vz, src = 'player') {
+    if (!this.nades) this.nades = [];
+    const mesh = new THREE.Mesh(NADE_GEO, NADE_MAT); mesh.position.set(ox, oy, oz); G.scene.add(mesh);
+    if (src === 'player') G.stats.nades = (G.stats.nades || 0) + 1;
+    this.nades.push({ p: new THREE.Vector3(ox, oy, oz), v: new THREE.Vector3(vx, vy, vz), t: 0, fuse: 2.6, mesh, src, water: false });
+    G.audio.click();
+  }
+  updateNades(dt) {
+    if (!this.nades || !this.nades.length) return;
+    const W = G.world, WY = -0.8;
+    for (let i = this.nades.length - 1; i >= 0; i--) {
+      const n = this.nades[i];
+      n.t += dt;
+      if (!n.water) {
+        n.v.y -= 18 * dt;
+        const nx = n.p.x + n.v.x * dt, nz = n.p.z + n.v.z * dt;
+        // Wände: abprallen
+        W.query(nx, nz, 0.5, _qb, _qc);
+        let wall = false;
+        for (const b of _qb) if (nx > b.x0 && nx < b.x1 && nz > b.z0 && nz < b.z1 && n.p.y < b.y1 && n.p.y > b.y0) wall = true;
+        _qb.length = 0; _qc.length = 0;
+        if (wall) { n.v.x *= -0.4; n.v.z *= -0.4; } else { n.p.x = nx; n.p.z = nz; }
+        n.p.y += n.v.y * dt;
+        const gh = W.groundHeight(n.p.x, n.p.z, n.p.y + 0.5);
+        if (gh < WY && n.p.y <= WY + 0.06) { n.water = true; n.p.y = WY + 0.06; n.v.set(n.v.x * 0.2, 0, n.v.z * 0.2); G.effects.splash(n.p.x, WY, n.p.z, 6); }
+        else if (n.p.y <= gh + 0.08) { n.p.y = gh + 0.08; if (n.v.y < -2) G.audio.click(); n.v.y = -n.v.y * 0.35; n.v.x *= 0.62; n.v.z *= 0.62; if (Math.abs(n.v.y) < 0.6) n.v.y = 0; }
+        n.mesh.rotation.x += dt * 9; n.mesh.rotation.z += dt * 5;
+      } else {
+        // schwimmt auf dem Wasser und treibt langsam
+        n.p.x += n.v.x * dt; n.p.z += n.v.z * dt; n.v.multiplyScalar(Math.exp(-0.8 * dt));
+        n.p.y = WY + 0.06 + Math.sin(n.t * 3) * 0.04;
+      }
+      n.mesh.position.copy(n.p);
+      if (n.t >= n.fuse) {
+        G.scene.remove(n.mesh); this.nades.splice(i, 1);
+        G.effects.explosion(n.p.x, n.p.y + 0.3, n.p.z, 0.9);
+        if (n.water) G.effects.splash(n.p.x, WY, n.p.z, 40);
+        G.audio.explosion(n.p.x, n.p.z);
+        this.explosionDamage(n.p.x, n.p.y, n.p.z, 7.5, 280, n.src, null);
+        const P = G.player, pd = Math.hypot(P.x - n.p.x, P.z - n.p.z);
+        if (pd < 7 && !P.inCar && n.src === 'player') P.damage((1 - pd / 7) * 70, null);
+        if (n.src === 'player') G.police.crime('shoot');
+        if (Math.hypot(G.camera.position.x - n.p.x, G.camera.position.z - n.p.z) < 40) G.cam.shake(0.5);
+      }
+    }
+  }
   updateShells(dt) {
+    this.updateNades(dt);
     if (!this.shells || !this.shells.length) return;
     const W = G.world;
     for (let i = this.shells.length - 1; i >= 0; i--) {
@@ -172,6 +225,7 @@ export class Combat {
         continue;
       }
       G.effects.tracer(ox, oy, oz, h.x, h.y, h.z);
+      if (h.type === 'ped' || h.type === 'veh') G.stats.longShot = Math.max(G.stats.longShot || 0, Math.round(Math.hypot(h.x - ox, h.z - oz)));
       this.applyHit(h, S.dmg, 'player', sx, sz);
     }
     if (!S.quiet) G.effects.muzzle(ox, oy, oz);

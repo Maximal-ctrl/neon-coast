@@ -18,6 +18,11 @@ export const HILLS = REGION;
 export const CAUSEWAY = CAUSEWAYS[0];
 export const VILLAGE = { x: -160, z: -752, r: 92, y: 26 };
 
+// Monte Negro: einzelner hoher Berg mit Anwesen auf dem Gipfel
+export const PEAK = { x: 1000, z: -2300, r: 74, top: 232 };
+// Finca Escondida: abgelegene Farm mit Landepiste (Plateau)
+export const FARM = { x0: -650, x1: -290, z0: -1398, z1: -1312, y: 78 };
+
 // Rohgelände: Küste im Süden, Hügel, Ringgebirge an den Rändern, Hochgebirge im Norden
 function rawHill(x, z) {
   const shore = -478 + 22 * Math.sin(x * 0.011) + 10 * Math.sin(x * 0.033 + 1.3);
@@ -33,6 +38,8 @@ function rawHill(x, z) {
   const big = fbm(x * 0.0021 + 17.3, z * 0.0021 - 9.1);
   h += ring * ring * (230 + 210 * big) * smoothstep(10, 220, d);
   h += smoothstep(-1500, -2700, z) * Math.max(0, big - 0.38) * 520 * land;
+  const dp = Math.hypot(x - PEAK.x, z - PEAK.z);
+  if (dp < 340) h = Math.max(h, PEAK.top - Math.max(0, dp - PEAK.r) * 0.75);
   return [h, d];
 }
 
@@ -74,6 +81,25 @@ function profile(pts, startY, slope, fixedY, smooth = 6, full = false) {
   }
   return hs;
 }
+// Höhenprofil weich machen: keine Knicke an Kuppen und Senken (feste Punkte bleiben)
+let _pts = null, _slope = 0.1;
+function smoothHs(hs, fixed) {
+  const n = hs.length, P = _pts, sl = _slope;
+  const seg = (i) => Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]);
+  for (let round = 0; round < 12; round++) {
+    for (let it = 0; it < 24; it++) for (let i = 1; i < n - 1; i++) if (!fixed[i]) hs[i] += 0.5 * ((hs[i - 1] + hs[i + 1]) * 0.5 - hs[i]);
+    for (let it = 0; it < 3; it++) {
+      for (let i = 1; i < n; i++) if (!fixed[i]) { const d = seg(i - 1) * sl; hs[i] = Math.max(hs[i - 1] - d, Math.min(hs[i - 1] + d, hs[i])); }
+      for (let i = n - 2; i > 0; i--) if (!fixed[i]) { const d = seg(i) * sl; hs[i] = Math.max(hs[i + 1] - d, Math.min(hs[i + 1] + d, hs[i])); }
+    }
+  }
+  for (let it = 0; it < 6; it++) for (let i = 1; i < n - 1; i++) if (!fixed[i]) hs[i] += 0.5 * ((hs[i - 1] + hs[i + 1]) * 0.5 - hs[i]);
+  for (let it = 0; it < 3; it++) {
+    for (let i = 1; i < n; i++) if (!fixed[i]) { const d = seg(i - 1) * sl; hs[i] = Math.max(hs[i - 1] - d, Math.min(hs[i - 1] + d, hs[i])); }
+    for (let i = n - 2; i > 0; i--) if (!fixed[i]) { const d = seg(i) * sl; hs[i] = Math.max(hs[i + 1] - d, Math.min(hs[i + 1] + d, hs[i])); }
+  }
+  return hs;
+}
 function bbox(pts) { const xs = pts.map((p) => p[0]), zs = pts.map((p) => p[1]); return [Math.min(...xs) - 40, Math.min(...zs) - 40, Math.max(...xs) + 40, Math.max(...zs) + 40]; }
 
 // ---------------------------------------------------------------- Orte (Plateaus)
@@ -88,6 +114,7 @@ export const AIRFIELD = { x0: RANCH.cx - 330, x1: RANCH.cx + 230, z0: RANCH.cz +
 const PLATEAUS = [
   ...TOWNS.map((t) => ({ ...C.townRect(t, 26), y: t.y, fall: 110 })),
   { ...AIRFIELD, fall: 90 },
+  { ...FARM, fall: 80 },
 ];
 const townY = (key) => TOWNS.find((t) => t.key === key).y;
 const inTown = (key, m = 6) => { const t = TOWNS.find((q) => q.key === key), r = C.townRect(t, m); return ([x, z]) => (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1 ? t.y : null); };
@@ -95,7 +122,9 @@ const inTown = (key, m = 6) => { const t = TOWNS.find((q) => q.key === key), r =
 // ---------------------------------------------------------------- Landstraßen
 export const HILL_ROAD = (() => {
   const pts = spline([[40, -490], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]]);
-  const hs = profile(pts, 0.9, 0.11, ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null));
+  const vfix = ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null);
+  _pts = pts; _slope = 0.11;
+  const hs = smoothHs(profile(pts, 0.9, 0.11, vfix), pts.map((p, i) => i === 0 || vfix(p) != null));
   return { name: 'Bergstraße', pts, hs, bb: bbox(pts) };
 })();
 const nearestIdx = (R, x, z) => { let b = 0, bd = 1e18; R.pts.forEach((p, i) => { const d = (p[0] - x) ** 2 + (p[1] - z) ** 2; if (d < bd) { bd = d; b = i; } }); return b; };
@@ -103,12 +132,14 @@ export const SUMMIT_JOIN = nearestIdx(HILL_ROAD, 34, -585);
 export const SUMMIT_ROAD = (() => {
   const j = HILL_ROAD.pts[SUMMIT_JOIN];
   // Endstück führt gerade durch das Tor des Anwesens (Tor bei z = -864)
-  const pts = spline([[j[0], j[1]], [80, -592], [150, -580], [230, -566], [310, -580], [380, -606], [432, -646], [414, -694], [452, -736], [492, -758], [498, -796], [486, -826], [508, -846], [530, -852], [530, -872]]);
+  const pts = spline([[j[0], j[1]], [80, -592], [150, -580], [230, -566], [310, -580], [380, -606], [432, -646], [414, -694], [452, -736], [492, -758], [498, -796], [486, -826], [510, -840], [527, -856], [530, -872]]);
   const hs = profile(pts, HILL_ROAD.hs[SUMMIT_JOIN], 0.17, null);
   // Zufahrt am Anwesen eben auf Hofhöhe; davor mit max. 17 % Steigung anschließen
   const end = pts[pts.length - 1], my = hs[hs.length - 1];
   for (let i = pts.length - 1; i >= 0; i--) if (Math.hypot(pts[i][0] - end[0], pts[i][1] - end[1]) < 16) hs[i] = my;
   for (let i = pts.length - 2; i > 0; i--) { const d = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); hs[i] = Math.max(hs[i], hs[i + 1] - d * 0.17); }
+  _pts = pts; _slope = 0.17;
+  smoothHs(hs, pts.map((p, i) => i === 0 || Math.hypot(p[0] - end[0], p[1] - end[1]) < 16));
   return { name: 'Gipfelstraße', pts, hs, bb: bbox(pts) };
 })();
 export const MANSION = (() => { const e = SUMMIT_ROAD.pts[SUMMIT_ROAD.pts.length - 1]; return { x: e[0], z: e[1] - 40, r: 58, y: SUMMIT_ROAD.hs[SUMMIT_ROAD.hs.length - 1] }; })();
@@ -122,7 +153,9 @@ function road(name, ctrl, o = {}) {
   if (o.to) { const i = nearestIdx(o.to, ctrl[ctrl.length - 1][0], ctrl[ctrl.length - 1][1]); ctrl[ctrl.length - 1] = [...o.to.pts[i]]; endY = o.to.hs[i]; }
   const pts = spline(ctrl);
   const n = pts.length;
-  const hs = profile(pts, startY, o.slope || 0.1, (p, i) => { if (i === n - 1 && endY != null) return endY; for (const f of o.fixed || []) { const y = f(p); if (y != null) return y; } return null; }, 14, true);
+  const fx = (p, i) => { if (i === n - 1 && endY != null) return endY; for (const f of o.fixed || []) { const y = f(p); if (y != null) return y; } return null; };
+  _pts = pts; _slope = o.slope || 0.1;
+  const hs = smoothHs(profile(pts, startY, o.slope || 0.1, fx, 14, true), pts.map((p, i) => i === 0 || fx(p, i) != null));
   return { name, pts, hs, bb: bbox(pts) };
 }
 const V = TOWNS[0], B = TOWNS[1], Rn = TOWNS[2];
@@ -152,11 +185,28 @@ export const LAGO_N = road('Seeweg Valverde', [C.townNode(V, 4, 3), [520, -1660]
 export const PINAR_R = road('Pinienweg', [[-261, -1991], [-290, -2150], [-340, -2300], C.townNode(PA, 2, 2)], { from: PASS, y1: PA.y, fixed: [inTown('pinar')] });
 export const LUCAR_R = road('Zufahrt San Lúcar', [C.townNode(B, 3, 0), [1515, -840], C.townNode(SL, 1, 2)], { y0: B.y, y1: SL.y, fixed: [inTown('bahia'), inTown('sanlucar')] });
 
-export const HILL_ROADS = [HILL_ROAD, SUMMIT_ROAD, WEST_ROAD, COAST_W, COAST_E, NORTH_E, VALLEY, PASS, SIERRA, CRUZ_E, CRUZ_N, LAGO_W, LAGO_N, PINAR_R, LUCAR_R];
+// 3.1: Cañón Rojo nach Piedra Roja, Serpentine auf den Monte Negro, Feldweg zur Finca
+const PR = TOWNS.find((t) => t.key === 'piedra');
+export const CANYON = road('Cañón Rojo', [[-1125, -1590], [-1225, -1690], [-1320, -1825], [-1395, -1965], C.townNode(PR, 2, 2)], { from: PASS, y1: PR.y, fixed: [inTown('piedra')] });
+CANYON.canyon = true;
+export const PEAK_R = road('Montenegro-Serpentine', (() => {
+  const out = [[894, -1589], [930, -1800], [PEAK.x, PEAK.z + 255]];
+  for (let k = 1; k <= 22; k++) { const t = k / 22, a = t * Math.PI * 2, r = 255 - t * 168; out.push([PEAK.x + Math.sin(a) * r, PEAK.z + Math.cos(a) * r]); }
+  out.push([PEAK.x, PEAK.z + 55]);
+  return out;
+})(), { from: NORTH_E, y1: PEAK.top, slope: 0.13, fixed: [([x, z]) => (Math.hypot(x - PEAK.x, z - PEAK.z) < PEAK.r ? PEAK.top : null)] });
+PEAK_R.noBridge = true;
+const inFarm = ([x, z]) => (x > FARM.x0 - 4 && x < FARM.x1 + 4 && z > FARM.z0 - 4 && z < FARM.z1 + 4 ? FARM.y : null);
+export const FARM_R = road('Feldweg zur Finca', [[-18, -1117], [-110, -1195], [-210, -1285], [FARM.x1 - 6, (FARM.z0 + FARM.z1) / 2]], { from: VALLEY, y1: FARM.y, slope: 0.13, fixed: [inFarm] });
+FARM_R.dirt = true;
+export const ESTATE2 = { x: PEAK.x, z: PEAK.z, r: 58, y: PEAK.top };
+
+export const HILL_ROADS = [HILL_ROAD, SUMMIT_ROAD, WEST_ROAD, COAST_W, COAST_E, NORTH_E, VALLEY, PASS, SIERRA, CRUZ_E, CRUZ_N, LAGO_W, LAGO_N, PINAR_R, LUCAR_R, CANYON, PEAK_R, FARM_R];
 
 // Brücken: Abschnitte, die hoch über dem natürlichen Gelände verlaufen (keine Aufschüttung, Brückenbau)
 for (const R of HILL_ROADS) {
   const n = R.pts.length, hi = new Uint8Array(n), br = new Uint8Array(n);
+  if (R.noBridge) { R.bridge = new Uint8Array(R.pts.length); continue; }
   R.pts.forEach(([x, z], i) => { if (!C.townAt(x, z, 40) && Math.hypot(x - VILLAGE.x, z - VILLAGE.z) > VILLAGE.r + 30 && R.hs[i] - rawHill(x, z)[0] > 7.5) hi[i] = 1; });
   for (let i = 0; i < n;) {
     if (!hi[i]) { i++; continue; }
@@ -220,7 +270,7 @@ function roadNear(x, z) {
 }
 // grobe Suche für die Tal-Aufweitung (bis ~170 m): Stützpunkte jeder Straße im 96-m-Raster
 const WC = 96, wide = new Map();
-HILL_ROADS.forEach((R) => { for (let i = 0; i < R.pts.length; i += 3) { if (R.bridge[i]) continue; const [x, z] = R.pts[i]; for (let cx = Math.floor((x - 170) / WC); cx <= Math.floor((x + 170) / WC); cx++) for (let cz = Math.floor((z - 170) / WC); cz <= Math.floor((z + 170) / WC); cz++) { const k = hk(cx, cz); let l = wide.get(k); if (!l) wide.set(k, (l = [])); l.push(x, z, R.hs[i]); } } });
+HILL_ROADS.forEach((R) => { for (let i = 0; i < R.pts.length; i += 3) { if (R.bridge[i] || R.canyon) continue; const [x, z] = R.pts[i]; for (let cx = Math.floor((x - 170) / WC); cx <= Math.floor((x + 170) / WC); cx++) for (let cz = Math.floor((z - 170) / WC); cz <= Math.floor((z + 170) / WC); cz++) { const k = hk(cx, cz); let l = wide.get(k); if (!l) wide.set(k, (l = [])); l.push(x, z, R.hs[i]); } } });
 function valleyAt(x, z) {
   const l = wide.get(hk(Math.floor(x / WC), Math.floor(z / WC)));
   if (!l) return null;
@@ -243,6 +293,8 @@ export function terrainExact(x, z) {
   if (dv < VILLAGE.r + 60) h = lerp(h, VILLAGE.y, 1 - smoothstep(VILLAGE.r, VILLAGE.r + 60, dv));
   const dm = Math.hypot(x - MANSION.x, z - MANSION.z);
   if (dm < MANSION.r + 70) h = lerp(h, MANSION.y, 1 - smoothstep(MANSION.r, MANSION.r + 70, dm));
+  const dk = Math.hypot(x - PEAK.x, z - PEAK.z);
+  if (dk < PEAK.r + 30) h = lerp(h, PEAK.top, 1 - smoothstep(PEAK.r - 4, PEAK.r + 30, dk));
   const dl = Math.hypot(x - LOOKOUT.x, z - LOOKOUT.z);
   if (dl < LOOKOUT.r + 50) h = lerp(h, LOOKOUT.y, 1 - smoothstep(LOOKOUT.r, LOOKOUT.r + 50, dl));
   // Orte & Flugplatz
@@ -257,6 +309,7 @@ export function terrainExact(x, z) {
   if (r) {
     const R = HILL_ROADS[r[2]], tgt = r[1] - 0.12, dh = Math.abs(h - tgt);
     if (R.bridge[r[3]] && h < tgt - 2) h = Math.min(h, tgt - 5.5); // unter der Brücke: Tal bleibt frei
+    else if (R.canyon && !C.townAt(x, z, 20)) { h = lerp(h, tgt, 1 - smoothstep(12, 26, r[0])); h = Math.max(h, tgt - 0.12 + 58 * smoothstep(13, 44, r[0]) + 6 * (fbm(x * 0.04, z * 0.04) - 0.5) * smoothstep(20, 40, r[0])); } // hohe, steile Canyonwände
     else h = lerp(h, tgt, 1 - smoothstep(11, Math.min(80, 30 + dh * 1.3), r[0]));
   }
   // unter den Dämmen: Gelände unter Wasser halten

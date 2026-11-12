@@ -170,6 +170,8 @@ export class Input {
   }
 
   held(n) { return this.cur.has(n); }
+  // nach dem ersten Teilschritt: Tastendrücke & Mausbewegung nicht doppelt auswerten
+  consumeFrame() { this.prev = new Set(this.cur); this.tapsFrame = new Set(); this.lookDX = 0; this.lookDY = 0; }
   pressed(n) { return this.cur.has(n) && !this.prev.has(n) || this.tapsFrame.has(n); }
 
   update() {

@@ -55,7 +55,9 @@ export class Dealer {
       p.yaw = Math.atan2(P.x - p.x, P.z - p.z);
       G.hud.subtitle('Händler', pick(['Psst … du siehst aus, als bräuchtest du was.', 'Hey, Kumpel. Gute Ware, faire Preise.', 'Schnell, bevor die Bullen kommen.']), '#b26bff');
       setTimeout(() => G.hud.subtitle(), 2600);
-      G.ui.street();
+      const job = !G.missions.active && G.police.level === 0 && G.missions.list.find((d) => d.contact === 'dealer' && G.missions.isAvailable(d));
+      if (job) G.openMenu('FUEGO', `<div style="opacity:.85">„Ich hätte da einen Job für dich …“</div>`, [[`Auftrag: ${job.title}`, () => setTimeout(() => G.missions.start(job), 50)], ['Nur einkaufen', () => setTimeout(() => G.ui.street(), 50)]]);
+      else G.ui.street();
     }
     this.near = near;
   }

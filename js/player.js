@@ -204,7 +204,7 @@ export class Player {
       if (!p.alive) continue;
       const dx = p.x - this.x, dz = p.z - this.z;
       const d = Math.hypot(dx, dz);
-      if (d > (this.wmods[this.weapon] && this.wmods[this.weapon].scope ? 65 : 40) || d < 0.5) continue;
+      if (d > (this.weapon === 'sniper' ? 160 : this.wmods[this.weapon] && this.wmods[this.weapon].scope ? 65 : 40) || d < 0.5) continue;
       const dot = Math.max((dx * fx + dz * fz) / d, (dx * cfx + dz * cfz) / d);
       if (dot < 0.55) continue;
       let score = dot * 2 - d / 40;
@@ -259,6 +259,23 @@ export class Player {
       return;
     }
     if (this.ammo[this.weapon] <= 0) { this.nextWeapon(); G.audio.click(); this.fireT = 0.3; return; }
+    if (w.throw) {
+      // Granate werfen: PC in Blickrichtung, Touch zum Ziel
+      this.fireT = w.rate; this.ammo[this.weapon]--; this.anim.punch = 1;
+      const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+      const ox = this.x + fx * 0.5, oy = this.y + 1.7, oz = this.z + fz * 0.5;
+      let vx, vy, vz;
+      if (!G.isTouch) { const d = G.cam.dir; vx = d.x * 17; vz = d.z * 17; vy = d.y * 17 + 6; this.yaw = Math.atan2(d.x, d.z); }
+      else {
+        const t = this.target || this.findTarget();
+        if (t) { const dx = t.x - this.x, dz = t.z - this.z, dd = Math.hypot(dx, dz) || 1, sp = Math.min(22, Math.sqrt(dd * 9.5) + 2); vx = dx / dd * sp; vz = dz / dd * sp; vy = sp * 0.55; this.yaw = Math.atan2(dx, dz); }
+        else { vx = fx * 15; vz = fz * 15; vy = 7; }
+      }
+      G.combat.throwGrenade(ox, oy, oz, vx, vy, vz);
+      if (this.ammo[this.weapon] <= 0) setTimeout(() => this.nextWeapon(), 400);
+      G.hud.weapon();
+      return;
+    }
     if (this.reloadT > 0) return;
     const S = wstats(this.weapon, this.wmods[this.weapon]);
     let clip = this.clipOf(this.weapon);
@@ -422,6 +439,7 @@ export class Player {
       if (!v.ownedByPlayer && this.state !== 'entering') G.stats.carsStolen++;
     }
     v.driver = 'player';
+    if (v.roadblock) { v.roadblock = false; v.mass = v.T.mass; }
     v.ai = null; v.parked = false; v.siren = false;
     v.input.noReverse = false;
     this.vehicle = v; this.lastVehicle = v;
@@ -537,9 +555,25 @@ export class Player {
       ba.rotation.x = clamp(-(G.cam.pitch + 0.2) * 0.8, -0.35, 0.12);
       v.cannonT = (v.cannonT || 0) - dt;
       if (I.held('fire') && v.cannonT <= 0) { v.cannonT = 1.8; G.combat.fireShell(v); }
-    } else
-    // Drive-by
-    if (I.held('fire') && this.fireT <= 0 && this.weapon !== 'fists' && this.ammo[this.weapon] > 0 && this.reloadT <= 0) {
+    } else if (v.T.mg) {
+      // Bord-MG: dreht mit der Kamera (Touch: zum Ziel), verbraucht keine Munition
+      const mg = v.parts.mg, tgt = G.isTouch ? this.findDriveByTarget(v) : null;
+      const rel = G.isTouch ? (tgt ? Math.atan2(tgt.x - v.x, tgt.z - v.z) - v.h : 0) : G.cam.yaw - v.h;
+      if (mg) mg.rotation.y = dampAngleT(mg.rotation.y, rel, 9, dt);
+      v.mgT = (v.mgT || 0) - dt;
+      if (I.held('fire') && v.mgT <= 0) {
+        v.mgT = 0.085;
+        const a = v.h + (mg ? mg.rotation.y : 0), ox = v.x + Math.sin(a) * 1.2, oy = v.y + v.height + 0.45, oz = v.z + Math.cos(a) * 1.2;
+        let tx, ty, tz;
+        if (!G.isTouch) { const c = G.camera.position, f = G.cam.dir, h = G.combat.raycast(c.x, c.y, c.z, f.x, f.y, f.z, 160, v); tx = h.type ? h.x : c.x + f.x * 160; ty = h.type ? h.y : c.y + f.y * 160; tz = h.type ? h.z : c.z + f.z * 160; }
+        else if (tgt) { tx = tgt.x; ty = tgt.y + (tgt.isPed ? 1.2 : 0.8); tz = tgt.z; }
+        else { tx = ox + Math.sin(a) * 60; ty = oy - 0.5; tz = oz + Math.cos(a) * 60; }
+        const dx = tx - ox, dy = ty - oy, dz = tz - oz, L = Math.hypot(dx, dy, dz) || 1;
+        G.combat.playerShot('mg', ox, oy, oz, dx / L, dy / L, dz / L, v);
+        G.cam.kick(0.003);
+      }
+    }
+    if (!v.T.tank && !v.T.mg && I.held('fire') && this.fireT <= 0 && this.weapon !== 'fists' && !WEAPONS[this.weapon].throw && this.ammo[this.weapon] > 0 && this.reloadT <= 0) {
       const w = WEAPONS[this.weapon], S = wstats(this.weapon, this.wmods[this.weapon]);
       if (this.clipOf(this.weapon) <= 0) { this.startReload(); return; }
       this.fireT = S.rate * 1.2;

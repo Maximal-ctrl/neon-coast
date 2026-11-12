@@ -139,7 +139,7 @@ export function setupGarageEntrances(A, I) {
   for (const s of spots) {
     const spot = A.add({ x: s.x, z: s.z, y: s.y, color: 0x4fc3ff, label: '🅿️', r: 2.2, anyMode: true, onEnter: () => enterGarage(I, { ...s, latchSpot: spot }) });
   }
-  G.blipFns.push(() => spots.map((s) => ({ x: s.x, z: s.z, col: '#4fc3ff', label: 'P', r: 0.03, name: s.name })));
+  G.blipFns.push(() => spots.map((s) => ({ x: s.x, z: s.z, col: '#4fc3ff', label: 'G', r: 0.03, name: s.name })));
   // Beim Verlassen zu Fuß über den Aufzug: zurück zum Eingang
   const origExit = I.exit.bind(I);
   I.exit = function () {

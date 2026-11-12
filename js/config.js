@@ -90,6 +90,10 @@ export const DISTRICT_NAMES = {
   lagoverde: 'Lago Verde',
   pinar: 'Pinar Alto',
   sanlucar: 'San Lúcar',
+  piedra: 'Piedra Roja',
+  canyon: 'Cañón Rojo',
+  montenegro: 'Monte Negro',
+  finca: 'Finca Escondida',
   club: 'Club Velvet',
   bank: 'Solera Bank',
 };
@@ -99,6 +103,9 @@ export function districtAt(x, z) {
   if (Math.hypot(x + 160, z + 752) < 112) return 'village';
   { const t = townAt(x, z); if (t) return t.key; }
   if (Math.hypot(x - 530, z + 912) < 70) return 'estate';
+  if (Math.hypot(x - 1000, z + 2300) < 280) return 'montenegro';
+  if (x > -680 && x < -260 && z > -1430 && z < -1280) return 'finca';
+  if (x < -1150 && x > -1460 && z < -1600 && z > -2050) return 'canyon';
   if (z < -440 && z > REGION.z0 && x > REGION.x0 && x < REGION.x1) return z < -2150 ? 'sierra' : x < -700 ? 'westland' : x > 900 ? 'eastcoast' : 'hills';
   if (x > 470) return 'sea';
   if (x > BEACH_X0) return 'beach';
@@ -134,6 +141,7 @@ export const TOWNS = [
   { key: 'lagoverde', name: 'Lago Verde', cx: 600, cz: -1450, nx: 3, nz: 2, style: 'town' },
   { key: 'pinar', name: 'Pinar Alto', cx: -400, cz: -2480, nx: 3, nz: 2, style: 'town', y: 62 },
   { key: 'sanlucar', name: 'San Lúcar', cx: 1530, cz: -1030, nx: 3, nz: 2, style: 'desert' },
+  { key: 'piedra', name: 'Piedra Roja', cx: -1500, cz: -2150, nx: 3, nz: 2, style: 'desert', y: 95 },
 ];
 export const townNode = (t, i, j) => [t.cx + (i - t.nx / 2) * TOWN_CS, t.cz + (j - t.nz / 2) * TOWN_CS];
 export const townRect = (t, m = 0) => ({ x0: t.cx - (t.nx / 2) * TOWN_CS - m, x1: t.cx + (t.nx / 2) * TOWN_CS + m, z0: t.cz - (t.nz / 2) * TOWN_CS - m, z1: t.cz + (t.nz / 2) * TOWN_CS + m });
@@ -154,4 +162,7 @@ export const DOCKS = [
   { key: 'altstadt', name: 'Altstadt-Kai', side: 'W', gap: [-4.5, 4.5], y: 0.35,
     rects: [[-680, -4, -623.8, 4], [-692, -12, -680, 12]],
     shop: [-618.5, 8], slips: [[-650, -6.6, -Math.PI / 2], [-668, -6.6, -Math.PI / 2], [-656, 6.6, -Math.PI / 2]] },
+  { key: 'suedwest', name: 'Yachthafen Südwest', side: 'S', gap: [-484.5, -475.5], y: 0.35,
+    rects: [[-484, 383.8, -476, 444], [-488, 444, -472, 456]],
+    shop: [-480, 378.5], slips: [[-469.4, 404, 0], [-469.4, 424, 0], [-490.6, 410, 0], [-490.6, 432, 0]] },
 ];

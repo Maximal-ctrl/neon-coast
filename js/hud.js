@@ -9,6 +9,8 @@ import { clamp, fmtMoney, fmtTime, lerp } from './utils.js';
 const $ = (id) => document.getElementById(id);
 
 export const ICONS = {
+  sniper: '<svg viewBox="0 0 64 40"><path d="M0 15h58v4H40v3h-5l2 12h-6l-2-12h-6l-6 9H9l5-9v-3H0z" fill="currentColor"/><rect x="20" y="8" width="16" height="5" rx="2" fill="currentColor"/><rect x="26" y="12" width="3" height="4" fill="currentColor"/></svg>',
+  grenade: '<svg viewBox="0 0 64 40"><ellipse cx="30" cy="24" rx="11" ry="13" fill="currentColor"/><rect x="26" y="6" width="9" height="6" rx="1" fill="currentColor"/><path d="M35 9l9-4v4l-8 3z" fill="currentColor"/><circle cx="44" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   fist: '<svg viewBox="0 0 64 40"><path d="M14 10h30a6 6 0 0 1 6 6v10a8 8 0 0 1-8 8H22a8 8 0 0 1-8-8z" fill="currentColor"/><path d="M20 10v8M28 10v8M36 10v8M44 10v8" stroke="#000" stroke-width="2" opacity=".35"/></svg>',
   pistol: '<svg viewBox="0 0 64 40"><path d="M6 8h48v8H30l-3 4h-6l2 16h-9l-3-18H6z" fill="currentColor"/><rect x="50" y="6" width="6" height="4" fill="currentColor"/></svg>',
   smg: '<svg viewBox="0 0 64 40"><path d="M2 10h52v8H40v4h-8l1 14h-7l-1-14h-5l-2 8h-6l1-12H2z" fill="currentColor"/><rect x="54" y="12" width="8" height="3" fill="currentColor"/><rect x="34" y="22" width="5" height="12" fill="currentColor"/></svg>',
@@ -79,7 +81,7 @@ export class HUD {
   weapon() {
     const P = G.player, w = WEAPONS[P.weapon];
     $('weapon-icon').innerHTML = ICONS[w.icon];
-    $('weapon-ammo').textContent = w.melee ? '' : P.reloadT > 0 ? 'NACHLADEN …' : `${P.clipOf(P.weapon)} / ${P.ammo[P.weapon] - P.clipOf(P.weapon)}`;
+    $('weapon-ammo').textContent = w.melee ? '' : w.throw ? `${P.ammo[P.weapon] || 0}` : P.reloadT > 0 ? 'NACHLADEN …' : `${P.clipOf(P.weapon)} / ${P.ammo[P.weapon] - P.clipOf(P.weapon)}`;
     $('weapon-name').textContent = w.name;
   }
   vehicleName(n) { const el = $('veh-name'); el.textContent = n; el.classList.add('show'); this.vehT = 3; }
@@ -153,6 +155,7 @@ export class HUD {
       $('car-hp').classList.toggle('low', hp < 0.3);
     } else sp.classList.remove('show');
     document.body.classList.toggle('in-car', !!P.inCar);
+    document.body.classList.toggle('scoped', !G.isTouch && !P.inCar && P.weapon === 'sniper' && !!P.anim.aim);
     document.body.classList.toggle('armed', P.weapon !== 'fists');
     // Fadenkreuz / Ziel
     const ch = $('crosshair');
@@ -228,7 +231,8 @@ export class HUD {
     const tgt = this.getRouteTarget();
     if (tgt && this.routeT <= 0) {
       this.routeT = 0.6;
-      this.route = W.gpsPath(px, pz, tgt.x, tgt.z);
+      const Pl = G.player, cv = Pl.inCar ? Pl.vehicle : null;
+      this.route = (cv && (cv.T.boat || cv.T.plane)) || Pl.state === 'swim' ? [[px, pz], [tgt.x, tgt.z]] : W.gpsPath(px, pz, tgt.x, tgt.z);
     }
     if (tgt && this.route) {
       g.lineWidth = Math.max(3, S * 0.025);
@@ -296,7 +300,7 @@ export class HUD {
     g.restore();
   }
 
-  // ------------------------------------------------------------ Karte groß
+  // ------------------------------------------------------------ Karte groß (3.1: flüssig, mit Schwung und weichem Zoom)
   bindMap() {
     const cv = $('bigmap');
     this.mapView = null;
@@ -307,22 +311,26 @@ export class HUD {
       cv.setPointerCapture(e.pointerId);
       ptrs.set(e.pointerId, toCanvas(e));
       moved = 0;
-      if (ptrs.size === 1) drag = { p: toCanvas(e) };
-      if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: this.mapView.zoom }; drag = null; }
+      if (this.mapView) { this.mapView.vx = this.mapView.vy = 0; this.mapView.tz = null; }
+      if (ptrs.size === 1) drag = { p: toCanvas(e), t: performance.now() };
+      if (ptrs.size === 2 && this.mapView) { const [a, b] = [...ptrs.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), z: this.mapView.zoom, c: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] }; drag = null; }
     });
     cv.addEventListener('pointermove', (e) => {
       if (!ptrs.has(e.pointerId) || !this.mapView) return;
       const p = toCanvas(e); ptrs.set(e.pointerId, p);
       const V = this.mapView;
       if (pinch && ptrs.size === 2) {
-        const [a, b] = [...ptrs.values()];
-        this.setZoom(pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+        const [a, b] = [...ptrs.values()], c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        V.ox += c[0] - pinch.c[0]; V.oy += c[1] - pinch.c[1]; pinch.c = c; // mit zwei Fingern auch verschieben
+        this.setZoom(pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d, c[0], c[1], true);
         moved += 10;
       } else if (drag) {
-        const dx = p[0] - drag.p[0], dy = p[1] - drag.p[1];
+        const now = performance.now(), dx = p[0] - drag.p[0], dy = p[1] - drag.p[1], dt = Math.max(1, now - drag.t);
         moved += Math.abs(dx) + Math.abs(dy);
-        V.ox += dx; V.oy += dy; drag.p = p;
-        this.drawBigMap(true);
+        V.ox += dx; V.oy += dy; drag.p = p; drag.t = now;
+        // Geschwindigkeit für den Schwung (Pixel pro ms, geglättet)
+        V.vx = V.vx * 0.5 + (dx / dt) * 0.5; V.vy = V.vy * 0.5 + (dy / dt) * 0.5;
+        this.requestMap();
       }
     });
     const up = (e) => {
@@ -331,93 +339,193 @@ export class HUD {
       ptrs.delete(e.pointerId);
       if (ptrs.size < 2) pinch = null;
       if (ptrs.size === 0) {
-        if (moved < 12 && drag) this.tapMap(p[0], p[1]);
+        if (moved < 12 && drag) { this.mapView.vx = this.mapView.vy = 0; this.tapMap(p[0], p[1]); }
+        else if (drag && performance.now() - drag.t > 80) { this.mapView.vx = this.mapView.vy = 0; }
         drag = null;
+        this.requestMap();
       }
     };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-    cv.addEventListener('wheel', (e) => { e.preventDefault(); const p = toCanvas(e); this.setZoom(this.mapView.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), p[0], p[1]); }, { passive: false });
-    $('map-zin').onclick = () => this.setZoom(this.mapView.zoom * 1.4, cv.width / 2, cv.height / 2);
-    $('map-zout').onclick = () => this.setZoom(this.mapView.zoom / 1.4, cv.width / 2, cv.height / 2);
-    $('map-center').onclick = () => { this.mapView = null; this.drawBigMap(); };
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); if (!this.mapView) return; const p = toCanvas(e); this.zoomTo((this.mapView.tz || this.mapView.zoom) * Math.pow(1.0018, -e.deltaY), p[0], p[1]); }, { passive: false });
+    $('map-zin').onclick = () => this.mapView && this.zoomTo((this.mapView.tz || this.mapView.zoom) * 1.6, cv.width / 2, cv.height / 2);
+    $('map-zout').onclick = () => this.mapView && this.zoomTo((this.mapView.tz || this.mapView.zoom) / 1.6, cv.width / 2, cv.height / 2);
+    $('map-center').onclick = () => {
+      const V = this.mapView; if (!V) return;
+      const W = G.world, [px, pz] = this.mapPlayerPos(), [mx, mz] = W.mapToPx(px, pz);
+      V.vx = V.vy = 0; V.fly = { mx, mz };
+      this.requestMap();
+    };
+    const lg = document.querySelector('.map-legend');
+    if (lg) {
+      try { if (localStorage.getItem('nc_legend_closed') === '1') lg.classList.add('closed'); } catch (e) { /* egal */ }
+      const hb = lg.querySelector('b');
+      if (hb) hb.onclick = () => { lg.classList.toggle('closed'); try { localStorage.setItem('nc_legend_closed', lg.classList.contains('closed') ? '1' : '0'); } catch (e) { /* egal */ } };
+    }
   }
-  setZoom(z, cx, cy) {
+  // Zeichnen höchstens einmal pro Bildschirm-Frame; Schwung/Zoom-Animation läuft hier weiter
+  requestMap() {
+    if (this._mapRaf) return;
+    this._mapRaf = requestAnimationFrame((t) => {
+      this._mapRaf = 0;
+      const V = this.mapView, scr = $('mapscreen');
+      if (!V || !scr || scr.classList.contains('hidden')) return;
+      const dt = Math.min(0.05, (t - (this._mapT || t)) / 1000) || 1 / 60; this._mapT = t;
+      let anim = false;
+      if (Math.abs(V.vx) + Math.abs(V.vy) > 0.02) {
+        V.ox += V.vx * dt * 1000; V.oy += V.vy * dt * 1000;
+        const f = Math.exp(-dt * 5); V.vx *= f; V.vy *= f; anim = true;
+      } else V.vx = V.vy = 0;
+      if (V.tz) {
+        const nz = V.zoom + (V.tz - V.zoom) * (1 - Math.exp(-dt * 14));
+        this.setZoom(Math.abs(nz - V.tz) < V.tz * 0.002 ? V.tz : nz, V.tcx, V.tcy, true);
+        if (V.zoom === V.tz) V.tz = null; else anim = true;
+      }
+      if (V.fly) {
+        const k = 1 - Math.exp(-dt * 9);
+        const cvs = $('bigmap'), fx = cvs.width / 2 - V.fly.mx * V.zoom, fy = cvs.height / 2 - V.fly.mz * V.zoom;
+        V.ox += (fx - V.ox) * k; V.oy += (fy - V.oy) * k;
+        if (Math.abs(fx - V.ox) + Math.abs(fy - V.oy) < 1 && !V.tz) { V.ox = fx; V.oy = fy; V.fly = null; } else anim = true;
+      }
+      this.drawBigMap(true);
+      if (anim) this.requestMap(); else this._mapT = 0;
+    });
+  }
+  zoomTo(z, cx, cy) {
+    const V = this.mapView; if (!V) return;
+    V.tz = Math.max(V.min, Math.min(V.max, z)); V.tcx = cx; V.tcy = cy;
+    this.requestMap();
+  }
+  setZoom(z, cx, cy, noDraw = false) {
     const V = this.mapView;
-    z = Math.max(V.min, Math.min(V.min * 18, z));
+    z = Math.max(V.min, Math.min(V.max, z));
     // Punkt unter (cx,cy) bleibt fest
     V.ox = cx - (cx - V.ox) * (z / V.zoom); V.oy = cy - (cy - V.oy) * (z / V.zoom);
     V.zoom = z;
-    this.drawBigMap(true);
+    if (!noDraw) this.requestMap();
   }
   tapMap(mx, my) {
     const V = this.mapView, W = G.world, MB = W.mapBounds;
     const wx = MB.x0 + ((mx - V.ox) / V.zoom) / W.mapScale, wz = MB.z0 + ((my - V.oy) / V.zoom) / W.mapScale;
     const M = G.missions;
-    if (M.waypoint && Math.hypot(M.waypoint.x - wx, M.waypoint.z - wz) < 30) { M.waypoint = null; this.toast('Wegpunkt entfernt'); }
+    const tol = 22 * (V.dpr || 1) / (V.zoom * W.mapScale); // Antipp-Toleranz in Weltmetern
+    if (M.waypoint && Math.hypot(M.waypoint.x - wx, M.waypoint.z - wz) < Math.max(12, tol)) { M.waypoint = null; this.toast('Wegpunkt entfernt'); }
     else { M.waypoint = { x: wx, z: wz }; this.toast('Wegpunkt gesetzt – folge der lila Route'); }
     this.routeT = 0;
-    this.drawBigMap(true);
+    this.requestMap();
+  }
+  // Spielerposition für die Karte (in Innenräumen: der Eingang draußen)
+  mapPlayerPos() {
+    const P = G.player;
+    if (G.interior && G.interiors) {
+      const I = G.interiors, d = I.curDoor || (I.doors || []).find((o) => o.kind === G.interior.kind);
+      if (d && d.out) return [d.out.x, d.out.z, d.out.yaw || 0];
+    }
+    return P.inCar ? [P.vehicle.x, P.vehicle.z, P.vehicle.h] : [P.x, P.z, P.yaw];
   }
   drawBigMap(keep = false) {
     const cv = $('bigmap'), g = cv.getContext('2d');
     const r = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const W = G.world, img = W.mapCanvas;
-    if (!keep || !this.mapView) {
-      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const cw = Math.round(r.width * dpr), ch = Math.round(r.height * dpr);
+    if (!keep || !this.mapView || cv.width !== cw || cv.height !== ch) {
+      const old = this.mapView;
+      cv.width = cw; cv.height = ch;
       const fit = Math.min(cv.width / img.width, cv.height / img.height);
-      if (!this.mapView || !keep) {
+      if (!old || !keep) {
         // auf den Spieler zentriert, leicht vergrößert
-        const P = G.player, px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
+        const [px, pz] = this.mapPlayerPos();
         const [mx, mz] = W.mapToPx(px, pz);
         const zoom = fit * 3.4;
-        this.mapView = { min: fit * 0.9, zoom, ox: cv.width / 2 - mx * zoom, oy: cv.height / 2 - mz * zoom };
-      }
+        this.mapView = { min: fit * 0.9, max: fit * 22, zoom, ox: cv.width / 2 - mx * zoom, oy: cv.height / 2 - mz * zoom, vx: 0, vy: 0, dpr };
+      } else { old.min = fit * 0.9; old.max = fit * 22; old.dpr = dpr; }
     }
-    const V = this.mapView, k = V.zoom;
+    const V = this.mapView;
+    // Karte nicht aus dem Bild schieben
+    const iw = img.width * V.zoom, ih = img.height * V.zoom, mg = Math.min(cv.width, cv.height) * 0.35;
+    V.ox = Math.min(cv.width - mg, Math.max(mg - iw, V.ox)); V.oy = Math.min(cv.height - mg, Math.max(mg - ih, V.oy));
+    const k = V.zoom;
+    // Meer (gleiche Farbe wie der Kartenrand)
     g.fillStyle = '#3f7299'; g.fillRect(0, 0, cv.width, cv.height);
-    g.imageSmoothingEnabled = true;
-    g.drawImage(img, V.ox, V.oy, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = k > V.min * 6 ? 'medium' : 'high';
+    // nur den sichtbaren Ausschnitt der Kartengrafik zeichnen (deutlich schneller beim Ziehen)
+    const sx0 = Math.max(0, -V.ox / k), sy0 = Math.max(0, -V.oy / k);
+    const sx1 = Math.min(img.width, (cv.width - V.ox) / k), sy1 = Math.min(img.height, (cv.height - V.oy) / k);
+    if (sx1 > sx0 && sy1 > sy0) g.drawImage(img, sx0, sy0, sx1 - sx0, sy1 - sy0, V.ox + sx0 * k, V.oy + sy0 * k, (sx1 - sx0) * k, (sy1 - sy0) * k);
     const toS = (x, z) => { const [mx, mz] = W.mapToPx(x, z); return [V.ox + mx * k, V.oy + mz * k]; };
-    const u = dpr * Math.min(1.6, Math.max(0.9, k / (Math.min(cv.width, cv.height) / img.width)));
-    // Bezirksnamen
+    const rel = k / V.min; // 1 = ganze Insel sichtbar
+    const u = dpr * Math.min(1.5, Math.max(0.95, 0.85 + rel * 0.05));
+    // Ortsnamen: große Namen immer, kleinere erst beim Hineinzoomen
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.font = `600 ${Math.round(13 * u)}px Oswald, sans-serif`;
-    const labels = [['CORAL HEIGHTS', 0, -300], ['DOWNTOWN', 0, -80], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['SOLERA HILLS', 200, -900], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860], ['ANWESEN', 530, -990], ['VALVERDE', 300, -2040], ['BAHÍA BLANCA', 1450, -760], ['LOS RANCHOS', -1250, -1360], ['FLUGPLATZ', -1300, -1090], ['SIERRA ALTA', 300, -2900], ['MIRADOR', 330, -2740], ['TIERRA SECA', -1150, -1750], ['COSTA ESTE', 1050, -620], ['SANTA CRUZ', -1000, -740], ['LAGO VERDE', 600, -1550], ['PINAR ALTO', -400, -2580], ['SAN LÚCAR', 1530, -1130], ['GRAN CASINO', 1555, -730], ['SOLERA MARINA', 90, 470]];
-    for (const [t, x, z] of labels) { const [sx, sy] = toS(x, z); g.lineWidth = 3 * u; g.strokeStyle = 'rgba(255,255,255,0.85)'; g.strokeText(t, sx, sy); g.fillStyle = 'rgba(40,44,52,0.9)'; g.fillText(t, sx, sy); }
+    const big = [['DOWNTOWN', 0, -80], ['SOLERA HILLS', 200, -900], ['VALVERDE', 300, -2040], ['BAHÍA BLANCA', 1450, -760], ['LOS RANCHOS', -1250, -1360], ['SIERRA ALTA', 300, -2900], ['TIERRA SECA', -1150, -1750], ['SAN LÚCAR', 1530, -1130], ['PIEDRA ROJA', -1500, -2250], ['SANTA CRUZ', -1000, -740], ['PINAR ALTO', -400, -2580], ['MONTE NEGRO', 1000, -2420]];
+    const small = [['CORAL HEIGHTS', 0, -300], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860], ['ANWESEN', 530, -990], ['FLUGPLATZ', -1300, -1090], ['MIRADOR', 330, -2740], ['COSTA ESTE', 1050, -620], ['LAGO VERDE', 600, -1550], ['GRAN CASINO', 1555, -730], ['SOLERA MARINA', 90, 470], ['CAÑÓN ROJO', -1300, -1790], ['FINCA ESCONDIDA', -470, -1430], ['YACHTHAFEN', -480, 470]];
+    const label = (t, x, z, size, alpha) => {
+      const [sx, sy] = toS(x, z);
+      if (sx < -200 || sy < -50 || sx > cv.width + 200 || sy > cv.height + 50) return;
+      g.globalAlpha = alpha; g.font = `600 ${Math.round(size * u)}px Oswald, sans-serif`;
+      g.lineWidth = 3.5 * u; g.lineJoin = 'round'; g.strokeStyle = 'rgba(255,255,255,0.88)'; g.strokeText(t, sx, sy);
+      g.fillStyle = 'rgba(34,38,46,0.95)'; g.fillText(t, sx, sy); g.globalAlpha = 1;
+    };
+    for (const [t, x, z] of big) label(t, x, z, 15, 1);
+    const sa = Math.max(0, Math.min(1, (rel - 1.6) / 1.2));
+    if (sa > 0) for (const [t, x, z] of small) label(t, x, z, 12, sa);
     // Route
     const tgt = this.getRouteTarget();
     if (tgt && this.route) {
-      g.save(); g.lineWidth = 5 * u; g.lineJoin = 'round'; g.lineCap = 'round';
-      g.strokeStyle = G.missions.gpsTarget ? '#ffd60a' : '#be6eff'; g.shadowColor = g.strokeStyle; g.shadowBlur = 10 * u;
-      g.beginPath(); this.route.forEach(([x, z], i) => { const [sx, sy] = toS(x, z); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy); }); g.stroke(); g.restore();
-    }
-    // Symbole
-    const icon = (x, z, col, label, size = 13) => {
-      const [sx, sy] = toS(x, z), rad = size * u;
-      g.save();
-      g.shadowColor = col; g.shadowBlur = 14 * u;
-      g.fillStyle = '#0d1220'; g.beginPath(); g.arc(sx, sy, rad, 0, 7); g.fill();
-      g.shadowBlur = 0; g.lineWidth = 3 * u; g.strokeStyle = col; g.stroke();
-      g.fillStyle = col; g.font = `700 ${Math.round(rad * 1.15)}px Oswald, sans-serif`; g.fillText(label, sx, sy + 1 * u);
+      g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
+      const col = G.missions.gpsTarget ? '#ffd60a' : '#be6eff';
+      g.beginPath(); this.route.forEach(([x, z], i) => { const [sx, sy] = toS(x, z); i ? g.lineTo(sx, sy) : g.moveTo(sx, sy); });
+      g.lineWidth = 8 * u; g.strokeStyle = 'rgba(13,18,32,0.55)'; g.stroke();
+      g.lineWidth = 4.5 * u; g.strokeStyle = col; g.stroke();
       g.restore();
+    }
+    // Symbole (ohne teure Schatten – Ring + dunkler Rand)
+    const icon = (x, z, col, lbl, size = 13) => {
+      const [sx, sy] = toS(x, z), rad = size * u;
+      if (sx < -rad || sy < -rad || sx > cv.width + rad || sy > cv.height + rad) return null;
+      g.fillStyle = 'rgba(13,18,32,0.45)'; g.beginPath(); g.arc(sx, sy + 1.5 * u, rad + 3 * u, 0, 7); g.fill();
+      g.fillStyle = '#0d1220'; g.beginPath(); g.arc(sx, sy, rad, 0, 7); g.fill();
+      g.lineWidth = 2.6 * u; g.strokeStyle = col; g.stroke();
+      g.fillStyle = col; g.font = `700 ${Math.round(rad * 1.1)}px Oswald, sans-serif`; g.fillText(lbl, sx, sy + 1 * u);
       return [sx, sy, rad];
     };
-    for (const b of G.missions.mapBlips(true)) {
-      const [sx, sy, rad] = icon(b.x, b.z, b.col, b.label || '•', b.label ? 13 : 9);
-      if (b.name && k > V.min * 1.5) { g.font = `600 ${Math.round(11 * u)}px Inter, sans-serif`; g.fillStyle = '#1b1e24'; g.fillText(b.name, sx, sy + rad + 9 * u); }
+    const blips = G.missions.mapBlips(true);
+    // Auftrags- und Missionsziele zuletzt (oben)
+    blips.sort((a, b) => (a.edge ? 1 : 0) - (b.edge ? 1 : 0));
+    const names = rel > 2.2;
+    for (const b of blips) {
+      const res = icon(b.x, b.z, b.col, b.label || '•', b.label ? 12.5 : 9);
+      if (res && b.name && (names || (b.edge && rel > 1.6))) {
+        const [sx, sy, rad] = res;
+        g.font = `600 ${Math.round(10.5 * u)}px Inter, sans-serif`; g.lineWidth = 3 * u; g.strokeStyle = 'rgba(255,255,255,0.85)';
+        g.strokeText(b.name, sx, sy + rad + 9 * u); g.fillStyle = '#1b1e24'; g.fillText(b.name, sx, sy + rad + 9 * u);
+      }
     }
     if (G.missions.waypoint) icon(G.missions.waypoint.x, G.missions.waypoint.z, '#be6eff', '⚑', 12);
     // Spieler
-    const P = G.player, px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z, ph = P.inCar ? P.vehicle.h : P.yaw;
+    const [px, pz, ph] = this.mapPlayerPos();
     const [sx, sy] = toS(px, pz);
     g.save(); g.translate(sx, sy);
-    g.fillStyle = 'rgba(25,230,255,0.18)'; g.beginPath(); g.arc(0, 0, 22 * u, 0, 7); g.fill();
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+    g.fillStyle = `rgba(25,230,255,${0.12 + pulse * 0.1})`; g.beginPath(); g.arc(0, 0, (20 + pulse * 5) * u, 0, 7); g.fill();
     g.rotate(Math.atan2(Math.cos(ph), Math.sin(ph)));
     const a = 12 * u;
-    g.shadowColor = '#19e6ff'; g.shadowBlur = 12 * u;
     g.fillStyle = '#fff'; g.strokeStyle = '#0d1220'; g.lineWidth = 2.5 * u;
     g.beginPath(); g.moveTo(a, 0); g.lineTo(-a * 0.7, a * 0.68); g.lineTo(-a * 0.3, 0); g.lineTo(-a * 0.7, -a * 0.68); g.closePath(); g.fill(); g.stroke();
     g.restore();
+    // Maßstab und Nordpfeil
+    const mPerPx = 1 / (k * W.mapScale);
+    let len = 50; for (const c of [50, 100, 200, 250, 500, 1000, 2000]) if (c / mPerPx < 150 * dpr) len = c;
+    const bw = len / mPerPx, bx = 24 * dpr, by = cv.height - 30 * dpr;
+    g.fillStyle = 'rgba(13,18,32,0.72)'; g.fillRect(bx - 10 * dpr, by - 14 * dpr, bw + 20 * dpr, 34 * dpr);
+    g.fillStyle = '#fff'; g.fillRect(bx, by + 8 * dpr, bw, 3 * dpr); g.fillRect(bx, by + 3 * dpr, 2 * dpr, 8 * dpr); g.fillRect(bx + bw - 2 * dpr, by + 3 * dpr, 2 * dpr, 8 * dpr);
+    g.font = `600 ${Math.round(11 * dpr)}px Inter, sans-serif`; g.textAlign = 'center'; g.fillText(len >= 1000 ? (len / 1000) + ' km' : len + ' m', bx + bw / 2, by - 3 * dpr);
+    // Spieler-Pfeil am Rand, wenn außerhalb des Bildes
+    if (sx < 0 || sy < 0 || sx > cv.width || sy > cv.height) {
+      const cx = cv.width / 2, cy = cv.height / 2, ang = Math.atan2(sy - cy, sx - cx), m = 26 * dpr;
+      const ex = Math.max(m, Math.min(cv.width - m, cx + Math.cos(ang) * cv.width)), ey = Math.max(m, Math.min(cv.height - m, cy + Math.sin(ang) * cv.height));
+      g.save(); g.translate(ex, ey); g.rotate(ang); g.fillStyle = '#19e6ff'; g.strokeStyle = '#0d1220'; g.lineWidth = 2 * dpr;
+      g.beginPath(); g.moveTo(12 * dpr, 0); g.lineTo(-8 * dpr, 9 * dpr); g.lineTo(-8 * dpr, -9 * dpr); g.closePath(); g.fill(); g.stroke(); g.restore();
+    }
   }
 }

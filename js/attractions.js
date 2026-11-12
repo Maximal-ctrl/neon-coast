@@ -47,6 +47,7 @@ export class Attractions {
       if (d < bd) { bd = d; best = k; }
     }
     this.ride = { k: best, t: 0, start: W.wheel.rotation.x };
+    G.stats.wheelRides = (G.stats.wheelRides || 0) + 1;
     W.wheelBoost = 1;
     P.state = 'ride'; P.visible = true; P.yaw = Math.PI / 2; P.vx = P.vz = P.vy = 0;
     G.hud.fadeIn();

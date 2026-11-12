@@ -7,7 +7,8 @@ import { AIDriver } from './traffic.js';
 import { WEAPONS } from './combat.js';
 import { randomLook, OUTFITS, CAR_TYPES } from './models.js';
 import { clamp, rand, dist2, pick, chance } from './utils.js';
-import { MISSIONS3, CONTACTS3, TALK3, registerPois } from './missions3.js';
+import { MISSIONS3, CONTACTS3, TALK3, registerPois, cpGuide, routePts } from './missions3.js';
+import { LOOKOUT } from './terrain.js';
 
 const N = (i, j) => C.nodeId(i, j);
 const NP = (x, z) => C.nodeId(Math.round((x + C.HALF) / C.CELL), Math.round((z + C.HALF) / C.CELL));
@@ -141,7 +142,7 @@ export class Missions {
     P(-350, 0, 'weapon', { w: 'shotgun', ammo: 16 });
     P(600, 70, 'weapon', { w: 'rifle', ammo: 60 });
     // Neon-Muscheln
-    this.shellPos = [[420, -340], [445, -120], [640, 70], [415, 300], [12, -252], [-320, 110], [-240, 340], [-378, 0], [100, 378], [-80, 175], [250, 235], [-228, 12], [172, 172], [-320, -350], [300, -378], [376, 0], [-50, -50], [520, 40], [-200, 378], [630, 15]];
+    this.shellPos = [[420, -340], [445, -120], [640, 70], [415, 300], [12, -252], [-320, 110], [-240, 340], [-378, 0], [100, 378], [-80, 175], [250, 235], [-228, 12], [172, 172], [-320, -350], [300, -378], [376, 0], [-50, -50], [520, 40], [-200, 378], [630, 15], [655, 22], [90, 449], [500, -196], [-688, 2], [-30, 366], [10, 40], [234, 114], [162, 36], [80, 272], [-106, 172], [244, -112], [-560, 60], [40, -440], [-520, -440], [-160, -752], [632, 58]];
     this.shellPos.forEach(([x, z], i) => { if (!this.shells.has(i)) this.addPickup(x, z, 'shell', { i }, 0); });
     this.grantRewards(true);
     this.updateGivers(true);
@@ -570,15 +571,16 @@ function* checkpoints(m, pts, opts = {}) {
     const mk = m.marker(x, z, last ? 0xffd23f : 0xff2e88, { r: opts.r || 8, h: 6, blipCol: last ? '#ffd23f' : '#ff2e88' });
     let nextMk = null;
     if (!last) { const [nx, nz] = pts[i + 1]; nextMk = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xff2e88, transparent: true, opacity: 0.35, depthWrite: false })); nextMk.scale.set(5, 1, 5); nextMk.position.set(nx, G.world.groundHeight(nx, nz) + 0.08, nz); G.scene.add(nextMk); }
+    const gd = !last ? cpGuide(m, x, G.world.groundHeight(x, z), z, pts[i + 1][0], G.world.groundHeight(pts[i + 1][0], pts[i + 1][1]), pts[i + 1][1]) : null;
     if (opts.onCp) opts.onCp(i);
     yield* m.until(() => {
       const v = P.inCar ? P.vehicle : P;
       return dist2(v.x, v.z, x, z) < (opts.r || 8) * (opts.r || 8) && (!opts.vehicle || P.vehicle === opts.vehicle);
     });
-    m.removeMarker(mk);
+    m.removeMarker(mk); if (gd) m.removeMarker(gd);
     if (nextMk) G.scene.remove(nextMk);
     G.audio.checkpoint();
-    if (opts.bonus) m.timerLeft += opts.bonus;
+    if (opts.bonus && m.timerLeft != null) m.timerLeft += opts.bonus;
     if (opts.passed) opts.passed(i);
   }
 }
@@ -788,12 +790,13 @@ const NEW_MISSIONS = [
   // ---------------------------------------------------------------- Dex
   {
     id: 'd4', title: 'Bergkönig', sub: 'Dex', contact: 'dex', req: ['m6'], label: 'D', npc: 'dex', reward: 3500, rewardCar: ['atlas', 0x3a5a40],
-    desc: 'Bergrennen über die Serpentinen nach Monte Solera.',
+    desc: 'Bergrennen vom Damm bis hinauf zum Mirador in der Sierra.',
     *run(m) {
       const dex = yield* standAt(m, this);
       yield* m.talk([
         ['Dex', 'Auf dem Monte Solera wohnt ein gewisser Don Aurelio. Reich, alt, und verrückt nach Autos.'],
-        ['Dex', 'Er hat eine Wette laufen: Wer es in Rekordzeit vom Damm bis ins Dorf schafft, bekommt seinen SUV.'],
+        ['Dex', 'Er hat eine Wette laufen: Wer es in Rekordzeit vom Damm bis ganz hinauf zum Mirador in der Sierra schafft, bekommt seinen SUV.'],
+        ['Dex', 'Das sind gut drei Kilometer Serpentinen, Brücken und Pässe. Fahr sauber – jede Sekunde zählt.'],
         ['Dex', 'Ich hab dir einen Zephyra an den Damm gestellt. Zeig ihm, was du kannst.'],
       ], dex, dex);
       yield* m.getInCar();
@@ -806,9 +809,11 @@ const NEW_MISSIONS = [
       m.freeze = true;
       for (const t of ['3', '2', '1']) { G.hud.countdown(t); G.audio.countdown(false); yield* m.wait(1); }
       G.hud.countdown('LOS!'); G.audio.countdown(true); m.freeze = false;
-      m.timerLeft = 58;
-      m.objective('Rase die <b>Serpentinen</b> hinauf!');
-      yield* checkpoints(m, HILL_CPS(), { r: 9, vehicle: car, bonus: 2 });
+      const cps = routePts(40, -440, LOOKOUT.x, LOOKOUT.z, 260);
+      let len = 0; { let px = 40, pz = -440; for (const [x, z] of cps) { len += Math.hypot(x - px, z - pz); px = x; pz = z; } }
+      m.timerLeft = Math.round(len / 27) + 60; // eine Minute extra
+      m.objective('Rase die Serpentinen hinauf bis zum <b>Mirador</b>!');
+      yield* checkpoints(m, cps, { r: 10, vehicle: car, bonus: 2 });
       m.timerLeft = null; G.hud.timer(null);
       car.persistent = false;
       G.hud.toast('🏁 Neuer Rekord! Don Aurelio hat zugeschaut …');
@@ -820,32 +825,78 @@ const NEW_MISSIONS = [
     desc: 'Container-Pendelfahrten im Hafen unter Zeitdruck.',
     *run(m) {
       const b = yield* standAt(m, this);
+      // Abendstimmung: Uhrzeit festhalten, bis der Auftrag vorbei ist
+      G.timeOfDay = 19.3;
+      m.failIf(() => { G.timeOfDay = 19.3; return false; }, '');
       yield* m.talk([
-        ['Brandt', 'Du bist der Fahrer, von dem Dex erzählt? Gut. Die „Solera Star“ legt heute Nacht ab.'],
-        ['Brandt', 'Meine Leute streiken, und die Ladung muss an Bord. Drei Fuhren vom Containerhof an die Kaimauer.'],
+        ['Brandt', 'Du bist der Fahrer, von dem Dex erzählt? Gut. Die „Solera Star“ legt heute Abend ab.'],
+        ['Brandt', 'Meine Leute streiken – und seit Wochen terrorisiert die Tiburones-Bande den Hafen. Schutzgeld, Überfälle, brennende Container.'],
+        ['Brandt', 'Die Bande will verhindern, dass die Ladung an Bord geht. Die werden dich aufhalten wollen – mit Autos, mit Waffen, mit allem.'],
+        ['Brandt', 'Die Polizei ist informiert und rückt gegen die Tiburones an. Um dich kümmern die sich heute nicht.'],
         ['Leo', 'Und wenn ich zu langsam bin?'],
-        ['Brandt', 'Dann legt sie ohne die Ladung ab – und wir beide haben ein Problem.'],
+        ['Brandt', 'Dann legt sie ohne die Ladung ab – und die Bande hat gewonnen.'],
       ], b, b);
       if (G.interior) G.interiors.exit();
+      G.police.setLevel(0); G.police.locked = true; // keine Sterne für dich
       const van = m.spawnCar('coyote', -54, 352, -Math.PI / 2, 0x8d99ae, { missionCar: true });
+      van.health = van.maxHealth = 2400;
       m.failIf(() => !van.alive || van.sinking, 'Der Pick-up wurde zerstört.');
       m.objective('Steig in den <b>Hafen-Pick-up</b>.');
       const mk = m.marker(van.x, van.z, 0x19e6ff, { arrow: true, follow: van, blipCol: '#19e6ff' });
       yield* m.until(() => G.player.vehicle === van);
       m.removeMarker(mk); van.missionCar = false;
+      // Chaos: Bandenautos, Bandenmitglieder, Polizei gegen Bande
+      const gangCars = [], gangs = [], cops = [];
+      const chaos = () => {
+        const P = G.player, px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
+        for (let i = gangCars.length - 1; i >= 0; i--) { const v = gangCars[i]; if (!v.alive || v.removed || !v.driver || !v.driver.isPed) { if (v.mk) { m.removeMarker(v.mk); v.mk = null; } gangCars.splice(i, 1); } }
+        if (gangCars.length < 3 && Math.random() < 0.02) {
+          const v = G.traffic.spawnCar(px, pz, 70, 160, pick(['brutus', 'atlas', 'coyote']), 'chase');
+          if (v) { v.driver.look = LOOKS.gang(0x1d6f6a); v.persistent = true; v.missionTarget = true; v.ai.target = van; v.ai.cruise = 26; m.track(v); v.mk = m.marker(0, 0, 0xff3b5c, { follow: v, arrow: true, blipCol: '#ff3b5c' }); gangCars.push(v); }
+        }
+        const aliveG = gangs.filter((p) => p.alive && !p.removed);
+        if (aliveG.length < 5 && Math.random() < 0.015) {
+          const sp = pick([[-240, 300], [-180, 340], [-300, 330], [-120, 360], [-60, 300]]);
+          for (const p of m.gang(sp[0], sp[1], 3, { gun: true, hp: 55, col: 0x1d6f6a, aggro: 60, mark: false })) gangs.push(p);
+        }
+        const aliveC = cops.filter((p) => p.alive && !p.removed);
+        if (aliveC.length < 5 && aliveG.length && Math.random() < 0.02) {
+          const t = pick(aliveG);
+          const v = G.vm.spawn('police', t.x + rand(-25, 25), t.z + rand(-25, 25), rand(0, 6.28));
+          if (v) { v.parked = true; v.siren = true; v.persistent = true; m.track(v); }
+          for (let k = 0; k < 2; k++) { const c = G.peds.spawnCop(t.x + rand(-20, 20), t.z + rand(-20, 20)); c.persistent = true; m.track(c); cops.push(c); }
+        }
+        // Polizei schießt auf die Bande, die Bande zurück
+        for (const c of aliveC) {
+          let best = null, bd = 50 * 50;
+          for (const g of aliveG) { const d = dist2(g.x, g.z, c.x, c.z); if (d < bd) { bd = d; best = g; } }
+          if (!best) continue;
+          c.yaw = Math.atan2(best.x - c.x, best.z - c.z); c.state = 'goto'; c.tx = best.x; c.tz = best.z; c.gotoSpeed = bd > 15 * 15 ? 4.5 : 0;
+          c.shootT = (c.shootT ?? rand(0.5, 1.5)) - G.dt;
+          if (c.shootT <= 0 && bd < 45 * 45) { c.shootT = rand(0.5, 1.1); G.combat.npcShoot(c, best.x, best.y + 1.2, best.z); }
+        }
+        for (const g of aliveG) {
+          if (Math.random() > 0.01) continue;
+          let best = null, bd = 40 * 40;
+          for (const c of aliveC) { const d = dist2(g.x, g.z, c.x, c.z); if (d < bd) { bd = d; best = c; } }
+          if (best) G.combat.npcShoot(g, best.x, best.y + 1.2, best.z);
+        }
+        return false;
+      };
+      m.failIf(chaos, '');
       const runs = [[[-252, 284], [-300, 364]], [[-196, 320], [-220, 364]], [[-228, 284], [-140, 364]]];
       for (let i = 0; i < runs.length; i++) {
         const [[ax, az], [bx, bz]] = runs[i];
-        m.timerLeft = 32;
-        yield* m.goTo(ax, az, `Fuhre ${i + 1}/3: Lade am <b>Containerhof</b>.`, { r: 5, vehicle: van, stop: true, color: 0xff9f1c });
+        m.timerLeft = 45;
+        yield* m.goTo(ax, az, `Fuhre ${i + 1}/3: Lade am <b>Containerhof</b> – die Tiburones wollen dich stoppen!`, { r: 5, vehicle: van, stop: true, color: 0xff9f1c });
         G.hud.toast('🏗️ Container verladen'); G.audio.checkpoint();
-        m.timerLeft += 22;
+        m.timerLeft += 30;
         yield* m.goTo(bx, bz, `Fuhre ${i + 1}/3: Bring sie zur <b>Kaimauer</b>.`, { r: 5, vehicle: van, stop: true });
         G.audio.checkpoint();
         m.timerLeft = null; G.hud.timer(null);
       }
       van.persistent = false;
-      G.hud.toast('Brandt: „Die Solera Star ist beladen. Gute Arbeit, Junge.“');
+      G.hud.toast('Brandt: „Die Solera Star ist beladen – trotz der Tiburones. Respekt, Junge.“');
     },
   },
   {

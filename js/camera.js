@@ -88,7 +88,7 @@ export class CameraRig {
         const rx = -Math.cos(this.yaw), rz = Math.sin(this.yaw);
         tx += rx * 0.55; tz += rz * 0.55; ty += 0.1;
         const wm = P.wmods && P.wmods[P.weapon];
-        fovT = wm && wm.scope ? 28 : 55;
+        fovT = P.weapon === 'sniper' ? (wm && wm.scope ? 9 : 14) : wm && wm.scope ? 28 : 55;
       }
       const sp = Math.hypot(P.vx, P.vz);
       if (this.userT <= 0 && sp > 1 && G.isTouch) this.yaw = dampAngle(this.yaw, P.yaw, 0.9, dt);

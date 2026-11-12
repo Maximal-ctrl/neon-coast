@@ -28,7 +28,7 @@ export const SIGN = { HOTEL: 0, MOTEL: 1, BAR: 2, CLUB: 3, DINER: 4, TACOS: 5, P
 
 
 // Gelände, Landstraßen & Orte: siehe terrain.js
-import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES , JUNCTIONS } from './terrain.js';
+import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES , JUNCTIONS, ESTATE2, FARM, PEAK } from './terrain.js';
 export { HILLS, CAUSEWAY, VILLAGE, MANSION, HILL_ROAD, SUMMIT_ROAD, hillHeight };
 
 export class World {
@@ -98,7 +98,14 @@ export class World {
     if (z < -384 && z > -492) for (const CW of C.CAUSEWAYS) if (x > CW.x0 && x < CW.x1) return lerp(0, CW.y1, (CW.z1 - z) / (CW.z1 - CW.z0));
     if (z < HILLS.z1) {
       const r = hillRoadAt(x, z);
-      if (r && r[0] < 5.2 && !(yHint !== undefined && yHint < r[1] - 3 && HILL_ROADS[r[2]].bridge[r[3]])) return r[1];
+      if (r) {
+        const br = HILL_ROADS[r[2]].bridge[r[3]];
+        if (!(br && yHint !== undefined && yHint < r[1] - 3)) {
+          // ganze Fahrbahn inkl. Bankett auf Straßenhöhe, danach weicher Übergang ins Gelände
+          if (r[0] < (br ? 6.6 : 7.4)) return r[1];
+          if (!br && r[0] < 10) { const ry = r[1], t = (r[0] - 7.4) / 2.6; return ry + (hillHeight(x, z) - ry) * t * t * (3 - 2 * t); }
+        }
+      }
       return hillHeight(x, z);
     }
     for (let i = 0; i < this.rooms.length; i++) { const r = this.rooms[i]; if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return r.y; }
@@ -1073,7 +1080,8 @@ export class World {
         c.lerp(c2.setHex(0xb99a62).lerp(c3.setHex(0x9a7a4a), big), dry * 0.92);
         if (y > 40) c.lerp(c2.setHex(0x6b6a45), smoothstep(40, 110, y) * (1 - dry));
         const rock = Math.max(smoothstep(0.86, 0.7, ny), smoothstep(150, 230, y));
-        c.lerp(c2.setHex(dry > 0.5 ? 0x9a7f62 : 0x7d776d).lerp(c3.setHex(0x5e5952), nz), rock);
+        const red = smoothstep(-1080, -1250, x) * smoothstep(-1500, -1650, z);
+        c.lerp(c2.setHex(red > 0.3 ? 0xa4563a : dry > 0.5 ? 0x9a7f62 : 0x7d776d).lerp(c3.setHex(red > 0.3 ? 0x7a3a26 : 0x5e5952), nz), Math.min(1, Math.max(rock, red * 0.82)));
         if (y > 270) c.lerp(c2.setHex(0xe9e9ec), smoothstep(270, 340, y) * smoothstep(0.55, 0.8, ny));
       }
       c.multiplyScalar(0.88 + nz * 0.24);
@@ -1081,7 +1089,8 @@ export class World {
     }
     g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     g.computeBoundingSphere();
-    const terrMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.4 });
+    // Gelände leicht nach hinten versetzt: Straßen, Kreuzungen und Plätze gewinnen immer den Tiefentest
+    const terrMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, envMapIntensity: 0.4, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 4 });
     if (TEX.grass) applyDetail(terrMat, { a: 'grass', b: 'rock', mode: 'terrain', scale: 3, scaleB: 7, col: 0.85, nrm: 0.9 });
     const mesh = new THREE.Mesh(g, terrMat);
     mesh.receiveShadow = true;
@@ -1114,6 +1123,8 @@ export class World {
     this.hillRoad = HILL_ROAD;
     this.genVillage();
     this.genMansion();
+    this.genMansion(ESTATE2, 'montenegro', 'Castillo Montenegro', 9191);
+    this.genFarm();
     this.genLookout();
     this.genTowns();
     // Dämme mit Straße
@@ -1151,7 +1162,8 @@ export class World {
         (col ? P : this.B.asph).quad([ax + na[0] * o0, ya, az + na[1] * o0], [ax + na[0] * o1, ya, az + na[1] * o1], [bx + nb[0] * o1, yb, bz + nb[1] * o1], [bx + nb[0] * o0, yb, bz + nb[1] * o0], [0, 0, 1, 1], col);
       }
     };
-    strip(-7, 7, -0.08, shoulder);
+    if (R.dirt) { strip(-6.5, 6.5, -0.04, rgb(0x9a8462)); strip(-3.6, 3.6, 0.0, rgb(0x7d6a4c)); this.villageRoads.push(R.pts); return; }
+    strip(-7.8, 7.8, -0.04, shoulder);
     strip(-4.8, 4.8, 0.0, null);
     strip(-4.4, -4.2, 0.02, wh); strip(4.2, 4.4, 0.02, wh);
     strip(-0.1, 0.1, 0.02, ye, 2);
@@ -1214,6 +1226,36 @@ export class World {
         }
       }
     }
+  }
+
+  // Finca Escondida: Felder, Gewächshäuser, Scheune, Landepiste mit Windsack
+  genFarm() {
+    const F = FARM, P = this.B.props, rnd = mulberry32(4711);
+    this.raised(F.y, () => {
+      const zc = (F.z0 + F.z1) / 2;
+      // Landepiste (Schotter) über die volle Länge
+      P.quad([F.x0 + 6, 0.05, zc + 9], [F.x1 - 30, 0.05, zc + 9], [F.x1 - 30, 0.05, zc - 9], [F.x0 + 6, 0.05, zc - 9], [0, 0, 1, 1], rgb(0x9c8b6a));
+      for (let x = F.x0 + 20; x < F.x1 - 40; x += 24) P.quad([x, 0.07, zc + 0.35], [x + 10, 0.07, zc + 0.35], [x + 10, 0.07, zc - 0.35], [x, 0.07, zc - 0.35], [0, 0, 1, 1], rgb(0xe8e2d0));
+      // Felder mit Pflanzen (Reihen) nördlich und südlich der Piste
+      for (const [z0, z1] of [[F.z0 + 4, zc - 13], [zc + 13, F.z1 - 4]]) {
+        P.quad([F.x0 + 30, 0.04, z1], [F.x1 - 60, 0.04, z1], [F.x1 - 60, 0.04, z0], [F.x0 + 30, 0.04, z0], [0, 0, 1, 1], rgb(0x5a4632));
+        for (let x = F.x0 + 34; x < F.x1 - 64; x += 3.2) for (let z = z0 + 1.5; z < z1 - 1; z += 2.4) {
+          const h = 0.6 + rnd() * 0.6, w = 0.35 + rnd() * 0.2;
+          P.box(x - w, 0.04, z - w, x + w, h, z + w, { col: rgb(rnd() < 0.5 ? 0x3f7d2c : 0x4f8f34) });
+        }
+      }
+      // Gewächshäuser, Scheune, Wohnwagen, Wassertank
+      for (let k = 0; k < 2; k++) { const gx = F.x1 - 52 + k * 20; P.box(gx - 7, 0, F.z0 + 4, gx + 7, 3.4, F.z0 + 24, { col: rgb(0xd8e8e0) }); this.B.accent.box(gx - 6.9, 0.3, F.z0 + 4.1, gx + 6.9, 3.2, F.z0 + 4.15, { col: rgb(0x8fd6a8, 0.9) }); this.collider(gx - 7, F.z0 + 4, gx + 7, F.z0 + 24, 3.5); }
+      this.warehouse(F.x1 - 48, F.z1 - 26, F.x1 - 8, F.z1 - 4, rnd);
+      P.box(F.x1 - 22, 0, zc - 4, F.x1 - 12, 2.8, zc + 1, { col: rgb(0xd9d4c4) }); this.collider(F.x1 - 22, zc - 4, F.x1 - 12, zc + 1, 3);
+      P.addGeometry(new THREE.CylinderGeometry(2, 2, 5, 14), new THREE.Matrix4().makeTranslation(F.x1 - 16, 4.6, zc + 6), rgb(0x8a8f99));
+      for (const sx of [-1.5, 1.5]) P.box(F.x1 - 16 + sx - 0.12, 0, zc + 6 - 0.12, F.x1 - 16 + sx + 0.12, 2.2, zc + 6 + 0.12, { col: rgb(0x555555) });
+      // Windsack
+      P.box(F.x0 + 14, 0, zc + 13, F.x0 + 14.15, 6, zc + 13.15, { col: rgb(0xdddddd) });
+      P.addGeometry(new THREE.ConeGeometry(0.5, 2.2, 10, 1, true).rotateZ(Math.PI / 2), new THREE.Matrix4().makeTranslation(F.x0 + 15.2, 5.6, zc + 13), rgb(0xff6a1a));
+    });
+    this.pois.finca = { x: F.x1 - 30, z: (F.z0 + F.z1) / 2 + 10, name: 'Finca Escondida' };
+    this.pois.fincaStrip = { x: F.x0 + 30, z: (F.z0 + F.z1) / 2, y: F.y, h: Math.PI / 2 };
   }
 
   // Kreuzungen: ebene Asphaltfläche, Haltelinie, Wegweiser zu den Orten
@@ -1341,6 +1383,7 @@ export class World {
           lagoverde: { '1,0': 'plaza', '0,1': 'shops', '2,1': 'shops2', '0,0': 'gas', '2,0': 'park' },
           pinar: { '1,1': 'shops', '0,0': 'hall', '2,0': 'gas', '1,0': 'park' },
           sanlucar: { '1,1': 'shops', '0,1': 'gas', '2,0': 'hangar', '0,0': 'trailer', '2,1': 'shops2' },
+          piedra: { '1,1': 'shops', '0,0': 'gas', '2,0': 'trailer', '1,0': 'plaza', '2,1': 'shops2' },
         }[t.key];
         const doorSets = {
           valverde: { shops: [{ id: 'v_diner', kind: 'diner', name: 'DINER VALVERDE', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'v_gun', kind: 'gunshop', name: 'WAFFEN', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, { id: 'v_bar', kind: 'bar', name: 'CANTINA VERDE', col: '#7cff6b', label: '🍺', awning: 0x1f5a3a }, null], shops2: [{ id: 'v_moda', kind: 'boutique', name: 'MODA VALVERDE', col: '#ff6fb0', label: 'M', awning: 0x2b2d42 }, null, { id: 'v_house', kind: 'house', name: 'WOHNUNG', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null], gas: { id: 'v_shop', kind: 'shop', name: '24/7 VALVERDE', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
@@ -1350,6 +1393,7 @@ export class World {
           lagoverde: { shops: [{ id: 'lv_bar', kind: 'bar', name: 'TABERNA DEL LAGO', col: '#7cff6b', label: '🍺', awning: 0x1f5a3a }, { id: 'lv_diner', kind: 'diner', name: 'LAKESIDE GRILL', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, null], shops2: [{ id: 'lv_house', kind: 'house', name: 'SEEHAUS', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, { id: 'lv_moda', kind: 'boutique', name: 'LAGO MODA', col: '#ff6fb0', label: 'M', awning: 0x2b2d42 }, null], gas: { id: 'lv_shop', kind: 'shop', name: '24/7 LAGO VERDE', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
           pinar: { shops: [{ id: 'pa_bar', kind: 'bar', name: 'HÜTTE PINAR', col: '#ffb35c', label: '🍺', awning: 0x6b3a1f }, { id: 'pa_diner', kind: 'diner', name: 'BERGSTUBE', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'pa_gun', kind: 'gunshop', name: 'JAGDBEDARF', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, null], gas: { id: 'pa_shop', kind: 'shop', name: '24/7 PINAR ALTO', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
           sanlucar: { shops: [{ id: 'sl_diner', kind: 'diner', name: 'TACO LÚCAR', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'sl_bar', kind: 'bar', name: 'CANTINA DEL SOL', col: '#ffb35c', label: '🍺', awning: 0x6b3a1f }, null], shops2: [{ id: 'sl_gun', kind: 'gunshop', name: 'ARMAS LÚCAR', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, { id: 'sl_house', kind: 'house', name: 'CASITA', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null], gas: { id: 'sl_shop', kind: 'shop', name: '24/7 SAN LÚCAR', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
+          piedra: { shops: [{ id: 'pr_bar', kind: 'bar', name: 'SALOON PIEDRA', col: '#ffb35c', label: '🍺', awning: 0x6b3a1f }, { id: 'pr_diner', kind: 'diner', name: 'CANYON GRILL', col: '#ff5a5a', label: '🍔', awning: 0xb02a2a }, { id: 'pr_gun', kind: 'gunshop', name: 'ARMAS DEL CAÑÓN', col: '#ff7b39', label: 'W', awning: 0x2b2b2b }, null], shops2: [{ id: 'pr_house', kind: 'house', name: 'CASA ROJA', col: '#7cff6b', label: '🏠', awning: 0x3a5a40 }, null, null], gas: { id: 'pr_shop', kind: 'shop', name: '24/7 PIEDRA ROJA', col: '#ffd23f', label: '24', awning: 0x1d6f6a } },
         }[t.key] || { shops: [], shops2: [], gas: null };
         for (let i = 0; i < t.nx; i++) for (let j = 0; j < t.nz; j++) {
           const bx0 = r.x0 + i * CS + HW, bz0 = r.z0 + j * CS + HW, bx1 = bx0 + CS - 2 * HW, bz1 = bz0 + CS - 2 * HW;
@@ -1572,9 +1616,9 @@ export class World {
     P.addGeometry(new THREE.CylinderGeometry(0.12, 0.16, 0.7, 10).rotateZ(Math.PI / 2.4), new THREE.Matrix4().makeTranslation(cx + 10.1, 1.35, cz - 7.9), rgb(0x2a6f97));
   }
 
-  genMansion() {
-    // Anwesen der Familie Valcourt auf dem Gipfel – Schauplatz der Endmission
-    const M = MANSION, cx = M.x, cz = M.z, rnd = mulberry32(8080);
+  genMansion(M = MANSION, key = 'mansion', title = 'Anwesen Valcourt', seed = 8080) {
+    // Anwesen auf einem Gipfel (Valcourt: Endmission; Montenegro: Monte Negro)
+    const cx = M.x, cz = M.z, rnd = mulberry32(seed);
     this.raised(M.y, () => {
       const P = this.B.props, A = this.B.accent, wall = rgb(0xe9e3d6), dark = rgb(0x2b2b30);
       // Rasen & Einfahrt
@@ -1624,8 +1668,8 @@ export class World {
       for (let k = 0; k < 10; k++) { const z = cz + 12 + k * 3.6; for (const s of [-1, 1]) { P.box(cx + s * 5.6 - 0.08, 0, z - 0.08, cx + s * 5.6 + 0.08, 0.7, z + 0.08, { col: dark }); A.box(cx + s * 5.6 - 0.12, 0.7, z - 0.12, cx + s * 5.6 + 0.12, 0.85, z + 0.12, { col: rgb(0xffd9a0, 1.6) }); } }
       for (let k = 0; k < 4; k++) this.parkingSpots.push([cx - 14 + k * 4.5, cz + 26, 0]);
     });
-    this.pois.mansion = { x: cx, z: cz + 30, name: 'Anwesen Valcourt' };
-    this.pois.mansionGate = { x: cx, z: cz + 52 };
+    this.pois[key] = { x: cx, z: cz + 30, name: title };
+    this.pois[key + 'Gate'] = { x: cx, z: cz + 52 };
   }
 
   // Leuchtschild mit Text (eigenes Mesh)

@@ -55,6 +55,8 @@ import { Trip, TRIP_GLSL } from './drugs.js';
 import { Attractions, setupAttractions } from './attractions.js';
 import { chunkScene, DynRes } from './perf.js';
 import { Craft } from './craft.js';
+import { tickBarriers } from './police.js';
+import { applyTouchLayout, editTouchLayout, updateAchievements, achHTML } from './extras31.js';
 import { applyTune, openTuning } from './tuning.js';
 import { buildCasino } from './casino.js';
 import { buildGarage, setupGarageEntrances } from './garage3.js';
@@ -174,6 +176,7 @@ async function boot() {
   setupUI();
   window.addEventListener('resize', onResize);
   onResize();
+  applyTouchLayout();
   $('loading').classList.add('hidden');
   $('title').classList.remove('hidden');
   const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -188,6 +191,7 @@ function pixelRatio(q) {
 }
 
 function onResize() {
+  setTimeout(applyTouchLayout, 50);
   const w = window.innerWidth, h = window.innerHeight;
   G.renderer.setSize(w, h);
   if (composer) composer.setSize(w, h);
@@ -390,6 +394,7 @@ function showMap() {
   $('pause').classList.add('hidden');
   $('mapscreen').classList.remove('hidden');
   requestAnimationFrame(() => G.hud.drawBigMap());
+  clearInterval(G._mapTick); G._mapTick = setInterval(() => { if ($('mapscreen').classList.contains('hidden')) { clearInterval(G._mapTick); return; } G.hud.requestMap(); }, 120);
 }
 
 function controlsHTML() {
@@ -421,7 +426,8 @@ function settingsHTML() {
   <div class="row"><label>Effekte</label><input id="set-sfx" type="range" min="0" max="1" step="0.05" value="${s.sfxVol}"></div>
   <div class="row"><label>Kamera-Empfindlichkeit</label><input id="set-sens" type="range" min="0.3" max="2.5" step="0.05" value="${s.sensitivity}"></div>
   <div class="row"><label>Y-Achse umkehren</label><input id="set-inv" type="checkbox" ${s.invertY ? 'checked' : ''}></div>
-  <div class="row"><label>FPS anzeigen</label><input id="set-fps" type="checkbox" ${s.showFps ? 'checked' : ''}></div>`;
+  <div class="row"><label>FPS anzeigen</label><input id="set-fps" type="checkbox" ${s.showFps ? 'checked' : ''}></div>
+  <div class="row"><label>Touch-Tasten (iPad)</label><button class="mbtn small" id="set-tb">Tasten anordnen …</button></div>`;
 }
 function bindSettings() {
   const s = G.settings;
@@ -431,6 +437,7 @@ function bindSettings() {
   $('set-sens').oninput = (e) => { s.sensitivity = +e.target.value; Save.writeSettings(); };
   $('set-inv').onchange = (e) => { s.invertY = e.target.checked; Save.writeSettings(); };
   $('set-fps').onchange = (e) => { s.showFps = e.target.checked; Save.writeSettings(); };
+  $('set-tb').onclick = () => { closePanel(); if (phoneOpen) closePhone(); $('pause').classList.add('hidden'); G.state = 'menu'; editTouchLayout(); };
   $('set-q').onchange = (e) => {
     s.quality = e.target.value; Save.writeSettings();
     if (s.quality !== q0) {
@@ -472,6 +479,7 @@ G.openMenu = function (title, html, items) {
 
 let phoneOpen = false;
 const ICON = {
+  ach: '<svg viewBox="0 0 24 24"><path d="M7 3h10v3h3v2a4 4 0 0 1-4 4h-.4A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.4 12H8a4 4 0 0 1-4-4V6h3zm0 5V8H6a2 2 0 0 0 1 1.7zm10 0v1.7A2 2 0 0 0 18 8z"/></svg>',
   jobs: '<svg viewBox="0 0 24 24"><path d="M6 3h4v4H6zM14 3h4v4h-4zM10 15h4v4h-4zM7 7v3h10V7h-2v1H9V7zM11 10h2v5h-2z"/></svg>',
   contacts: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/></svg>',
   messages: '<svg viewBox="0 0 24 24"><path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>',
@@ -486,7 +494,7 @@ const ICON = {
   save: '<svg viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 2v5h9V5zm5 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
 };
 const APPS = [['jobs', 'Aufträge', '#ffd23f,#ff7b00'], ['contacts', 'Kontakte', '#34c759,#0a8f3c'], ['messages', 'Nachrichten', '#19e6ff,#1567d3'], ['map', 'Karte', '#ff9f1c,#e8590c'], ['radio', 'Radio', '#ff2e88,#a01458'],
-  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3'], ['garage', 'Garage', '#ff7b00,#b5179e'], ['inv', 'Inventar', '#06d6a0,#118ab2']];
+  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3'], ['garage', 'Garage', '#ff7b00,#b5179e'], ['inv', 'Inventar', '#06d6a0,#118ab2'], ['ach', 'Erfolge', '#ffe14d,#c77d00']];
 
 function openPhone() {
   if (G.state !== 'playing' || G.player.state === 'dead' || G.player.state === 'busted') return;
@@ -499,11 +507,13 @@ function openPhone() {
 function closePhone() {
   if (!phoneOpen) return;
   phoneOpen = false;
+  if (G.audio) G.audio.preview = false;
   $('phone').classList.add('closing');
   setTimeout(() => { if (!phoneOpen) $('phone').classList.add('hidden'); }, 220);
   if (G.state === 'menu') { G.state = 'playing'; last = performance.now(); }
 }
 function phoneScreen(title, html, back = true) {
+  if (G.audio) { G.audio.preview = title === 'Radio'; if (G.audio.preview && !G.audio.ready) G.audio.init(); }
   $('ph-time').textContent = $('clock').textContent;
   const el = $('ph-screen');
   el.innerHTML = (back ? `<div class="ph-head"><button class="ph-back" data-ph="home" aria-label="Zurück">‹</button><b>${title}</b></div>` : '') + `<div class="ph-content">${html}</div>`;
@@ -619,7 +629,7 @@ function phoneMessages() {
 function phoneJobs() {
   const M = G.missions, all = M.list;
   const byId = Object.fromEntries(all.map((d) => [d.id, d]));
-  const order = ['rosa', 'dex', 'sami', 'val', 'ines', 'brandt', 'aurelio', 'nina', 'marisol', 'paco', 'luna', 'ortiz', 'benito'];
+  const order = ['rosa', 'dex', 'sami', 'val', 'ines', 'brandt', 'aurelio', 'nina', 'marisol', 'paco', 'luna', 'ortiz', 'benito', 'dealer'];
   let html = `<div class="jb-sum"><b>${M.done.size}/${all.length}</b><span>Aufträge erledigt</span><i style="--p:${(M.done.size / all.length) * 100}%"></i></div>`;
   let hidden = 0;
   for (const cid of order) {
@@ -729,6 +739,7 @@ function setupPhone() {
     else if (app === 'messages') phoneMessages();
     else if (app === 'radio') phoneRadio();
     else if (app === 'stats') phoneScreen('Statistik', statsHTML());
+    else if (app === 'ach') phoneScreen('Erfolge', achHTML());
     else if (app === 'map') { closePhone(); showMap(); }
     else if (app === 'settings') { closePhone(); setPaused(true); openPanel('EINSTELLUNGEN', settingsHTML(), [['Zurück', closePanel]]); bindSettings(); }
     else if (app === 'mp') { closePhone(); openMultiplayer(); }
@@ -892,16 +903,23 @@ function frame(now) {
   let dt = (now - last) / 1000;
   if (G.state === 'playing' && G.dynRes) G.dynRes.frame(now - last);
   last = now;
-  if (dt > 0.1) dt = 0.1;
-  const step = Math.min(dt, 1 / 30) * (G.slowmo || 1) * (G.state === 'playing' ? Trip.time : 1);
-  G.dt = step;
+  if (dt > 0.125) dt = 0.125;
+  // Bei niedriger Bildrate mehrere Simulationsschritte pro Bild -> Spieltempo bleibt gleich
+  const scale = (G.slowmo || 1) * (G.state === 'playing' ? Trip.time : 1);
+  const n = Math.max(1, Math.min(4, Math.ceil(dt / (1 / 30) - 0.01)));
+  const step = (dt / n) * scale;
   const I = G.input;
   I.update();
-  try {
-    update(now, step, I);
-  } catch (e) {
-    // Ein einzelner Fehler darf das Spiel nicht einfrieren
-    reportError(e);
+  G._frameDt = step * n;
+  for (let k = 0; k < n; k++) {
+    G.dt = step; G._subLast = k === n - 1;
+    try {
+      update(now, step, I);
+    } catch (e) {
+      // Ein einzelner Fehler darf das Spiel nicht einfrieren
+      reportError(e);
+    }
+    if (k === 0) I.consumeFrame();
   }
   if (G.state !== 'loading') {
     try {
@@ -958,6 +976,7 @@ function update(now, step, I) {
     G.craft.update(step);
     G.traffic.update(step);
     G.police.update(step);
+    if (G._subLast) { tickBarriers(); updateAchievements(G._frameDt); }
     // Physik in Teilschritten für Stabilität
     const sub = step > 1 / 45 ? 2 : 1;
     for (let k = 0; k < sub; k++) G.vm.step(step / sub);
@@ -966,13 +985,12 @@ function update(now, step, I) {
     if (G.interiors) G.interiors.update(step);
     if (G.attr) G.attr.update(step);
     if (G.mp) G.mp.update(step);
-    G.world.update(step);
+    if (G._subLast) G.world.update(G._frameDt);
     G.effects.update(step);
     G.cam.update(step);
     const P = G.player;
-    G.world.env.update(step, G.timeOfDay, P.inCar ? P.vehicle : P);
-    G.audio.update(step);
-    G.hud.update(step);
+    if (G._subLast) G.world.env.update(G._frameDt, G.timeOfDay, P.inCar ? P.vehicle : P);
+    if (G._subLast) { G.audio.update(G._frameDt); G.hud.update(G._frameDt); }
     skids();
   } else if (G.state === 'creator') {
     const P = G.player;
@@ -986,6 +1004,7 @@ function update(now, step, I) {
     if (G.menuCam && G.state === 'menu') { G.menuCam(step); G.world.update(step); G.world.env.update(step, G.timeOfDay, G.camera.position); }
     if (I.pressed('pause') && G.state === 'paused') setPaused(false);
     if (phoneOpen && (I.pressed('phone') || I.pressed('pause'))) closePhone();
+    if (phoneOpen && G.audio.preview) G.audio.update(step);
     if (G.ui.isOpen && (I.pressed('pause') || I.pressed('inv'))) G.ui.close();
     if (G.state === 'menu' && I.pressed('map') && !$('mapscreen').classList.contains('hidden')) { $('mapscreen').classList.add('hidden'); G.state = 'playing'; }
   }
@@ -1035,7 +1054,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = '3.0 Beta';
+export const GAME_VERSION = 'Beta 3.1 Extended';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

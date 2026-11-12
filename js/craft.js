@@ -231,7 +231,7 @@ Vehicle.prototype.updateBoat = function (dt) {
   this.y = damp(this.y, ty, 6, dt);
   const wp = (wave(this.x + fx * 2, this.z + fz * 2, t) - wave(this.x - fx * 2, this.z - fz * 2, t)) * 0.25;
   this.pitch = damp(this.pitch, plane * (T.yacht ? 0.02 : 0.085) + wp - (this.braking ? 0.03 : 0), 3, dt);
-  this.roll = damp(this.roll, clamp(this.yawRate * vf * (T.ski ? 0.03 : 0.014), -0.3, 0.3) + Math.sin(t * 1.1 + this.id) * 0.025 * (1 - plane), 4, dt);
+  this.roll = damp(this.roll, clamp(-this.yawRate * vf * (T.ski ? 0.03 : 0.014), -0.3, 0.3) + Math.sin(t * 1.1 + this.id) * 0.025 * (1 - plane), 4, dt);
   this.grounded = true; this.slip = Math.abs(vl); this.lastVf = vf;
   // Gischt & Kielwasser
   this.wakeT = (this.wakeT || 0) - dt;
@@ -298,8 +298,8 @@ Vehicle.prototype.updatePlane = function (dt) {
     const alt = this.y - Math.max(W.groundHeight(this.x + Math.sin(this.h) * 60, this.z + Math.cos(this.h) * 60, this.y), W.groundHeight(this.x, this.z, this.y), C.WATER_Y);
     if (Math.abs(pitchIn) < 0.1) this.pitch = damp(this.pitch, alt < 35 && !(inp.brake > 0.5) ? 0.2 : 0, alt < 35 ? 1.5 : 0.45, dt);
     if (alt < 25 && this.driver === 'player' && this.pitch < 0 && (this.warnT = (this.warnT || 0) - dt) <= 0) { this.warnT = 3; G.hud.toast('⚠️ Bodennähe – hochziehen!'); }
-    this.roll = damp(this.roll, -inp.steer * 0.85, 2.2, dt);
-    this.yawRate = this.roll * 0.75;
+    this.roll = damp(this.roll, inp.steer * 0.85, 2.2, dt); // Rechtskurve: rechte Fläche nach unten
+    this.yawRate = -this.roll * 0.75;
     this.h += this.yawRate * dt;
     // Strömungsabriss
     const stall = clamp((24 - vf) / 10, 0, 1);
@@ -497,7 +497,7 @@ export class Craft {
       const px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
       const n = G.vehicles.filter((v) => v.ai instanceof BoatAI && v.ai.mode !== 'police').length;
       const nearWater = WATER_PATH.some(([x, z]) => dist2(x, z, px, pz) < 420 * 420);
-      if (nearWater && n < (G.quality === 'low' ? 2 : 4)) {
+      if (nearWater && n < (G.quality === 'low' ? 3 : 7)) {
         const cands = WATER_PATH.map((p, i) => [p, i]).filter(([[x, z]]) => { const d = dist2(x, z, px, pz); return d > 120 * 120 && d < 300 * 300; });
         if (cands.length) {
           const [[x, z], i] = pick(cands);
