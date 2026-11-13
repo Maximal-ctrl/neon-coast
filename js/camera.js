@@ -63,7 +63,10 @@ export class CameraRig {
     if (P.inCar) {
       const v = P.vehicle;
       const sp = v.speed;
-      tx = v.x; ty = v.y + 1.3 + (this.carView === 1 ? 1 : 0); tz = v.z;
+      // Höhe weich nachführen: kleine Bodenwellen schütteln die Kamera nicht
+      const vy = v.ry != null && Math.abs(v.ry - v.y) < 1.2 ? v.ry : v.y;
+      this.carY = this.carY == null || this.snapNext || Math.abs(this.carY - vy) > 6 ? vy : this.carY + (vy - this.carY) * (1 - Math.exp(-dt * (v.grounded ? 7 : 12)));
+      tx = v.x; ty = this.carY + 1.3 + (this.carView === 1 ? 1 : 0); tz = v.z;
       dist = (v.T.L * 0.9 + 3.6 + (v.T.plane ? 6 : v.T.yacht ? 4 : 0)) * (this.carView === 1 ? 1.5 : 1) + Math.min(2.5, sp * 0.05);
       if (this.carView === 2) { dist = 0.5; ty = v.y + v.height * 0.8 + 0.1; }
       // Versatz zurück zur Fahrtrichtung, wenn die Maus ruht
@@ -79,9 +82,9 @@ export class CameraRig {
       fovT = 66 + Math.min(16, sp * 0.28);
       maxPitch = 0.95;
     } else {
-      tx = P.x; ty = P.y + 1.55; tz = P.z;
+      tx = P.x; ty = P.y + 1.55 + (P.parachute ? 3.2 : 0); tz = P.z;
       const aiming = P.anim.aim && !G.isTouch;
-      dist = aiming ? 2.4 : (P.state === 'swim' ? 5 : P.state === 'ride' ? 10 : 4.4);
+      dist = aiming ? 2.4 : (P.parachute ? 11 : P.state === 'swim' ? 5 : P.state === 'ride' ? 10 : 4.4);
       if (P.state === 'dead' || P.state === 'busted') dist = 6;
       if (aiming) {
         // Schulterkamera

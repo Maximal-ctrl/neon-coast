@@ -229,17 +229,17 @@ add({ id: 'nb1', title: 'Ruf der Straße', sub: 'Nina', contact: 'nina', req: []
     G.hud.toast('🏁 Zeit geschafft! Nina schreibt: „Nicht schlecht für einen Anfänger.“');
     car.persistent = false;
   } });
-add({ id: 'nb2', title: 'Nitro-Kur', sub: 'Nina', contact: 'nina', req: ['nb1'], label: 'N', reward: 8000, desc: 'Nitro einbauen und die 200-km/h-Marke knacken.',
+add({ id: 'nb2', title: 'Nitro-Kur', sub: 'Nina', contact: 'nina', req: ['nb1'], label: 'N', reward: 8000, desc: 'Nitro einbauen und die 300-km/h-Marke knacken.',
   *run(m) {
     const n = yield* meet(m, this, 'nina');
-    yield* m.talk([['Nina', 'Ohne Nitro bist du auf der Küstenstraße nur Deko.'], ['Nina', 'Bau dir bei Dex Nitro ein – ich zahl\'s dir zurück, wenn du damit 200 Sachen schaffst.']], n, n);
+    yield* m.talk([['Nina', 'Ohne Nitro bist du auf der Küstenstraße nur Deko.'], ['Nina', 'Bau dir bei Dex Nitro ein – ich zahl\'s dir zurück, wenn du damit 300 Sachen schaffst. Nimm was Schnelles – Zephyra oder Vortex – und such dir eine lange Gerade.']], n, n);
     m.objective('Fahr mit einem Auto in die <b>Tuning-Einfahrt</b> (🔧) und bau <b>Nitro</b> ein.');
     const mk = m.marker(80, 267, 0xffb703, { r: 2.6, blip: true, blipCol: '#ffb703' }); mk.group.visible = false;
     yield* m.until(() => P().inCar && P().vehicle.nitro);
     m.removeMarker(mk);
-    m.objective('Erreiche <b>200 km/h</b> (Shift / NITRO halten).');
-    yield* m.until(() => P().inCar && P().vehicle.speed * 3.6 >= 200);
-    G.hud.bigToast('200 KM/H', 'Nina ist beeindruckt');
+    m.objective('Erreiche <b>300 km/h</b> (Shift / NITRO halten, lange Gerade).');
+    yield* m.until(() => P().inCar && P().vehicle.speed * 3.6 >= 300);
+    G.hud.bigToast('300 KM/H', 'Nina ist beeindruckt');
   } });
 add({ id: 'nb3', title: 'Bergsprint', sub: 'Nina', contact: 'nina', req: ['nb2'], label: 'N', reward: 4500, desc: 'Von Valverde hinauf nach Pinar Alto – auf Zeit.',
   *run(m) {

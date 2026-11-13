@@ -290,3 +290,17 @@ body.scoped #crosshair { opacity: 0; }
 .map-legend .lg-grid span { font-size: 13.5px !important; white-space: nowrap; }
 .map-legend .lg-grid i { flex: none; }
 @media (max-width: 700px) { .map-legend .lg-grid { grid-template-columns: 1fr; } }
+
+/* ---------- Höhenmesser (3.12) ---------- */
+#altimeter { position: absolute; left: calc(24px + var(--sal)); bottom: calc(24px + var(--sab)); width: 170px; padding: 8px 12px 10px 34px; background: rgba(10,14,26,.62); border: 1px solid rgba(25,230,255,.28); border-radius: 10px; color: #fff; font-family: var(--head); text-align: right; opacity: 0; pointer-events: none; transition: opacity .3s; }
+#altimeter.show { opacity: 1; }
+#altimeter .alt-h { font-size: 11px; letter-spacing: .2em; color: #19e6ff; }
+#altimeter .alt-main span { font-size: 34px; line-height: 1; }
+#altimeter .alt-main small { font-size: 14px; margin-left: 4px; opacity: .8; }
+#altimeter .alt-sub { display: flex; flex-direction: column; font-family: var(--ui); font-size: 12px; opacity: .85; gap: 1px; }
+#altimeter .alt-tape { position: absolute; left: 12px; top: 10px; bottom: 10px; width: 8px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; }
+#altimeter .alt-tape i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#19e6ff, #7cff6b); }
+#altimeter.warn { border-color: #ff4d6d; animation: altwarn .5s infinite alternate; }
+#altimeter.warn .alt-main span { color: #ff4d6d; }
+@keyframes altwarn { from { background: rgba(10,14,26,.62); } to { background: rgba(120,10,30,.62); } }
+body.touch #altimeter { bottom: auto; left: auto; top: calc(200px + var(--sat)); right: calc(16px + var(--sar)); width: 150px; }

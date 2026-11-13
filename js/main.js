@@ -216,8 +216,20 @@ function prepareWorld(d) {
   if (!G.missionsReady) { G.missions.init(); G.missionsReady = true; } else { G.missions.grantRewards(true); G.missions.updateGivers(true); }
   if (!G.interiors) { G.interiors = new Interiors(G.scene); buildCasino(G.interiors); buildGarage(G.interiors); const cd = (G.world.entrances || []).find((e) => e.id === 'casino'); if (cd) G.blipFns.push(() => [{ x: cd.x, z: cd.z, col: '#ffd23f', label: '♠', r: 0.04, name: 'Gran Casino' }]); }
   if (!G.attr) { G.attr = new Attractions(); setupAttractions(G.attr); G.craft.setup(G.attr); setupGarageEntrances(G.attr, G.interiors);
-    const gp = G.world.pois.garage; G.attr.add({ x: 80, z: 267, color: 0xffb703, label: '🔧', r: 2.6, car: true, onEnter: () => openTuning(G.player.vehicle) });
+    const gp = G.world.pois.garage; G.attr.add({ x: 80, z: 267, color: 0xffb703, label: '🔧', r: 2.6, car: true, always: true, onEnter: () => openTuning(G.player.vehicle) });
     G.blipFns.push(() => [{ x: 80, z: 267, col: '#ffb703', label: '🔧', r: 0.035, name: "Dex' Tuning" }]); void gp; }
+  // 3.12: alle Geschäfte, Lokale und Wohnungen (auch in den Orten der Solera Hills) auf der großen Karte
+  if (!G._shopBlips) {
+    G._shopBlips = true;
+    const KIND = { shop: ['24', '#ffd23f'], gunshop: ['W', '#ff7b39'], diner: ['🍴', '#ff9f6b'], bar: ['🍺', '#f2c14e'], boutique: ['M', '#ff6fb0'], house: ['⌂', '#9be37b'], villa: ['⌂', '#9be37b'] };
+    const nice = (t) => t.toLowerCase().replace(/(^|[\s&/-])([a-zäöüéíóú])/g, (m, a, b) => a + b.toUpperCase());
+    let cache = null;
+    G.blipFns.push((full) => {
+      if (!full) return [];
+      if (!cache) cache = (G.world.entrances || []).filter((e) => KIND[e.kind]).map((e) => ({ x: e.x, z: e.z, col: KIND[e.kind][1], label: KIND[e.kind][0], r: 0.03, shop: true, name: nice(e.name) }));
+      return cache;
+    });
+  }
   P.boats = P.boats || []; P.planes = P.planes || []; P.wmods = P.wmods || {}; P.props = P.props || [];
   if (G.attr.ride) G.attr.ride = null;
   G.trip.stop();
@@ -1054,7 +1066,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = 'Beta 3.11';
+export const GAME_VERSION = 'Beta 3.12';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

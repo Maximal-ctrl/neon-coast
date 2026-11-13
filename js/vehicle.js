@@ -80,7 +80,7 @@ export class Vehicle {
         else { vf = damp(vf, 0, 8, dt); this.braking = true; }
       }
       if (thr === 0 && brk === 0) vf -= Math.sign(vf) * Math.min(Math.abs(vf), (0.45 + Math.abs(vf) * 0.035) * dt); // rollen lassen
-      const capTop = top * (this.pitch < -0.03 ? 1.3 : 1); // bergab darf er schneller werden
+      const capTop = top * (this.pitch < -0.03 ? 1.3 : 1) * (this.nitro && this.nitro.on ? 1.45 : 1); // bergab bzw. mit Nitro darf er schneller werden
       if (vf > capTop) vf = damp(vf, capTop, 2, dt);
       let grip = T.grip * 0.78 * (sand ? 0.65 : 1);
       if (inp.handbrake) {
@@ -94,6 +94,10 @@ export class Vehicle {
       if (inp.handbrake) yaw *= 1.45;
       if (T.tank) yaw += -inp.steer * 0.95 * Math.max(0, 1 - Math.abs(vf) / 6); // Ketten: Drehen auf der Stelle
       this.yawRate = yaw;
+      // Schlupf (3.12): die Fahrtrichtung dreht nicht ganz mit der Karosserie mit –
+      // bei viel Grip fast vollständig, mit Handbremse kaum (Drift)
+      const follow = T.tank ? 1 : inp.handbrake ? 0.3 : clamp(0.55 + grip * 0.045, 0.6, 0.95);
+      this._hv = this.h + yaw * dt * follow;
       this.h += yaw * dt;
       this.slip = Math.abs(vl);
     } else if (this.grounded) {
@@ -106,7 +110,8 @@ export class Vehicle {
     // Hangabtrieb: bergauf langsamer, bergab schneller
     if (this.grounded && Math.abs(this.pitch) > 0.02) vf -= 9.8 * Math.sin(this.pitch) * dt * 1.05;
     if (this.grounded) {
-      fx = Math.sin(this.h); fz = Math.cos(this.h); lx = fz; lz = -fx;
+      const hv = drive && this._hv !== undefined ? this._hv : this.h; this._hv = undefined;
+      fx = Math.sin(hv); fz = Math.cos(hv); lx = fz; lz = -fx;
       this.vx = fx * vf + lx * vl;
       this.vz = fz * vf + lz * vl;
     }
@@ -140,12 +145,18 @@ export class Vehicle {
         if (this.driver === 'player') G.player.onLanded(this);
       }
     }
+    // Federung: sichtbare Höhe folgt dem Boden weich (keine harten Stöße an Kanten)
+    if (this.grounded && this.ry != null && Math.abs(this.ry - this.y) < 1.2) {
+      this.ry += (this.y - this.ry) * (1 - Math.exp(-dt * 16));
+      this.ry = Math.min(this.y + 0.22, Math.max(this.y - 0.1, this.ry));
+    } else this.ry = this.y;
     // Neigung
     if (this.grounded) {
       const wb = this.geo.wheelbase / 2;
       const ghF = W.groundHeight(this.x + fx * wb, this.z + fz * wb, this.y), ghR = W.groundHeight(this.x - fx * wb, this.z - fz * wb, this.y);
-      const slope = Math.atan2(ghF - ghR, wb * 2);
-      this.pitch = damp(this.pitch, slope + clamp(-accel * 0.004, -0.05, 0.05), 10, dt);
+      const ghF2 = W.groundHeight(this.x + fx * wb * 0.5, this.z + fz * wb * 0.5, this.y), ghR2 = W.groundHeight(this.x - fx * wb * 0.5, this.z - fz * wb * 0.5, this.y);
+      const slope = Math.atan2((ghF + ghF2) - (ghR + ghR2), wb * 3); // gemittelt über zwei Achsabstände
+      this.pitch = damp(this.pitch, slope + clamp(-accel * 0.004, -0.05, 0.05), 8, dt);
       this.roll = damp(this.roll, clamp(this.yawRate * vf * 0.01, -0.07, 0.07), 6, dt);
     } else {
       const hs = Math.max(4, Math.hypot(this.vx, this.vz));
@@ -231,7 +242,7 @@ export class Vehicle {
       if (L) { this.parts.dTm.color.copy(L.shirt); this.parts.dHm.color.copy(L.skin); }
     }
     const g = this.group;
-    g.position.set(this.x, this.y, this.z);
+    g.position.set(this.x, this.ry != null && !this.remote && Math.abs(this.ry - this.y) < 1.2 ? this.ry : this.y, this.z);
     g.rotation.set(-this.pitch, this.h, this.roll, 'YXZ');
     // Licht
     const rev = this.alive && this.input.brake > 0 && this.fwdSpeed < 0.3 && !this.input.noReverse;

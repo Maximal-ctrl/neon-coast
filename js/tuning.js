@@ -96,9 +96,9 @@ export function nitroUpdate(v, I, dt) {
   if (!n) return;
   const want = (I.held('sprint') || I.held('nitro')) && v.input.throttle > 0.1 && v.alive;
   if (want && n.charge > 0.02) {
-    n.charge -= dt / 3.5;
+    n.charge -= dt / 5;
     const fx = Math.sin(v.h), fz = Math.cos(v.h);
-    if (v.fwdSpeed < v.T.maxSpeed * 1.25) { v.vx += fx * 15 * dt; v.vz += fz * 15 * dt; }
+    if (v.fwdSpeed < v.T.maxSpeed * 1.45) { v.vx += fx * 21 * dt; v.vz += fz * 21 * dt; }
     if (!n.on) { G.cam.shake(0.25); if (G.audio.whoosh) G.audio.whoosh(); }
     n.on = true;
     const ex = v.x - fx * (v.hl + 0.2), ez = v.z - fz * (v.hl + 0.2);

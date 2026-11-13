@@ -154,6 +154,21 @@ export class HUD {
       $('car-hp').style.width = hp * 100 + '%';
       $('car-hp').classList.toggle('low', hp < 0.3);
     } else sp.classList.remove('show');
+    // Höhenmesser im Flugzeug
+    const am = $('altimeter');
+    if (am) {
+      const pv = P.inCar && P.vehicle.T.plane ? P.vehicle : null;
+      am.classList.toggle('show', !!pv);
+      if (pv) {
+        const W = G.world, gh = Math.max(W.groundHeight(pv.x, pv.z, pv.y), C.WATER_Y), agl = Math.max(0, pv.y - gh);
+        $('alt-val').textContent = Math.round(agl);
+        $('alt-msl').textContent = 'ü. NN ' + Math.round(pv.y) + ' m';
+        const vs = pv.grounded ? 0 : (pv.vy || 0);
+        $('alt-vs').textContent = (vs > 0.5 ? '▲ ' : vs < -0.5 ? '▼ ' : '▬ ') + Math.abs(vs).toFixed(0) + ' m/s';
+        $('alt-bar').style.height = clamp(agl / 400, 0, 1) * 100 + '%';
+        am.classList.toggle('warn', !pv.grounded && agl < 25 && vs < -1);
+      }
+    }
     document.body.classList.toggle('in-car', !!P.inCar);
     document.body.classList.toggle('scoped', !G.isTouch && !P.inCar && P.weapon === 'sniper' && !!P.anim.aim);
     document.body.classList.toggle('armed', P.weapon !== 'fists');
@@ -437,8 +452,8 @@ export class HUD {
         const [px, pz] = this.mapPlayerPos();
         const [mx, mz] = W.mapToPx(px, pz);
         const zoom = fit * 3.4;
-        this.mapView = { min: fit * 0.9, max: fit * 22, zoom, ox: cv.width / 2 - mx * zoom, oy: cv.height / 2 - mz * zoom, vx: 0, vy: 0, dpr };
-      } else { old.min = fit * 0.9; old.max = fit * 22; old.dpr = dpr; }
+        this.mapView = { min: fit * 0.9, max: fit * 12, zoom, ox: cv.width / 2 - mx * zoom, oy: cv.height / 2 - mz * zoom, vx: 0, vy: 0, dpr };
+      } else { old.min = fit * 0.9; old.max = fit * 12; old.dpr = dpr; }
     }
     const V = this.mapView;
     // Karte nicht aus dem Bild schieben
@@ -457,8 +472,9 @@ export class HUD {
     const u = dpr * Math.min(1.5, Math.max(0.95, 0.85 + rel * 0.05));
     // Ortsnamen: große Namen immer, kleinere erst beim Hineinzoomen
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    const big = [['DOWNTOWN', 0, -80], ['SOLERA HILLS', 200, -900], ['VALVERDE', 300, -2040], ['BAHÍA BLANCA', 1450, -760], ['LOS RANCHOS', -1250, -1360], ['SIERRA ALTA', 300, -2900], ['TIERRA SECA', -1150, -1750], ['SAN LÚCAR', 1530, -1130], ['PIEDRA ROJA', -1500, -2250], ['SANTA CRUZ', -1000, -740], ['PINAR ALTO', -400, -2580], ['MONTE NEGRO', 1000, -2420]];
-    const small = [['CORAL HEIGHTS', 0, -300], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860], ['ANWESEN', 530, -990], ['FLUGPLATZ', -1300, -1090], ['MIRADOR', 330, -2740], ['COSTA ESTE', 1050, -620], ['LAGO VERDE', 600, -1550], ['GRAN CASINO', 1555, -730], ['SOLERA MARINA', 90, 470], ['CAÑÓN ROJO', -1300, -1790], ['FINCA ESCONDIDA', -470, -1430], ['YACHTHAFEN', -480, 470]];
+    const big = [['DOWNTOWN', 0, -80], ['SOLERA HILLS', 200, -900], ['SIERRA ALTA', 300, -2900], ['TIERRA SECA', -1150, -1750], ['MONTE NEGRO', 1000, -2420],
+      ...C.TOWNS.map((t) => { const r = C.townRect(t); return [t.name.toUpperCase(), (r.x0 + r.x1) / 2, r.z0 - 16]; })]; // Ortsnamen am Nordrand des Orts
+    const small = [['CORAL HEIGHTS', 0, -300], ['MIDTOWN', 200, -40], ['WESTSIDE', -280, 0], ['HAFEN', -200, 330], ['SEASIDE', 330, -150], ['SOLERA BEACH', 425, 200], ['SUNSET PIER', 600, 95], ['ALTSTADT', -480, -40], ['MONTE SOLERA', -160, -860], ['ANWESEN', 530, -990], ['FLUGPLATZ', -1300, -1090], ['MIRADOR', 330, -2740], ['COSTA ESTE', 1050, -620], ['GRAN CASINO', 1555, -730], ['SOLERA MARINA', 90, 470], ['CAÑÓN ROJO', -1300, -1790], ['FINCA ESCONDIDA', -470, -1430], ['YACHTHAFEN', -480, 470]];
     const label = (t, x, z, size, alpha) => {
       const [sx, sy] = toS(x, z);
       if (sx < -200 || sy < -50 || sx > cv.width + 200 || sy > cv.height + 50) return;
@@ -489,7 +505,7 @@ export class HUD {
       g.fillStyle = col; g.font = `700 ${Math.round(rad * 1.1)}px Oswald, sans-serif`; g.fillText(lbl, sx, sy + 1 * u);
       return [sx, sy, rad];
     };
-    const blips = G.missions.mapBlips(true);
+    const blips = G.missions.mapBlips(true).filter((b, i, A) => !(b.shop && A.some((o, j) => j !== i && !o.shop && o.label === b.label && Math.hypot(o.x - b.x, o.z - b.z) < 25)));
     // Auftrags- und Missionsziele zuletzt (oben)
     blips.sort((a, b) => (a.edge ? 1 : 0) - (b.edge ? 1 : 0));
     const names = rel > 2.2;

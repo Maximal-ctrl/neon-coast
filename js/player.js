@@ -1,4 +1,5 @@
 // Spielfigur
+import * as THREE from 'three';
 import { G } from './state.js';
 import * as C from './config.js';
 import { playerLook } from './models.js';
@@ -48,6 +49,35 @@ export class Player {
     if (msg) G.hud.toast(msg);
   }
 
+  // Fallschirm-Kappe (sichtbar, solange der Schirm offen ist)
+  updateChute(dt) {
+    const on = this.parachute && this.state === 'foot';
+    if (!on && !this._chute) return;
+    if (!this._chute) {
+      const T = THREE;
+      const grp = new T.Group();
+      const geo = new T.SphereGeometry(4.2, 18, 6, 0, Math.PI * 2, 0, Math.PI * 0.32);
+      geo.scale(1.45, 0.9, 0.8);
+      const cols = [0xff2e88, 0xffd23f, 0x19e6ff, 0xffffff];
+      const c = [], pos = geo.attributes.position;
+      for (let k = 0; k < pos.count; k++) { const a = Math.atan2(pos.getZ(k), pos.getX(k)); const col = new T.Color(cols[(Math.floor((a + Math.PI) / (Math.PI / 4))) % 4]); c.push(col.r, col.g, col.b); }
+      geo.setAttribute('color', new T.Float32BufferAttribute(c, 3));
+      const canopy = new T.Mesh(geo, new T.MeshStandardMaterial({ vertexColors: true, side: T.DoubleSide, roughness: 0.8 }));
+      canopy.position.y = 5.2; canopy.castShadow = true; grp.add(canopy);
+      const lp = [];
+      for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2, rx = Math.cos(a) * 4.2 * 1.45 * 0.83, rz = Math.sin(a) * 4.2 * 0.8 * 0.83; lp.push(rx, 5.2 + 3.4 * 0.9 * 0.55, rz, (k < 4 ? 0.25 : -0.25), 1.45, 0); }
+      const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.Float32BufferAttribute(lp, 3));
+      grp.add(new T.LineSegments(lg, new T.LineBasicMaterial({ color: 0x333333 })));
+      this._chute = grp; G.scene.add(grp);
+    }
+    const g = this._chute;
+    g.visible = on;
+    if (on) {
+      g.position.set(this.x, this.y, this.z); g.rotation.y = this.yaw + Math.PI / 2;
+      g.rotation.z = Math.sin(this.anim.t * 1.3) * 0.05;
+    }
+  }
+
   // ------------------------------------------------------------ Update
   update(dt) {
     const I = G.input;
@@ -64,6 +94,7 @@ export class Player {
       case 'cutscene': case 'ride': A.amp = damp(A.amp, 0, 6, dt); break;
       default: this.footUpdate(dt, I);
     }
+    this.updateChute(dt);
     if (this.boostT > 0) this.boostT -= dt;
     if (this.reloadT > 0) {
       this.reloadT -= dt;
@@ -100,8 +131,7 @@ export class Player {
     if (aiming) speed = Math.min(speed, 3.2);
     const tvx = dx * speed, tvz = dz * speed;
     const accel = this.onGround ? 12 : 2.5;
-    this.vx = damp(this.vx, tvx, accel, dt);
-    this.vz = damp(this.vz, tvz, accel, dt);
+    if (!this.parachute) { this.vx = damp(this.vx, tvx, accel, dt); this.vz = damp(this.vz, tvz, accel, dt); }
     // Blickrichtung
     if (aiming) {
       if (G.isTouch) {
@@ -123,7 +153,15 @@ export class Player {
       if (this.gy > C.WATER_Y - 1.0) { this.state = 'foot'; this.y = Math.max(this.gy, this.y); }
     } else {
       this.vy -= 18 * dt;
-      if (this.parachute) { this.vy = Math.max(this.vy, -5.5); this.vx *= 0.99; this.vz *= 0.99; }
+      if (this.parachute) {
+        // Gleitschirm (3.12): schnell und lenkbar, Vorwärtsfahrt bleibt erhalten; Sprint = schneller sinken
+        const ia = Math.hypot(dx, dz), fast = this.sprinting;
+        const gx = ia > 0.1 ? dx / ia : Math.sin(this.yaw), gz = ia > 0.1 ? dz / ia : Math.cos(this.yaw);
+        const glide = fast ? 30 : ia > 0.1 ? 24 : 14;
+        this.vx = damp(this.vx, gx * glide, 1.4, dt); this.vz = damp(this.vz, gz * glide, 1.4, dt);
+        this.vy = Math.max(this.vy, fast ? -9 : -4.6);
+        this.yaw = dampAngle(this.yaw, Math.atan2(this.vx, this.vz), 3, dt);
+      }
       this.y += this.vy * dt;
       if (this.y <= this.gy) {
         if (!this.onGround && this.vy < -14) this.damage((-this.vy - 14) * 6, null);
@@ -131,7 +169,7 @@ export class Player {
         this.y = this.gy; this.vy = 0; this.onGround = true;
       } else if (this.y > this.gy + 0.25) this.onGround = false;
       if (this.gy < C.WATER_Y - 1.1 && this.y < C.WATER_Y - 0.2) {
-        this.state = 'swim'; G.effects.splash(this.x, C.WATER_Y, this.z, 12); G.audio.splash();
+        this.state = 'swim'; this.parachute = false; G.effects.splash(this.x, C.WATER_Y, this.z, 12); G.audio.splash();
       }
     }
     this.collide();
@@ -512,7 +550,7 @@ export class Player {
     this.vehicle = null; this.visible = true; this.vx = this.vz = this.vy = 0;
     G.audio.exitCar();
     const air = v.T.plane && !v.grounded && v.y - W.groundHeight(v.x, v.z) > 6;
-    if (air) { this.x = v.x - Math.cos(v.h) * 3; this.z = v.z + Math.sin(v.h) * 3; this.y = v.y - 1; this.state = 'foot'; this.onGround = false; this.parachute = true; G.hud.toast('🪂 Fallschirm geöffnet!'); }
+    if (air) { this.x = v.x - Math.cos(v.h) * 3; this.z = v.z + Math.sin(v.h) * 3; this.y = v.y - 1; this.state = 'foot'; this.onGround = false; this.parachute = true; this.vx = (v.vx || 0) * 0.6; this.vz = (v.vz || 0) * 0.6; this.vy = 0; this.yaw = v.h; G.hud.toast('🪂 Fallschirm offen! Lenken mit Bewegung, Sprint = schneller sinken'); }
     else if (best) { this.x = best[0]; this.z = best[1]; this.y = this.gy = best[2]; this.state = 'foot'; G.hud.fadeIn(); }
     else if (v.T.boat) { this.x = v.x + Math.cos(v.h) * (v.hw + 0.8); this.z = v.z - Math.sin(v.h) * (v.hw + 0.8); this.y = C.WATER_Y - 0.25; this.state = 'swim'; G.effects.splash(this.x, C.WATER_Y, this.z, 10); G.audio.splash(); }
     else { this.x = v.x + Math.cos(v.h) * 2.2; this.z = v.z - Math.sin(v.h) * 2.2; this.y = this.gy = W.groundHeight(this.x, this.z); this.state = 'foot'; }

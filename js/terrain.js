@@ -168,7 +168,7 @@ export const WEST_ROAD = road('Westroute', [[-520, -490], [-520, -545], [-560, -
 // Küstenstraße West: Westroute -> Bergstraße
 export const COAST_W = road('Küstenstraße', [[-520, -545], [-420, -550], [-300, -546], [-180, -541], [-70, -538], [40, -536]], { from: WEST_ROAD, to: HILL_ROAD });
 // Küstenstraße Ost: Gipfelstraße -> Bahía Blanca
-export const COAST_E = road('Küstenstraße Ost', [[230, -566], [330, -548], [480, -538], [700, -548], [950, -562], [1150, -592], [1250, -632], C.townNode(B, 0, 1)], { from: SUMMIT_ROAD, y1: B.y, fixed: [inTown('bahia')] });
+export const COAST_E = road('Küstenstraße Ost', [[230, -566], [258, -538], [320, -526], [480, -538], [700, -548], [950, -562], [1150, -592], [1250, -632], C.townNode(B, 0, 1)], { from: SUMMIT_ROAD, y1: B.y, fixed: [inTown('bahia')] });
 // Bahía Blanca -> Valverde
 export const NORTH_E = road('Ostroute', [C.townNode(B, 2, 0), [1440, -800], [1380, -950], [1250, -1150], [1080, -1400], [860, -1620], [650, -1790], [520, -1858], C.townNode(V, 4, 2)], { y0: B.y, y1: V.y, fixed: [inTown('bahia'), inTown('valverde')] });
 // Valverde -> Monte Solera
@@ -275,6 +275,34 @@ export function hillRoadAt(x, z) {
   _hr[0] = Math.sqrt(best); _hr[1] = by; _hr[2] = br; _hr[3] = bi;
   return _hr;
 }
+// 3.12: weiche Fahrbahnhöhe – Catmull-Rom entlang der Straße, mehrere nahe Straßen werden stufenlos gemischt
+const _hs = [0, 0, 0, 0], _best = new Map();
+const crY = (hs, i, t) => { const n = hs.length, p0 = hs[Math.max(0, i - 1)], p1 = hs[i], p2 = hs[Math.min(n - 1, i + 1)], p3 = hs[Math.min(n - 1, i + 2)], t2 = t * t, t3 = t2 * t; return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3); };
+export function hillRoadSmooth(x, z, band = 9.6) {
+  const l = segHash.get(hk(Math.floor(x / HC), Math.floor(z / HC)));
+  if (!l) return null;
+  _best.clear();
+  let gd = 1e18, gr = 0, gi = 0;
+  for (let k = 0; k < l.length; k += 2) {
+    const ri = l[k], R = HILL_ROADS[ri], i = l[k + 1], P = R.pts;
+    const ax = P[i][0], az = P[i][1], dx = P[i + 1][0] - ax, dz = P[i + 1][1] - az, l2 = dx * dx + dz * dz;
+    let t = ((x - ax) * dx + (z - az) * dz) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const ex = ax + dx * t - x, ez = az + dz * t - z, d2 = ex * ex + ez * ez;
+    const b = _best.get(ri);
+    if (!b || d2 < b[0]) _best.set(ri, [d2, i, t]);
+    if (d2 < gd) { gd = d2; gr = ri; gi = i; }
+  }
+  let ws = 0, ys = 0;
+  const dmin = Math.sqrt(gd), g0 = _best.get(gr), yNear = crY(HILL_ROADS[gr].hs, g0[1], g0[2]);
+  for (const [ri, [d2, i, t]] of _best) {
+    const d = Math.sqrt(d2), y = ri === gr ? yNear : crY(HILL_ROADS[ri].hs, i, t);
+    if (d > band || Math.abs(y - yNear) > 2.5) continue; // Über-/Unterführungen nicht mischen
+    const w = (band - d) * (band - d) + 1e-6;
+    ws += w; ys += w * y;
+  }
+  _hs[0] = dmin; _hs[1] = ws > 0 ? ys / ws : yNear; _hs[2] = gr; _hs[3] = gi;
+  return _hs;
+}
 // breitere Suche nur für den Geländeaufbau (Böschungen bis ~80 m)
 const segWide = new Map();
 HILL_ROADS.forEach((R, ri) => {
@@ -347,6 +375,8 @@ export function terrainExact(x, z) {
     else if (R.canyon && !C.townAt(x, z, 20)) { h = lerp(h, tgt, 1 - smoothstep(12, 26, r[0])); h = Math.max(h, tgt - 0.12 + 58 * smoothstep(13, 44, r[0]) + 6 * (fbm(x * 0.04, z * 0.04) - 0.5) * smoothstep(20, 40, r[0])); } // hohe, steile Canyonwände
     else h = lerp(h, tgt, 1 - smoothstep(11, Math.min(80, 30 + dh * 1.3), r[0]));
   }
+  // Orte immer exakt eben (inkl. Randstraßen), egal was Straßen-Böschungen vorher gemacht haben
+  for (const t of TOWNS) { const tr = t._r10 || (t._r10 = C.townRect(t, 10)); if (x > tr.x0 && x < tr.x1 && z > tr.z0 && z < tr.z1) { h = t.y; break; } }
   // unter den Dämmen: Gelände unter Wasser halten
   for (const cw of CAUSEWAYS) if (z > cw.z0 && Math.abs(x - (cw.x0 + cw.x1) / 2) < 16) h = Math.min(h, -1.2);
   return Math.max(-6, h);
@@ -359,6 +389,23 @@ export function buildHeightmap() {
   if (!ruralOn) { computeRural(); ruralOn = true; }
   const a = new Float32Array(GW * GD);
   for (let j = 0; j < GD; j++) for (let i = 0; i < GW; i++) a[j * GW + i] = terrainExact(REGION.x0 + i * GRID, REGION.z0 + j * GRID);
+  // 3.12: Gelände abseits der Straßen glätten (weniger Holpern im Gelände, sanftere Hänge)
+  const wgt = new Float32Array(GW * GD);
+  for (let j = 1; j < GD - 1; j++) for (let i = 1; i < GW - 1; i++) {
+    const x = REGION.x0 + i * GRID, z = REGION.z0 + j * GRID, h = a[j * GW + i];
+    if (h < 1.5 || C.townAt(x, z, 40)) continue; // Küste und Orte bleiben
+    const r = roadNear(x, z); const d = r ? r[0] : 99;
+    if (r && HILL_ROADS[r[2]].canyon && d < 50) continue;
+    wgt[j * GW + i] = smoothstep(16, 36, d) * (JUNCTIONS.some((J) => Math.hypot(x - J.x, z - J.z) < 40) ? 0 : 1);
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    const b = a.slice();
+    for (let j = 1; j < GD - 1; j++) for (let i = 1; i < GW - 1; i++) {
+      const k = j * GW + i, w = wgt[k]; if (!w) continue;
+      const avg = (b[k] * 4 + (b[k - 1] + b[k + 1] + b[k - GW] + b[k + GW]) * 2 + b[k - GW - 1] + b[k - GW + 1] + b[k + GW - 1] + b[k + GW + 1]) / 16;
+      a[k] = b[k] + (avg - b[k]) * w;
+    }
+  }
   HM = a;
   return a;
 }

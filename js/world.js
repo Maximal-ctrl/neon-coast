@@ -28,7 +28,7 @@ export const SIGN = { HOTEL: 0, MOTEL: 1, BAR: 2, CLUB: 3, DINER: 4, TACOS: 5, P
 
 
 // Gelände, Landstraßen & Orte: siehe terrain.js
-import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES , JUNCTIONS, ESTATE2, FARM, PEAK, RURAL } from './terrain.js';
+import { vnoise, fbm, HILLS, CAUSEWAY, VILLAGE, MANSION, LOOKOUT, AIRFIELD, HILL_ROAD, SUMMIT_ROAD, SUMMIT_JOIN, HILL_ROADS, hillRoadAt, hillHeight, terrainExact, buildHeightmap, GRID, GW, GD, NET, netRoute, netLocate, GATES , JUNCTIONS, ESTATE2, FARM, PEAK, RURAL, hillRoadSmooth } from './terrain.js';
 export { HILLS, CAUSEWAY, VILLAGE, MANSION, HILL_ROAD, SUMMIT_ROAD, hillHeight };
 
 export class World {
@@ -92,6 +92,15 @@ export class World {
   }
 
   // yHint: aktuelle Höhe des Objekts – unter Brücken gilt dann das Tal statt der Fahrbahn
+  // Höhe auf einer Kreuzungsfläche: innen eben in der Ebene der Hauptstraße, zum Rand hin weich in die Fahrbahnen
+  junctionY(J, x, z) {
+    const dx = x - J.x, dz = z - J.z, d = Math.hypot(dx, dz), p = J.y + (J.g || 0) * (dx * (J.tx || 0) + dz * (J.tz || 0));
+    if (d <= 5.5) return p;
+    const r = hillRoadSmooth(x, z);
+    if (!r || r[0] > 7.4 || Math.abs(r[1] - p) > 2.5) return p;
+    const t = Math.min(1, (d - 5.5) / 4), k = t * t * (3 - 2 * t) * (1 - Math.max(0, (r[0] - 5) / 2.4));
+    return p + (r[1] - p) * k;
+  }
   groundHeight(x, z, yHint) {
     const PL = this.platforms;
     if (PL) for (let i = 0; i < PL.length; i++) { const p = PL[i]; if (x > p.x0 && x < p.x1 && z > p.z0 && z < p.z1) return p.y; }
@@ -100,9 +109,9 @@ export class World {
       // Kreuzungsflächen (in der Ebene der durchgehenden Straße)
       for (let i = 0; i < JUNCTIONS.length; i++) {
         const J = JUNCTIONS[i], dx = x - J.x, dz = z - J.z;
-        if (dx > -9.4 && dx < 9.4 && dz > -9.4 && dz < 9.4 && dx * dx + dz * dz < 88.4 && !(yHint !== undefined && yHint < J.y - 3)) return J.y + (J.g || 0) * (dx * (J.tx || 0) + dz * (J.tz || 0));
+        if (dx > -9.4 && dx < 9.4 && dz > -9.4 && dz < 9.4 && dx * dx + dz * dz < 88.4 && !(yHint !== undefined && yHint < J.y - 3)) return this.junctionY(J, x, z);
       }
-      const r = hillRoadAt(x, z);
+      const r = hillRoadSmooth(x, z);
       if (r) {
         const br = HILL_ROADS[r[2]].bridge[r[3]];
         if (!(br && yHint !== undefined && yHint < r[1] - 3)) {
@@ -1116,6 +1125,10 @@ export class World {
       if (Math.hypot(x - LOOKOUT.x, z - LOOKOUT.z) < LOOKOUT.r + 6) continue;
       if (C.townAt(x, z, 34)) continue;
       if (x > AIRFIELD.x0 - 20 && x < AIRFIELD.x1 + 20 && z > AIRFIELD.z0 - 20 && z < AIRFIELD.z1 + 20) continue;
+      if (x > FARM.x0 - 170 && x < FARM.x1 + 170 && z > FARM.z0 - 30 && z < FARM.z1 + 30) continue; // Finca + Ein-/Abflugschneise frei
+      if (Math.hypot(x - PEAK.x, z - PEAK.z) < PEAK.r + 14) continue;
+      if (RURAL.some((p) => x > p.fx0 - 2 && x < p.fx1 + 2 && z > p.fz0 - 2 && z < p.fz1 + 2)) continue;
+      if (JUNCTIONS.some((J) => Math.hypot(x - J.x, z - J.z) < 16)) continue;
       const dry = smoothstep(-520, -950, x) * smoothstep(-2300, -1900, z);
       if (rnd() < dry * 0.93) continue;
       if (vnoise(x * 0.012, z * 0.012) < 0.42 && y > 6 && rnd() < 0.9) continue;
@@ -1177,6 +1190,7 @@ export class World {
     // Leitplanke auf der Talseite + Laternen
     for (let i = 4; lamps && i < n - 3; i += 9) {
       const [x, z] = pts[i], [nx, nz] = nrm(i), side = i % 18 < 9 ? 1 : -1;
+      if (JUNCTIONS.some((J) => Math.hypot(x - J.x, z - J.z) < 22)) continue;
       this.pierLamps.push([x + nx * 6.4 * side, z + nz * 6.4 * side, Math.atan2(-nx * side, -nz * side) - Math.PI / 2]);
     }
     for (let i = 0; i < n - 1; i++) {
@@ -1270,7 +1284,7 @@ export class World {
     const P = this.B.props;
     for (const J of JUNCTIONS) {
       // Kreuzungsfläche in der Ebene der durchgehenden Straße (gleiche Steigung)
-      const disk = (r, dy) => { const g = new THREE.CircleGeometry(r, 36).rotateX(-Math.PI / 2), a = g.attributes.position; for (let k = 0; k < a.count; k++) a.setY(k, dy + (J.g || 0) * (a.getX(k) * (J.tx || 0) + a.getZ(k) * (J.tz || 0))); return g; };
+      const disk = (r, dy) => { const g = new THREE.RingGeometry(0, r, 48, 12).rotateX(-Math.PI / 2), a = g.attributes.position; for (let k = 0; k < a.count; k++) { const vx = a.getX(k), vz = a.getZ(k), rr = Math.hypot(vx, vz); a.setY(k, dy + (rr > 9.4 ? (J.g || 0) * (vx * (J.tx || 0) + vz * (J.tz || 0)) : this.junctionY(J, J.x + vx, J.z + vz) - J.y)); } g.computeVertexNormals(); return g; };
       const at = new THREE.Matrix4().makeTranslation(J.x, J.y, J.z);
       this.B.asph.addGeometry(disk(9.4, 0.012), at);
       P.addGeometry(disk(11.4, -0.045), at, rgb(0x8c8573));
