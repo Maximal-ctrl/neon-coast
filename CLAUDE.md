@@ -11,6 +11,10 @@ Die Version steht in `js/main.js` (`GAME_VERSION`) und wird im Titelbildschirm n
 - Nach dem Update in der Antwort die neue Versionsnummer nennen.
 
 ## Sonstiges
-- Sprache im Spiel und in Antworten: Deutsch.
+- Antworten an den Nutzer: Deutsch.
+- Spielsprache: Englisch (Standard) und Deutsch (Einstellungen / EN-DE-Taste im Titel).
+  Texte im Code bleiben Deutsch; `js/i18n.js` übersetzt sie beim Anzeigen mit dem Wörterbuch `js/lang-en.js`
+  (Schlüssel = deutscher Originaltext, `{0}`, `{1}` … für Platzhalter in Template-Strings).
+  Neue oder geänderte Texte immer auch in `js/lang-en.js` eintragen.
 - Spiel ist ein eigenständiges Werk (keine Namen, Figuren oder Inhalte aus GTA o. Ä.).
 - Änderungen direkt auf `main` committen und pushen (GitHub Pages veröffentlicht von `main`).

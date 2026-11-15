@@ -1,4 +1,5 @@
 // NEON COAST – Hauptprogramm
+import { LANG, setLanguage } from './i18n.js'; // muss zuerst geladen werden
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -403,6 +404,14 @@ function setPaused(on) {
   }
 }
 
+// Sprache wechseln: Spielstand sichern, Einstellung speichern, neu laden
+function switchLanguage(l) {
+  if (l === LANG) return;
+  G.settings.lang = l; Save.writeSettings(); setLanguage(l);
+  if (G.state !== 'title' && G.player && !(G.missions.active && !G.missions.active.side)) { try { Save.write(); } catch (e) { /* */ } }
+  location.reload();
+}
+G.switchLanguage = switchLanguage;
 function showMap() {
   if (G.state === 'playing') { G.state = 'menu'; if (document.pointerLockElement) document.exitPointerLock(); }
   $('pause').classList.add('hidden');
@@ -441,7 +450,8 @@ function settingsHTML() {
   <div class="row"><label>Kamera-Empfindlichkeit</label><input id="set-sens" type="range" min="0.3" max="2.5" step="0.05" value="${s.sensitivity}"></div>
   <div class="row"><label>Y-Achse umkehren</label><input id="set-inv" type="checkbox" ${s.invertY ? 'checked' : ''}></div>
   <div class="row"><label>FPS anzeigen</label><input id="set-fps" type="checkbox" ${s.showFps ? 'checked' : ''}></div>
-  <div class="row"><label>Touch-Tasten (iPad)</label><button class="mbtn small" id="set-tb">Tasten anordnen …</button></div>`;
+  <div class="row"><label>Touch-Tasten (iPad)</label><button class="mbtn small" id="set-tb">Tasten anordnen …</button></div>
+  <div class="row"><label>🌐 Language / Sprache</label><select id="set-lang"><option value="en" ${LANG === 'en' ? 'selected' : ''}>English</option><option value="de" ${LANG === 'de' ? 'selected' : ''}>Deutsch</option></select></div>`;
 }
 function bindSettings() {
   const s = G.settings;
@@ -451,6 +461,7 @@ function bindSettings() {
   $('set-sens').oninput = (e) => { s.sensitivity = +e.target.value; Save.writeSettings(); };
   $('set-inv').onchange = (e) => { s.invertY = e.target.checked; Save.writeSettings(); };
   $('set-fps').onchange = (e) => { s.showFps = e.target.checked; Save.writeSettings(); };
+  $('set-lang').onchange = (e) => switchLanguage(e.target.value);
   $('set-tb').onclick = () => { closePanel(); if (phoneOpen) closePhone(); $('pause').classList.add('hidden'); G.state = 'menu'; editTouchLayout(); };
   $('set-q').onchange = (e) => {
     s.quality = e.target.value; Save.writeSettings();
@@ -991,6 +1002,7 @@ function setupUI() {
   G.dynRes = new DynRes(G.renderer, composer, onResize, G.isTouch ? 0.6 : 0.7, pixelRatio(G.quality));
   window.addEventListener('click', unlock);
   $('title').addEventListener('pointerdown', () => { if (!G.audio.ready) G.audio.init(); }, { once: true });
+  for (const b of document.querySelectorAll('#lang-pick [data-lang]')) { b.classList.toggle('on', b.dataset.lang === LANG); b.onclick = () => switchLanguage(b.dataset.lang); }
 }
 
 // ------------------------------------------------------------ Schleife
@@ -1150,7 +1162,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = 'Beta 3.13';
+export const GAME_VERSION = 'Beta 3.14';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

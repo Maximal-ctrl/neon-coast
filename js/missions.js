@@ -1,5 +1,6 @@
 // Missionen, Marker, Pickups, Sammelobjekte, Läden
 import * as THREE from 'three';
+import { tr } from './i18n.js';
 import { G } from './state.js';
 import * as C from './config.js';
 import * as TX from './textures.js';
@@ -473,7 +474,7 @@ export class Missions {
     for (let [who, text] of lines) {
       const col = { Leo: '#7cff6b', Rosa: '#ff8fab', Dex: '#ffd23f', Val: '#b26bff', Marco: '#ff9f1c', Sami: '#ffd23f', 'Inés': '#ffb35c', Brandt: '#19e6ff', Aurelio: '#e9d8a6', Schläger: '#ff3b5c' }[who] || TALK3[who] || '#19e6ff';
       const nm = G.player.name || 'Leo';
-      text = text.replace(/\bLeo\b/g, nm);
+      text = tr(text).replace(/\bLeo\b/g, nm); // erst übersetzen, dann den Spielernamen einsetzen
       G.hud.subtitle(who === 'Leo' ? nm : who, text, col);
       const dur = 1.6 + text.length * 0.05;
       let t = 0;

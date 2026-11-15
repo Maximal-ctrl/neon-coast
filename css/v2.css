@@ -347,3 +347,10 @@ body.touch #chute-btn small { display: none; }
 #title-cap i { position: relative; margin-right: 46px; }
 @keyframes livedot { 50% { opacity: .25; } }
 @media (max-width: 700px) { #title::before, #title::after { height: 4vh; } #title-cap { bottom: calc(4vh + 10px); font-size: 10px; } }
+
+/* ---------- Sprachwahl im Titel (3.14) ---------- */
+.lang-pick { display: flex; gap: 6px; margin: 18px 0 0 18px; }
+.lang-pick button { appearance: none; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.7); font: 600 12px var(--ui); letter-spacing: .18em; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.lang-pick button.on { background: #fff; color: #111; border-color: #fff; }
+#set-lang { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 6px 10px; font: inherit; }
+#set-lang option { color: #111; }

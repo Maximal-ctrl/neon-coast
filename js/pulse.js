@@ -2,6 +2,7 @@
 // Musik: eigene, im Browser erzeugte Tracks + optional eigene Songs des Spielers (bleiben auf dem Gerät).
 // Moderation: eigene Einspieler des Spielers (auf dem Gerät) oder Sprachausgabe des Geräts.
 import { G } from './state.js';
+import { isEN, tr } from './i18n.js';
 
 const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12);
 function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -26,6 +27,19 @@ const LINES = [
   'Port Solera schläft nie – und wir auch nicht.',
   'Ihr hört gerade die Nachtschicht auf Pulse. Haltet durch, die Sonne kommt sowieso.',
   'Wetter für Port Solera: {weather}. Musik: weiterhin Techno.',
+];
+
+const LINES_EN = [
+  'You are listening to Pulse one three two – the heartbeat of Port Solera.',
+  'Pulse one three two. No breaks, just bass.',
+  'It is {time} in Port Solera. We stay at one hundred and thirty-two beats per minute.',
+  'That was {last}. And next up: {next}.',
+  'Greetings to everyone cruising down Seaside Boulevard right now. Windows down, volume up!',
+  'Blue lights in your mirror? Only one thing helps: turn it up. Pulse one three two.',
+  'Live from the studio above the harbor: Pulse one three two. Coming up: {next}.',
+  'Port Solera never sleeps – and neither do we.',
+  'You are listening to the night shift on Pulse. Hang in there, the sun is coming anyway.',
+  'Weather for Port Solera: {weather}. Music: still techno.',
 ];
 
 export class PulseRadio {
@@ -197,12 +211,13 @@ export class PulseRadio {
         const S = window.speechSynthesis;
         const h = Math.floor(G.timeOfDay), mn = Math.floor((G.timeOfDay % 1) * 60);
         const weather = G.world.env.night > 0.5 ? 'klare Nacht, warm, leichte Brise vom Meer' : 'Sonne, neunundzwanzig Grad, kaum Wolken';
-        const line = LINES[Math.floor(Math.random() * LINES.length)]
-          .replace('{time}', `${h} Uhr ${mn ? mn : ''}`).replace('{last}', `${last.name} von ${last.artist}`).replace('{next}', `${next.name} von ${next.artist}`).replace('{weather}', weather);
+        const by = isEN ? ' by ' : ' von ';
+        const line = (isEN ? LINES_EN : LINES)[Math.floor(Math.random() * LINES.length)]
+          .replace('{time}', isEN ? `${h}:${String(mn).padStart(2, '0')}` : `${h} Uhr ${mn ? mn : ''}`).replace('{last}', last.name + by + last.artist).replace('{next}', next.name + by + next.artist).replace('{weather}', tr(weather));
         const u = new SpeechSynthesisUtterance(line);
-        u.lang = 'de-DE'; u.rate = 1.04; u.pitch = 0.92; u.volume = Math.min(1, (G.settings.musicVol ?? 0.7) * 1.2 + 0.2);
-        const vs = S.getVoices().filter((v) => v.lang && v.lang.startsWith('de'));
-        if (vs.length) u.voice = vs.find((v) => /male|Markus|Yannick|Viktor|Stefan|Daniel/i.test(v.name)) || vs[0];
+        u.lang = isEN ? 'en-US' : 'de-DE'; u.rate = 1.04; u.pitch = 0.92; u.volume = Math.min(1, (G.settings.musicVol ?? 0.7) * 1.2 + 0.2);
+        const vs = S.getVoices().filter((v) => v.lang && v.lang.startsWith(isEN ? 'en' : 'de'));
+        if (vs.length) u.voice = vs.find((v) => (isEN ? /male|Daniel|Alex|Fred|Guy|David|Aaron/i : /male|Markus|Yannick|Viktor|Stefan|Daniel/i).test(v.name)) || vs[0];
         u.onend = done; u.onerror = done;
         setTimeout(() => { try { S.cancel(); S.speak(u); } catch (e) { done(); } }, 500);
         setTimeout(() => { if (this.talking) done(); }, 12000);
