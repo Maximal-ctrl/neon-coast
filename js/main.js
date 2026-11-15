@@ -54,6 +54,8 @@ import { CAR_TYPES, CAR_SHOP } from './models.js';
 import { fmtTime, fmtMoney } from './utils.js';
 import { NET } from './terrain.js';
 import { Attract } from './attract.js';
+import { Account, openAccounts, accountBadge } from './accounts.js';
+import { PATCH_NOTES } from './patchnotes.js';
 import { Trip, TRIP_GLSL } from './drugs.js';
 import { Attractions, setupAttractions } from './attractions.js';
 import { chunkScene, DynRes } from './perf.js';
@@ -296,6 +298,7 @@ const CR = {
 };
 const hx = (n) => '#' + n.toString(16).padStart(6, '0');
 function openCreator() {
+  setTimeout(() => { const inp = $('cr-name'); if (inp && Account.cur && Account.cur.charName) inp.value = Account.cur.charName; }, 0);
   prepareWorld(null);
   const P = G.player;
   G.state = 'creator';
@@ -356,6 +359,7 @@ function showSlots(mode) {
   });
 }
 function refreshTitle() {
+  const ab = $('btn-account'); if (ab) { ab.innerHTML = accountBadge(); ab.classList.toggle('on', Account.loggedIn); }
   const n = Save.latest();
   $('btn-continue').classList.toggle('hidden', !n);
   $('btn-load').classList.toggle('hidden', !Save.exists());
@@ -674,6 +678,7 @@ function phoneJobs() {
   const byId = Object.fromEntries(all.map((d) => [d.id, d]));
   const order = ['rosa', 'dex', 'sami', 'val', 'ines', 'brandt', 'aurelio', 'nina', 'marisol', 'paco', 'luna', 'ortiz', 'benito', 'dealer'];
   let html = `<div class="jb-sum"><b>${M.done.size}/${all.length}</b><span>Aufträge erledigt</span><i style="--p:${(M.done.size / all.length) * 100}%"></i></div>`;
+  html += '<div class="jb-root"><i>🌴</i><b>Port Solera</b><span>Auftrags-Stammbaum</span></div>';
   let hidden = 0;
   for (const cid of order) {
     const ci = CONTACT_INFO[cid];
@@ -681,17 +686,22 @@ function phoneJobs() {
     const vis = list.filter((d) => M.isTeased(d));
     if (!vis.length) { hidden++; continue; }
     html += `<div class="jb-br"><div class="jb-head">${avatar({ name: ci.name, col: ci.col })}<div><b>${ci.name}</b><span>${ci.role}</span></div><em>${list.filter((d) => M.done.has(d.id)).length}/${list.length}</em></div>`;
+    // Tiefe im Stammbaum: Auftrag hängt am Vorgänger desselben Kontakts
+    const depthOf = (d, n = 0) => { if (n > 12) return 0; let m = 0; for (const r of d.req) { const q = byId[r]; if (q && q.contact === cid) m = Math.max(m, depthOf(q, n + 1) + 1); } return m; };
+    html += '<div class="jb-tree">';
     for (const d of list) {
-      if (!M.isTeased(d)) { html += '<div class="jb-node lock dim"><i>?</i><div><b>· · ·</b></div></div>'; continue; }
+      const dep = Math.min(4, depthOf(d));
+      if (!M.isTeased(d)) { html += `<div class="jb-node lock dim" style="--d:${dep}"><i>?</i><div><b>· · ·</b></div></div>`; continue; }
       const done = M.done.has(d.id), av = M.isAvailable(d);
       const need = d.req.filter((r) => !M.done.has(r)).map((r) => (byId[r] ? `${M.isTeased(byId[r]) ? byId[r].title : '???'} (${CONTACT_INFO[byId[r].contact].name})` : r));
       if (d.needContact && !(G.player.contacts && G.player.contacts.has(d.needContact))) need.push(`${CONTACT_INFO[d.needContact].name} kennenlernen`);
       const reward = `$${d.reward.toLocaleString('de-DE')}${d.rewardCar ? ' + 🚗 ' + CAR_TYPES[d.rewardCar[0]].name : ''}${d.rewardBoat ? ' + ⚓ ' + CAR_TYPES[d.rewardBoat[0]].name : ''}${d.rewardPlane ? ' + ✈️ ' + CAR_TYPES[d.rewardPlane[0]].name : ''}`;
-      html += `<div class="jb-node ${done ? 'done' : av ? 'av' : 'lock'}"><i>${done ? '✓' : av ? '★' : '🔒'}</i><div><b>${done || av ? d.title : '???'}</b>`
+      const cross = d.req.filter((r) => byId[r] && byId[r].contact !== cid && M.isTeased(byId[r])).map((r) => byId[r].title);
+      html += `<div class="jb-node ${done ? 'done' : av ? 'av' : 'lock'}" style="--d:${dep}"><i>${done ? '✓' : av ? '★' : '🔒'}</i><div><b>${done || av ? d.title : '???'}</b>`
         + `<span>${done || av ? d.desc || '' : 'Erfordert: ' + need.join(' + ')}</span>${done || av ? `<small>${reward}</small>` : ''}</div>`
-        + (av && !M.active ? `<button class="ph-btn2 small" data-nav="${d.id}">📍</button>` : '') + '</div>';
+        + (cross.length && !done ? `<em class="jb-link">⤷ ${cross.join(' · ')}</em>` : '') + (av && !M.active ? `<button class="ph-btn2 small" data-nav="${d.id}">📍</button>` : '') + '</div>';
     }
-    html += '</div>';
+    html += '</div></div>';
   }
   if (hidden) html += `<div class="ph-note">🔒 ${hidden} weitere${hidden > 1 ? '' : 'r'} Kontakt${hidden > 1 ? 'e' : ''} – werden durch Aufträge freigeschaltet.</div>`;
   phoneScreen('Aufträge', html);
@@ -1002,6 +1012,21 @@ function setupUI() {
   G.dynRes = new DynRes(G.renderer, composer, onResize, G.isTouch ? 0.6 : 0.7, pixelRatio(G.quality));
   window.addEventListener('click', unlock);
   $('title').addEventListener('pointerdown', () => { if (!G.audio.ready) G.audio.init(); }, { once: true });
+  // 4.2: Accounts (oben rechts) und Patch-Notes (unten links)
+  G.refreshTitle = refreshTitle;
+  G.onSaved = (slot, data) => Account.syncSave(slot, data);
+  G.loadAccountSave = (sv) => {
+    if (!sv || !sv.data) return;
+    const n = sv.slot || Save.latest() || 1;
+    try { localStorage.setItem(`neoncoast_slot_${n}`, JSON.stringify(sv.data)); } catch (e) { return; }
+    Save.setSlot(n); startGame(true);
+  };
+  $('btn-account').onclick = () => openAccounts();
+  Account.restore().then(refreshTitle);
+  const pn = $('patchnotes');
+  pn.querySelector('.pn-list').innerHTML = PATCH_NOTES.map(([v, items], i) => `<section${i ? '' : ' class="new"'}><h4>Version ${v}${i ? '' : ' <em>NEU</em>'}</h4><ul>${items.map((t) => `<li>${t}</li>`).join('')}</ul></section>`).join('');
+  pn.querySelector('.pn-tab').onclick = (e) => { e.stopPropagation(); pn.classList.toggle('open'); };
+  pn.querySelector('.pn-close').onclick = (e) => { e.stopPropagation(); pn.classList.remove('open'); };
   for (const b of document.querySelectorAll('#lang-pick [data-lang]')) { b.classList.toggle('on', b.dataset.lang === LANG); b.onclick = () => switchLanguage(b.dataset.lang); }
 }
 
@@ -1162,7 +1187,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = 'Beta 3.14';
+export const GAME_VERSION = 'Beta 4.2';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

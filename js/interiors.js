@@ -470,58 +470,164 @@ export class Interiors {
 
   // ------------------------------------------------------------ Wohnung (Startort & Speicherpunkt)
   buildHome() {
-    const wood = canvasTex(256, 256, (g, w) => {
-      for (let i = 0; i < 8; i++) { const b = 0.8 + Math.random() * 0.25; g.fillStyle = `rgb(${150 * b},${108 * b},${72 * b})`; g.fillRect(0, i * 32, w, 31); g.fillStyle = 'rgba(40,25,15,.6)'; g.fillRect(0, i * 32 + 31, w, 1); }
+    // 4.2: gemütliches Loft – Fensterfront mit Stadtblick, Schlafbereich, Küche mit Insel, Wohnecke, Leseecke
+    const rnd = (() => { let s = 4242; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
+    // Fischgrät-Parkett
+    const wood = canvasTex(512, 512, (g, w) => {
+      g.fillStyle = '#6b4a2f'; g.fillRect(0, 0, w, w);
+      const L = 128, Wd = 32;
+      for (let y = -L; y < w + L; y += Wd) for (let x = -L; x < w + L; x += L) {
+        for (const flip of [0, 1]) {
+          const b = 0.78 + rnd() * 0.3, hue = rnd() * 14;
+          g.save(); g.translate(x + (flip ? L / 2 : 0), y + (flip ? L / 2 : 0)); g.rotate(flip ? -Math.PI / 4 : Math.PI / 4);
+          g.fillStyle = `rgb(${(176 + hue) * b},${(128 + hue * 0.5) * b},${84 * b})`; g.fillRect(0, 0, L * 0.7, Wd - 2);
+          g.globalAlpha = 0.18; g.fillStyle = '#3a2412'; for (let k = 0; k < 5; k++) g.fillRect(rnd() * L * 0.7, rnd() * Wd, 20 + rnd() * 40, 1);
+          g.globalAlpha = 1; g.restore();
+        }
+      }
     }, true);
-    wood.repeat.set(4, 4);
+    wood.repeat.set(3, 3); wood.anisotropy = 8;
+    const plaster = canvasTex(256, 256, (g, w) => { g.fillStyle = '#efe7dc'; g.fillRect(0, 0, w, w); for (let i = 0; i < 2200; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '180,165,145'},${0.05 + rnd() * 0.06})`; g.fillRect(rnd() * w, rnd() * w, 2, 2); } }, true);
+    plaster.repeat.set(4, 1.5);
     const mats = {
-      floor: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.55 }),
-      ceil: new THREE.MeshStandardMaterial({ color: 0xf3efe8, emissive: 0x4a463e, roughness: 1 }),
-      wall: new THREE.MeshStandardMaterial({ color: 0xe9e1d6, emissive: 0x2a2620, roughness: 0.9 }),
+      floor: new THREE.MeshStandardMaterial({ map: wood, roughness: 0.42, metalness: 0.02 }),
+      ceil: new THREE.MeshStandardMaterial({ color: 0xf6f1ea, emissive: 0x3d3a34, roughness: 1 }),
+      wall: new THREE.MeshStandardMaterial({ map: plaster, color: 0xffffff, emissive: 0x231f19, roughness: 0.92 }),
     };
     const R = this.room('home', 1500, 300, 16, 14, 3.4, mats);
     R.name = 'Deine Wohnung';
     R.spawn = { x: 1500, z: 304.5, yaw: Math.PI };
     const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, ...o });
-    // Bett (Speichern)
-    this.box(R, 1504.5, 0.25, 295.2, 3.2, 0.5, 4.2, M(0x3b2a1e), true);
-    this.box(R, 1504.5, 0.58, 295.4, 3.0, 0.18, 3.8, M(0xf2f2f2));
-    this.box(R, 1504.5, 0.7, 296.4, 3.05, 0.1, 2.2, M(0x2a6bb8));
-    this.box(R, 1504.5, 0.75, 293.8, 2.4, 0.18, 0.7, M(0xffffff));
-    this.box(R, 1504.5, 1.0, 293.1, 3.2, 1.2, 0.15, M(0x3b2a1e));
-    // Sofa, Tisch, Teppich, TV
-    this.box(R, 1495, 0.25, 297, 4, 0.5, 1.6, M(0x4a5568), true);
-    this.box(R, 1495, 0.75, 296.35, 4, 0.6, 0.3, M(0x4a5568));
-    this.box(R, 1495, 0.22, 299.6, 2.2, 0.44, 1.0, M(0x1f1f1f, { metalness: 0.3 }), true);
-    const rug = new THREE.Mesh(new THREE.PlaneGeometry(5, 4).rotateX(-Math.PI / 2), M(0xb5485f, { roughness: 1 }));
-    rug.position.set(1495, 0.02, 299.3); R.g.add(rug);
-    this.box(R, 1495, 0.35, 306.6, 3.4, 0.7, 0.6, M(0x222222), true);
-    this.tv = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.7), new THREE.MeshBasicMaterial({ color: 0x19e6ff }));
-    this.tv.position.set(1495, 1.75, 306.78); this.tv.rotation.y = Math.PI; R.g.add(this.tv);
-    this.box(R, 1495, 1.75, 306.85, 3.15, 1.85, 0.08, M(0x111111));
-    // Küche
-    this.box(R, 1493.2, 0.5, 293.6, 1.2, 1.0, 1.4, M(0xdedede), true);
-    this.box(R, 1495.6, 0.5, 293.6, 3.6, 1.0, 1.4, M(0xdedede), true);
-    this.box(R, 1495, 1.02, 293.6, 4.9, 0.05, 1.45, M(0x2b2b2b, { metalness: 0.4, roughness: 0.3 }));
-    this.box(R, 1492.6, 1.0, 293.3, 0.9, 2.0, 0.9, M(0xc9ced6, { metalness: 0.6, roughness: 0.3 }), true);
-    // Fenster mit Stadtblick
-    const view = canvasTex(512, 256, (g, w, h) => {
-      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#1a1145'); gr.addColorStop(0.6, '#b0246b'); gr.addColorStop(1, '#ff8a50');
+    const E = (c, k = 1.6) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k) });
+    const add = (geo, mat, x, y, z, ry = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; R.g.add(m); return m; };
+    const B = (x, y, z, sx, sy, sz, mat, collide = false) => this.box(R, x, y, z, sx, sy, sz, mat, collide);
+    const oak = M(0xb8875a, { roughness: 0.55 }), walnut = M(0x5a3a24, { roughness: 0.5 }), black = M(0x1c1d21, { roughness: 0.4, metalness: 0.4 });
+    const brass = M(0xc9a35a, { roughness: 0.3, metalness: 0.9 }), white = M(0xf4f2ee, { roughness: 0.6 });
+    // Akzentwand hinter dem Sofa (Petrol) und Sockelleisten
+    B(1491.85, 1.7, 301.5, 0.06, 3.4, 11, M(0x1f4e57, { roughness: 0.95 }));
+    for (const [x, z, sx, sz] of [[1500, 293.05, 16, 0.06], [1500, 306.95, 16, 0.06], [1492.05, 300, 0.06, 14], [1507.95, 300, 0.06, 14]]) B(x, 0.07, z, sx, 0.14, sz, white);
+    // indirektes Licht an der Decke (warmer LED-Streifen)
+    for (const [x, z, sx, sz] of [[1500, 293.25, 15.6, 0.05], [1500, 306.75, 15.6, 0.05], [1492.25, 300, 0.05, 13.6], [1507.75, 300, 0.05, 13.6]]) B(x, 3.32, z, sx, 0.04, sz, E(0xffb36b, 1.5));
+    // ---------------- Fensterfront (Norden) mit Abendhimmel und Skyline
+    const view = canvasTex(1024, 384, (g, w, h) => {
+      const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#151036'); gr.addColorStop(0.45, '#6b2a6e'); gr.addColorStop(0.75, '#e0566a'); gr.addColorStop(1, '#ffb070');
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      for (let i = 0; i < 26; i++) { const bw = 14 + Math.random() * 30, bh = 40 + Math.random() * 150, x = Math.random() * w; g.fillStyle = '#0d0618'; g.fillRect(x, h - bh, bw, bh);
-        for (let k = 0; k < 20; k++) if (Math.random() < 0.4) { g.fillStyle = Math.random() < 0.5 ? '#ffd9a0' : '#19e6ff'; g.fillRect(x + 2 + Math.random() * (bw - 6), h - bh + 4 + Math.random() * (bh - 8), 3, 4); } }
+      for (let i = 0; i < 90; i++) { g.fillStyle = `rgba(255,255,255,${rnd() * 0.7})`; g.fillRect(rnd() * w, rnd() * h * 0.35, 1.5, 1.5); }
+      g.fillStyle = 'rgba(255,190,120,.9)'; g.beginPath(); g.arc(w * 0.72, h * 0.83, 34, 0, 7); g.fill();
+      for (let layer = 0; layer < 2; layer++) for (let i = 0; i < 46; i++) {
+        const bw = 18 + rnd() * 46, bh = (layer ? 60 : 110) + rnd() * (layer ? 120 : 210), x = rnd() * w;
+        g.fillStyle = layer ? '#160b25' : '#2a1640'; g.fillRect(x, h - bh, bw, bh);
+        for (let k = 0; k < bh / 9; k++) if (rnd() < 0.45) { g.fillStyle = rnd() < 0.6 ? '#ffd9a0' : rnd() < 0.5 ? '#19e6ff' : '#ff4fa8'; g.fillRect(x + 3 + rnd() * (bw - 8), h - bh + 5 + rnd() * (bh - 10), 3, 4); }
+      }
     });
-    for (const x of [1494, 1500]) {
-      const win = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.8), new THREE.MeshBasicMaterial({ map: view }));
-      win.position.set(x + 3, 1.9, 293.02); R.g.add(win);
-      this.box(R, x + 3, 1.9, 293.0, 3.8, 2.0, 0.05, M(0xffffff));
-      win.position.z = 293.05;
+    add(new THREE.PlaneGeometry(13.4, 2.6), new THREE.MeshBasicMaterial({ map: view }), 1500, 1.85, 293.06);
+    for (let k = 0; k <= 6; k++) B(1493.3 + k * 2.233, 1.85, 293.1, 0.08, 2.7, 0.08, black); // Fensterrahmen
+    B(1500, 0.5, 293.1, 13.5, 0.08, 0.1, black); B(1500, 3.18, 293.1, 13.5, 0.08, 0.1, black);
+    const sheer = M(0xf6efe4, { transparent: true, opacity: 0.82, roughness: 1, side: THREE.DoubleSide });
+    for (const x of [1492.75, 1507.25]) for (let k = 0; k < 5; k++) add(new THREE.BoxGeometry(0.28, 3.0, 0.1), sheer, x + (x < 1500 ? k * 0.22 : -k * 0.22), 1.65, 293.3 + (k % 2) * 0.07);
+    // ---------------- Schlafbereich (Nordost) – Bett bleibt Speicherpunkt
+    const rugBed = canvasTex(256, 256, (g, w) => { g.fillStyle = '#d9cbb6'; g.fillRect(0, 0, w, w); g.strokeStyle = 'rgba(120,96,70,.35)'; g.lineWidth = 6; for (let k = 16; k < w; k += 28) { g.strokeRect(k / 2, k / 2, w - k, w - k); } });
+    add(new THREE.PlaneGeometry(4.6, 5.4).rotateX(-Math.PI / 2), M(0xffffff, { map: rugBed, roughness: 1 }), 1504.5, 0.02, 296.2);
+    B(1504.5, 0.2, 295.4, 3.3, 0.4, 4.4, walnut, true);               // Bettgestell
+    B(1504.5, 0.52, 295.5, 3.05, 0.26, 4.0, white);                   // Matratze
+    B(1504.5, 0.69, 296.5, 3.1, 0.1, 2.3, M(0x2f4a6e, { roughness: 0.95 })); // Decke
+    B(1504.5, 0.75, 297.3, 3.12, 0.06, 0.7, M(0xc9a35a, { roughness: 0.95 })); // Plaid
+    for (const [x, c] of [[1503.6, 0xf3efe6], [1505.4, 0xf3efe6], [1504.5, 0xc75b4e]]) { const p = add(new THREE.BoxGeometry(c === 0xc75b4e ? 0.7 : 1.1, 0.26, 0.5), M(c, { roughness: 1 }), x, 0.82, c === 0xc75b4e ? 294.25 : 293.95); p.rotation.x = -0.35; }
+    B(1504.5, 1.15, 293.3, 3.6, 1.5, 0.18, M(0x6b4a33, { roughness: 0.8 }));      // gepolstertes Kopfteil
+    for (let k = 0; k < 6; k++) B(1502.95 + k * 0.62, 1.15, 293.2, 0.5, 1.3, 0.04, M(0x7a5640, { roughness: 0.85 }));
+    for (const x of [1502.3, 1506.7]) {
+      B(x, 0.28, 293.75, 0.7, 0.56, 0.6, oak, true);                  // Nachttisch
+      add(new THREE.CylinderGeometry(0.08, 0.1, 0.32, 10), brass, x, 0.72, 293.75);
+      add(new THREE.CylinderGeometry(0.16, 0.22, 0.24, 14, 1, true), E(0xffd59a, 1.4), x, 0.98, 293.75);
+      const L = new THREE.PointLight(0xffc98a, 3.2, 5, 1.6); L.position.set(x, 1.05, 294.1); R.g.add(L);
     }
-    // Pflanze & Lampe
-    this.box(R, 1507.2, 0.3, 306.2, 0.6, 0.6, 0.6, M(0x333333));
-    const pl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.6, 0), M(0x2f7d32, { flatShading: true })); pl.position.set(1507.2, 1.1, 306.2); R.g.add(pl);
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.8, 1.2) }));
-    lamp.position.set(1500, 3.0, 300); R.g.add(lamp);
+    // ---------------- Küche (Nordwest) mit Kochinsel
+    const navy = M(0x23324a, { roughness: 0.55 }), stone = M(0xeae6df, { roughness: 0.25, metalness: 0.05 });
+    B(1495.2, 0.45, 293.75, 6.2, 0.9, 1.1, navy, true);               // Unterschränke
+    B(1495.2, 0.93, 293.75, 6.3, 0.06, 1.15, stone);                  // Arbeitsplatte
+    B(1492.85, 1.05, 293.7, 1.0, 2.1, 1.0, M(0xc9ced6, { metalness: 0.7, roughness: 0.25 }), true); // Kühlschrank
+    B(1496.0, 0.97, 293.7, 0.9, 0.03, 0.55, black);                   // Kochfeld
+    B(1494.4, 0.95, 293.6, 0.7, 0.02, 0.45, M(0x9aa3ad, { metalness: 0.9, roughness: 0.2 })); // Spüle
+    add(new THREE.TorusGeometry(0.16, 0.02, 6, 12, Math.PI), brass, 1494.4, 1.12, 293.4);
+    for (let k = 0; k < 4; k++) B(1494.1 + k * 1.4, 2.0, 293.4, 1.3, 0.04, 0.32, oak); // offene Regale
+    for (let k = 0; k < 10; k++) { const c = [0xf4f2ee, 0x2f7d6b, 0xd9a441, 0xc75b4e][k % 4]; add(new THREE.CylinderGeometry(0.07, 0.07, 0.18, 8), M(c), 1493.7 + k * 0.45, 2.11, 293.4); }
+    B(1496.0, 1.9, 293.55, 1.2, 0.4, 0.6, black);                     // Dunstabzug
+    B(1496.5, 0.46, 296.3, 3.2, 0.92, 1.1, walnut, true);             // Insel
+    B(1496.5, 0.95, 296.3, 3.4, 0.06, 1.3, stone);
+    for (const x of [1495.4, 1496.5, 1497.6]) { add(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 14), M(0x2b2b2b), x, 0.75, 297.25); add(new THREE.CylinderGeometry(0.03, 0.03, 0.72, 6), brass, x, 0.37, 297.25); }
+    for (const x of [1495.6, 1497.4]) { // Pendelleuchten
+      add(new THREE.CylinderGeometry(0.01, 0.01, 1.2, 4), black, x, 2.8, 296.3);
+      add(new THREE.SphereGeometry(0.22, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), black, x, 2.2, 296.3).rotation.x = Math.PI;
+      add(new THREE.SphereGeometry(0.1, 10, 8), E(0xffd59a, 2), x, 2.12, 296.3);
+    }
+    { const L = new THREE.PointLight(0xffcf96, 5, 6, 1.5); L.position.set(1496.5, 2.0, 296.3); R.g.add(L); }
+    add(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(0xe9e1d6), 1496.9, 0.98, 296.2).rotation.x = Math.PI;
+    for (let k = 0; k < 4; k++) add(new THREE.SphereGeometry(0.08, 8, 6), M([0xe63946, 0xffb703, 0x7cc243, 0xff8c1a][k]), 1496.8 + (k % 2) * 0.12, 1.05 + (k > 1 ? 0.06 : 0), 296.15 + (k % 3) * 0.08);
+    // ---------------- Wohnecke (Süd/West): Ecksofa, Couchtisch, Teppich, TV-Wand
+    const rugLiving = canvasTex(512, 512, (g, w) => {
+      g.fillStyle = '#9c4a3c'; g.fillRect(0, 0, w, w);
+      g.strokeStyle = '#e8c9a0'; g.lineWidth = 10; g.strokeRect(24, 24, w - 48, w - 48); g.lineWidth = 3; g.strokeRect(46, 46, w - 92, w - 92);
+      for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { g.save(); g.translate(86 + i * 68, 86 + j * 68); g.rotate(Math.PI / 4); g.fillStyle = (i + j) % 2 ? '#e8c9a0' : '#2f4a6e'; g.fillRect(-14, -14, 28, 28); g.restore(); }
+      for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(0,0,0,${rnd() * 0.08})`; g.fillRect(rnd() * w, rnd() * w, 2, 2); }
+    });
+    add(new THREE.PlaneGeometry(5.6, 4.4).rotateX(-Math.PI / 2), M(0xffffff, { map: rugLiving, roughness: 1 }), 1495.4, 0.02, 302.0);
+    const fabric = M(0x8a9aa5, { roughness: 1 }), cushion = [M(0xd9a441, { roughness: 1 }), M(0xc75b4e, { roughness: 1 }), M(0xf3efe6, { roughness: 1 })];
+    B(1493.0, 0.24, 301.6, 1.1, 0.48, 4.6, fabric, true);             // Ecksofa – lange Seite an der Wand
+    B(1492.55, 0.75, 301.6, 0.3, 0.6, 4.6, fabric);
+    B(1494.6, 0.24, 303.5, 2.6, 0.48, 1.0, fabric, true);             // kurze Seite
+    B(1494.6, 0.75, 303.9, 2.6, 0.6, 0.25, fabric);
+    for (let k = 0; k < 4; k++) B(1493.05, 0.55, 299.9 + k * 1.05, 0.95, 0.14, 0.95, fabric);
+    [[1492.85, 300.2, 0], [1492.85, 301.9, 1], [1492.85, 303.0, 2], [1495.4, 303.75, 0]].forEach(([x, z, c]) => { const p = add(new THREE.BoxGeometry(0.2, 0.42, 0.42), cushion[c], x, 0.85, z); p.rotation.y = z > 303.5 ? Math.PI / 2 : 0; p.rotation.z = 0.15; });
+    B(1495.5, 0.38, 301.6, 1.6, 0.06, 1.0, oak, true);                // Couchtisch
+    for (const [dx, dz] of [[-0.7, -0.4], [0.7, -0.4], [-0.7, 0.4], [0.7, 0.4]]) B(1495.5 + dx, 0.18, 301.6 + dz, 0.06, 0.36, 0.06, black);
+    for (let k = 0; k < 3; k++) B(1495.1, 0.43 + k * 0.04, 301.4, 0.5, 0.035, 0.36, M([0xc75b4e, 0x2f4a6e, 0xf3efe6][k]));
+    add(new THREE.CylinderGeometry(0.12, 0.09, 0.2, 12), M(0xf4f2ee, { roughness: 0.3 }), 1495.9, 0.51, 301.8);
+    // TV-Wand an der Südwand
+    B(1496.5, 0.25, 306.6, 4.2, 0.5, 0.55, walnut, true);
+    this.tv = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.7), new THREE.MeshBasicMaterial({ color: 0x19e6ff }));
+    this.tv.position.set(1496.5, 1.6, 306.78); this.tv.rotation.y = Math.PI; R.g.add(this.tv);
+    B(1496.5, 1.6, 306.86, 3.12, 1.82, 0.06, black);
+    B(1496.5, 0.03, 306.4, 4.4, 0.04, 0.05, E(0xff4fa8, 1.2));       // LED unter dem Lowboard
+    for (const x of [1494.2, 1498.8]) { B(x, 0.62, 306.6, 0.25, 0.25, 0.25, black); }
+    // ---------------- Leseecke & Bücherregal (Westwand vorn)
+    B(1492.22, 1.3, 297.5, 0.05, 2.6, 2.6, walnut); for (const z of [296.2, 298.8]) B(1492.45, 1.3, z, 0.5, 2.6, 0.05, oak); B(1492.45, 2.6, 297.5, 0.5, 0.05, 2.65, oak);
+    G.world.addBox(1492.2, 296.2, 1492.7, 298.8, -1, 2.6, 'bld');
+    for (let s = 0; s < 4; s++) {
+      B(1492.45, 0.35 + s * 0.62, 297.5, 0.5, 0.04, 2.6, walnut);
+      let z = 296.3;
+      while (z < 298.6) { const bw = 0.06 + rnd() * 0.08, bh = 0.32 + rnd() * 0.2; B(1492.5, 0.37 + s * 0.62 + bh / 2, z + bw / 2, 0.3, bh, bw, M([0xc75b4e, 0x2f4a6e, 0xd9a441, 0x2f7d6b, 0xf3efe6, 0x5a3a24][Math.floor(rnd() * 6)])); z += bw + 0.01 + (rnd() < 0.1 ? 0.2 : 0); }
+    }
+    // Stehlampe neben dem Sofa
+    add(new THREE.CylinderGeometry(0.18, 0.2, 0.05, 16), black, 1493.4, 0.03, 305.2);
+    add(new THREE.CylinderGeometry(0.02, 0.02, 1.55, 6), brass, 1493.4, 0.8, 305.2);
+    add(new THREE.CylinderGeometry(0.24, 0.3, 0.38, 18, 1, true), M(0xf3e6cf, { emissive: 0xffb060, emissiveIntensity: 0.9, side: THREE.DoubleSide, roughness: 1 }), 1493.4, 1.7, 305.2);
+    { const L = new THREE.PointLight(0xffc98a, 4.5, 6, 1.6); L.position.set(1493.6, 1.7, 304.8); R.g.add(L); }
+    // ---------------- Pflanzen (Monstera & Olivenbaum)
+    const leaf = M(0x2f7d4f, { roughness: 0.75, side: THREE.DoubleSide }), pot = M(0xe9e1d6, { roughness: 0.8 });
+    const plant = (x, z, s) => {
+      add(new THREE.CylinderGeometry(0.28 * s, 0.22 * s, 0.5 * s, 14), pot, x, 0.25 * s, z);
+      for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2 + rnd(), h = (0.7 + rnd() * 0.9) * s; const l = new THREE.Mesh(new THREE.CircleGeometry(0.28 * s, 8), leaf); l.position.set(x + Math.cos(a) * 0.32 * s, 0.5 * s + h, z + Math.sin(a) * 0.32 * s); l.rotation.set(-0.9 + rnd() * 0.4, a, 0); l.scale.y = 1.4; R.g.add(l); add(new THREE.CylinderGeometry(0.012, 0.012, h, 4), leaf, x + Math.cos(a) * 0.15 * s, 0.5 * s + h / 2, z + Math.sin(a) * 0.15 * s); }
+    };
+    plant(1507.2, 306.2, 1.2); plant(1492.8, 305.9, 1.0); plant(1499.0, 293.8, 0.9); plant(1507.3, 299.6, 0.8);
+    // ---------------- Wandbilder (eigene Neon-Kunst)
+    const art = (seed, c1, c2) => canvasTex(256, 320, (g, w, h) => { g.fillStyle = '#f4efe6'; g.fillRect(0, 0, w, h); for (let i = 0; i < 7; i++) { g.fillStyle = [c1, c2, '#2f4a6e', '#d9a441'][i % 4]; g.globalAlpha = 0.85; g.beginPath(); g.arc(40 + ((seed * 37 + i * 61) % 180), 50 + ((seed * 53 + i * 47) % 220), 18 + ((i * 13 + seed) % 50), 0, 7); g.fill(); } g.globalAlpha = 1; });
+    [[1491.95, 2.0, 299.2, 'art1', '#c75b4e', '#ff4fa8', 1.0], [1491.95, 2.0, 301.0, 'art2', '#19e6ff', '#2f7d6b', 1.0], [1491.95, 2.1, 303.2, 'art3', '#d9a441', '#c75b4e', 1.3]].forEach(([x, y, z, , a, b, s], i) => {
+      B(x + 0.03, y, z, 0.05, 1.05 * s, 0.85 * s, black);
+      const p = add(new THREE.PlaneGeometry(0.75 * s, 0.95 * s), new THREE.MeshStandardMaterial({ map: art(i + 3, a, b), roughness: 0.9 }), x + 0.065, y, z); p.rotation.y = Math.PI / 2;
+    });
+    // Neon-Schriftzug über dem Bett
+    const neon = textTex('home', '#ff4fa8', 512, 160, 110);
+    const ns = add(new THREE.PlaneGeometry(1.6, 0.5), new THREE.MeshBasicMaterial({ map: neon, transparent: true, color: new THREE.Color(2, 2, 2) }), 1504.5, 2.65, 293.3);
+    void ns;
+    // Esstisch-Ecke am Fenster (Ost)
+    add(new THREE.CylinderGeometry(0.55, 0.55, 0.05, 24), oak, 1506.4, 0.76, 302.2);
+    add(new THREE.CylinderGeometry(0.06, 0.25, 0.74, 10), black, 1506.4, 0.37, 302.2);
+    this.addCircleCol && this.addCircleCol(1506.4, 302.2, 0.6);
+    for (const a of [0, Math.PI]) { const cx = 1506.4 + Math.cos(a) * 0.85, cz = 302.2 + Math.sin(a) * 0.85; B(cx, 0.45, cz, 0.45, 0.06, 0.45, walnut); B(cx + Math.cos(a) * 0.2, 0.75, cz, 0.06, 0.55, 0.45, walnut); for (const [dx, dz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) B(cx + dx, 0.22, cz + dz, 0.04, 0.44, 0.04, black); }
+    add(new THREE.CylinderGeometry(0.05, 0.06, 0.25, 8), M(0x2f7d6b, { transparent: true, opacity: 0.7, roughness: 0.1 }), 1506.4, 0.92, 302.2);
+    G.world.addBox(1505.8, 301.6, 1507.0, 302.8, -1, 0.8, 'bld');
+    // Deckenspots
+    for (const [x, z] of [[1496, 300], [1500, 302], [1504, 300], [1500, 297]]) add(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 12), E(0xfff0d8, 1.5), x, 3.38, z);
     R.exit = new Marker(1500, 306.4, 0x7cff6b, { label: 'X', r: 1.0 });
     R.bed = new Marker(1501.9, 295.6, 0x7cff6b, { label: 'S', r: 0.9 });
     R.markers = [R.exit, R.bed];
@@ -921,8 +1027,8 @@ export class Interiors {
       if (!this.clubHint) { this.clubHint = true; G.hud.hint('Willkommen im <b>Club Velvet</b>!<br>Bleib auf der Tanzfläche stehen zum <b>Tanzen</b>. Bar: <b>B</b> · Bühne: <b>$</b>', 8); }
     } else if (kind === 'home') {
       this.light.position.set(1500, 3, 300);
-      this.light.color.setHex(0xffe2c0);
-      this.light.intensity = 45;
+      this.light.color.setHex(0xffd9b0);
+      this.light.intensity = 30;
       if (!this.noLift) G.hud.toast('🛗 Aufzug · 34. Etage · Solera Heights');
       this.noLift = false;
     } else if (kind === 'shop') {

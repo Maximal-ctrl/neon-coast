@@ -38,7 +38,9 @@ export const Save = {
       stats: G.stats, time: G.timeOfDay,
       x3: { boats: P.boats || [], planes: P.planes || [], wmods: P.wmods || {}, props: P.props || [], casino: P.casinoStats || null, ach: P.ach || [] },
     };
-    try { s.setItem(key(this.slot), JSON.stringify(data)); return true; } catch (e) { return false; }
+    try { s.setItem(key(this.slot), JSON.stringify(data)); } catch (e) { return false; }
+    if (G.onSaved) { try { G.onSaved(this.slot, data); } catch (e) { /* Account-Sync ist optional */ } }
+    return true;
   },
   read(n = this.slot) { return get(key(n)); },
   clear(n = this.slot) { const s = store(); try { s && s.removeItem(key(n)); } catch (e) { /* */ } },
