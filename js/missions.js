@@ -1407,4 +1407,4 @@ export function shopItems() {
   items.push({ id: 'health', name: 'Erste-Hilfe-Set', price: 120, buy: () => { P.health = 100; } });
   return items;
 }
-export { OUTFITS };
+export { OUTFITS, LOOKS };

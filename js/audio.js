@@ -171,6 +171,8 @@ export class AudioSys {
     this.noiseHit(0.5, 'highpass', 1200, 0.5 * v);
     this.tone(70, 1.2, 'sine', 0.8 * v, 25);
   }
+  // Vorbeiflug / Nitro-Zischen
+  whoosh() { this.noiseHit(1.3, 'bandpass', 260, 0.55, 2200, 0.9); this.noiseHit(0.9, 'lowpass', 900, 0.35, 120); }
   crash(s, x, z) { const v = this.vol(x, z) * s; this.noiseHit(0.35 + s * 0.3, 'bandpass', 900, 0.9 * v, 200, 0.8); this.tone(90, 0.25, 'triangle', 0.4 * v, 40); }
   thud(s = 0.6, x, z) { const v = this.vol(x, z) * s; this.tone(110, 0.2, 'sine', 0.5 * v, 50); this.noiseHit(0.15, 'lowpass', 500, 0.4 * v); }
   punch(x, z) { this.tone(160, 0.12, 'sine', 0.5, 60); this.noiseHit(0.08, 'bandpass', 1200, 0.4); }
@@ -248,7 +250,7 @@ export class AudioSys {
     const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic || (pv && st.style !== 'off');
     const userOn = !!(((v && playing) || pv) && st.style === 'user' && !clubMusic && this.tracks.length);
     if (this.userGain) this.userGain.gain.setTargetAtTime(userOn ? 1.6 : 0, t, 0.3);
-    this.musicBus.gain.setTargetAtTime(wantMusic && !userOn ? (G.state === 'title' ? 0.7 : 1) : 0, t, 0.4);
+    this.musicBus.gain.setTargetAtTime(wantMusic && !userOn ? (G.state === 'title' ? 0.32 : 1) : 0, t, 0.4); // im Titel leise im Hintergrund
     if (wantMusic && !userOn) this.schedule();
     else this.nextBar = 0;
   }
@@ -266,7 +268,8 @@ export class AudioSys {
   schedule() {
     const ctx = this.ctx;
     const club = G.interior && G.interior.kind === 'club' && !(G.player && G.player.inCar);
-    const st = G.state === 'title' || club ? STATIONS[club ? (G.interior.station ?? 3) : 0] : STATIONS[this.station];
+    if (this.titleSt == null) this.titleSt = [0, 1, 2, 0, 1, 2][Math.floor(Math.random() * 6)]; // zufälliger Sender im Titel
+    const st = G.state === 'title' || club ? STATIONS[club ? (G.interior.station ?? 3) : this.titleSt] : STATIONS[this.station];
     if (st.style === 'off' || st.style === 'user') return;
     if (st.style === 'techno') {
       const now = ctx.currentTime;

@@ -110,12 +110,13 @@ export class Combat {
   }
 
   // Panzergranate abfeuern
-  fireShell(v) {
+  fireShell(v, aim = null) {
     if (!this.shells) this.shells = [];
     const b = v.parts.barrel;
     v.group.updateMatrixWorld(true);
     const tip = new THREE.Vector3(0, 0, 4.6).applyMatrix4(b.matrixWorld);
     const dir = new THREE.Vector3(0, 0, 1).transformDirection(b.matrixWorld).normalize();
+    if (aim) { const a = new THREE.Vector3(aim[0], aim[1], aim[2]).sub(tip).normalize(); if (a.dot(dir) > 0.8) dir.copy(a); } // genau aufs Fadenkreuz, solange das Rohr ungefähr hinzeigt
     const mesh = new THREE.Mesh(SHELL_GEO, SHELL_MAT);
     mesh.position.copy(tip); G.scene.add(mesh);
     this.shells.push({ p: tip.clone(), v: dir.multiplyScalar(95), t: 0, mesh, src: v.driver === 'player' ? 'player' : 'npc', veh: v });

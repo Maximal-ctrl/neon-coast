@@ -84,7 +84,7 @@ export class Vehicle {
       if (vf > capTop) vf = damp(vf, capTop, 2, dt);
       let grip = T.grip * 0.78 * (sand ? 0.65 : 1);
       if (inp.handbrake) {
-        grip *= 0.16;
+        grip *= 0.16 / (T.drift || 1);
         vf -= Math.sign(vf) * Math.min(Math.abs(vf), 5 * dt);
         this.braking = true;
       }
@@ -96,7 +96,8 @@ export class Vehicle {
       this.yawRate = yaw;
       // Schlupf (3.12): die Fahrtrichtung dreht nicht ganz mit der Karosserie mit –
       // bei viel Grip fast vollständig, mit Handbremse kaum (Drift)
-      const follow = T.tank ? 1 : inp.handbrake ? 0.3 : clamp(0.55 + grip * 0.045, 0.6, 0.95);
+      const dr = T.drift || 1;
+      const follow = T.tank ? 1 : inp.handbrake ? clamp(0.3 / dr, 0.1, 0.45) : clamp(0.55 + grip * 0.045 - (dr - 1) * 0.12, 0.45, 0.96);
       this._hv = this.h + yaw * dt * follow;
       this.h += yaw * dt;
       this.slip = Math.abs(vl);
@@ -108,7 +109,10 @@ export class Vehicle {
       this.h += this.yawRate * dt * 0.3;
     }
     // Hangabtrieb: bergauf langsamer, bergab schneller
-    if (this.grounded && Math.abs(this.pitch) > 0.02) vf -= 9.8 * Math.sin(this.pitch) * dt * 1.05;
+    // Feststellbremse: abgestellte Fahrzeuge ohne Fahrer rollen nicht von selbst weg (auch nicht am Hang)
+    const parkedNow = this.grounded && !this.driver && !(this.ai && this.ai.mode && this.ai.mode !== 'parked') && Math.abs(vf) < 5 && !this.T.boat;
+    if (parkedNow) { vf = damp(vf, 0, 5, dt); vl = damp(vl, 0, 5, dt); }
+    else if (this.grounded && Math.abs(this.pitch) > 0.02) vf -= 9.8 * Math.sin(this.pitch) * dt * 1.05;
     if (this.grounded) {
       const hv = drive && this._hv !== undefined ? this._hv : this.h; this._hv = undefined;
       fx = Math.sin(hv); fz = Math.cos(hv); lx = fz; lz = -fx;
@@ -137,7 +141,7 @@ export class Vehicle {
       if (this.y <= gh) {
         const impact = -this.vy;
         this.y = gh; this.vy = 0; this.grounded = true;
-        if (impact > 10) this.damage((impact - 10) * 30, null);
+        if (impact > 15) this.damage((impact - 15) * 9, null); // 3.13: Sprünge kosten kaum noch Haltbarkeit
         if (impact > 4) {
           if (this.driver === 'player') { G.cam.shake(Math.min(1, impact / 15)); G.audio.thud(Math.min(1, impact / 12)); }
           G.effects.dust(this.x, this.y, this.z, 10);
@@ -363,12 +367,14 @@ export class VehicleManager {
   }
 
   resolvePair(a, b, nx, nz, depth) {
-    const ma = a.mass, mb = b.mass, tot = ma + mb;
+    // 3.13: Streifenwagen lassen sich vom Spieler leichter wegschieben (keine Straßensperren)
+    const pl = a.driver === 'player' || b.driver === 'player';
+    const ma = a.mass * (pl && a.police && !a.roadblock ? 0.55 : 1), mb = b.mass * (pl && b.police && !b.roadblock ? 0.55 : 1), tot = ma + mb;
     a.x -= nx * depth * (mb / tot); a.z -= nz * depth * (mb / tot);
     b.x += nx * depth * (ma / tot); b.z += nz * depth * (ma / tot);
     const rv = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
     if (rv < 0) {
-      const e = 0.25;
+      const e = 0.45; // etwas mehr Abprall
       const j = (-(1 + e) * rv) / (1 / ma + 1 / mb);
       a.vx -= (j / ma) * nx; a.vz -= (j / ma) * nz;
       b.vx += (j / mb) * nx; b.vz += (j / mb) * nz;

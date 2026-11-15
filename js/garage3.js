@@ -5,6 +5,7 @@ import { G } from './state.js';
 import { Marker } from './missions.js';
 import { CAR_TYPES } from './models.js';
 import { MANSION } from './terrain.js';
+import * as C from './config.js';
 import { GeoBuilder, rgb } from './geo.js';
 import { applyTune } from './tuning.js';
 
@@ -122,6 +123,18 @@ export function setupGarageEntrances(A, I) {
     { x: sh.x + 8, z: sh.z + 8, h: 0, name: 'Tiefgarage Unterschlupf' },
     { x: MANSION.x + 14, z: MANSION.z + 26, h: Math.PI, name: 'Tiefgarage Anwesen', y: MANSION.y },
   ];
+  // 3.13: weitere Garagen – an jedem Ort in den Solera Hills (Ostrand) und auf freien Parkplätzen in der Stadt
+  for (const t of C.TOWNS) { const r = C.townRect(t); spots.push({ x: r.x1 + 9, z: r.z1 - 20, h: -Math.PI / 2, name: 'Garage ' + t.name, y: t.y }); }
+  const lots = (G.world.parkingSpots || []).filter((p) => p[1] > -360 && p[1] < 420);
+  const pick = [];
+  for (let k = 0; k < 4 && lots.length; k++) {
+    let best = null, bd = -1;
+    for (const p of lots) { const d = Math.min(...[[sh.x, sh.z], ...pick].map((q) => Math.hypot(q[0] - p[0], q[1] - p[1]))); if (d > bd) { bd = d; best = p; } }
+    if (!best || bd < 150) break;
+    pick.push(best);
+  }
+  const AREA = (x, z) => (z < -200 ? 'Coral Heights' : x < -350 ? 'Altstadt' : z > 250 ? 'Hafen' : x > 300 ? 'Seaside' : x < -120 ? 'Westside' : 'Midtown');
+  for (const p of pick) spots.push({ x: p[0], z: p[1], h: (p[2] || 0) + Math.PI, name: 'Parkgarage ' + AREA(p[0], p[1]) });
   // sichtbare Einfahrt: Betonrahmen, dunkle Rampe, P-Schild
   const conc = new THREE.MeshStandardMaterial({ color: 0xb9b6ae, roughness: 0.8 }), dark = new THREE.MeshBasicMaterial({ color: 0x050607 });
   const pc = document.createElement('canvas'); pc.width = pc.height = 128; const pg = pc.getContext('2d'); pg.fillStyle = '#1d4ed8'; pg.fillRect(0, 0, 128, 128); pg.fillStyle = '#fff'; pg.font = 'bold 100px Inter, sans-serif'; pg.textAlign = 'center'; pg.textBaseline = 'middle'; pg.fillText('P', 64, 70);

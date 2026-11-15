@@ -9,6 +9,7 @@ import { circleVsBox, circleVsVeh } from './physics.js';
 import { clamp, damp, dampAngle, angleDiff, dist2, rand, lerp } from './utils.js';
 
 const _b = [], _c = [];
+export const VEH_AIM_Y = 0.36; // Fadenkreuz für Fahrzeugwaffen: 32 % von oben
 
 const dampAngleT = (a, b, k, dt) => { let d = ((b - a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI; return a + d * (1 - Math.exp(-k * dt)); };
 
@@ -73,7 +74,7 @@ export class Player {
     const g = this._chute;
     g.visible = on;
     if (on) {
-      g.position.set(this.x, this.y, this.z); g.rotation.y = this.yaw + Math.PI / 2;
+      g.position.set(this.x, this.y, this.z); g.rotation.y = this.yaw;
       g.rotation.z = Math.sin(this.anim.t * 1.3) * 0.05;
     }
   }
@@ -144,6 +145,7 @@ export class Player {
       this.target = null;
     } else this.target = G.isTouch && armed ? this.findTarget() : null;
     // Springen / Schwerkraft
+    if (this.chuteReady && !this.parachute && !this.onGround && !swim && (I.pressed('jump') || this._chuteTap)) { this._chuteTap = false; this.parachute = true; this.chuteReady = false; this.vy = Math.max(this.vy, -12); G.cam.shake(0.3); G.audio.whoosh && G.audio.whoosh(); G.hud.toast('🪂 Fallschirm offen! Lenken mit Bewegung, Sprint = schneller sinken'); }
     if (I.pressed('jump') && this.onGround && !swim) { this.vy = 6.2; this.onGround = false; G.audio.jump(); }
     this.x += this.vx * dt; this.z += this.vz * dt;
     this.gy = W.groundHeight(this.x, this.z, this.y);
@@ -153,6 +155,7 @@ export class Player {
       if (this.gy > C.WATER_Y - 1.0) { this.state = 'foot'; this.y = Math.max(this.gy, this.y); }
     } else {
       this.vy -= 18 * dt;
+      if (this.chuteReady && !this.parachute) { this.vy = Math.max(this.vy, -48); this.vx *= Math.exp(-0.25 * dt); this.vz *= Math.exp(-0.25 * dt); }
       if (this.parachute) {
         // Gleitschirm (3.12): schnell und lenkbar, Vorwärtsfahrt bleibt erhalten; Sprint = schneller sinken
         const ia = Math.hypot(dx, dz), fast = this.sprinting;
@@ -165,11 +168,11 @@ export class Player {
       this.y += this.vy * dt;
       if (this.y <= this.gy) {
         if (!this.onGround && this.vy < -14) this.damage((-this.vy - 14) * 6, null);
-        this.parachute = false;
+        this.parachute = false; this.chuteReady = false;
         this.y = this.gy; this.vy = 0; this.onGround = true;
       } else if (this.y > this.gy + 0.25) this.onGround = false;
       if (this.gy < C.WATER_Y - 1.1 && this.y < C.WATER_Y - 0.2) {
-        this.state = 'swim'; this.parachute = false; G.effects.splash(this.x, C.WATER_Y, this.z, 12); G.audio.splash();
+        this.state = 'swim'; this.parachute = false; this.chuteReady = false; G.effects.splash(this.x, C.WATER_Y, this.z, 12); G.audio.splash();
       }
     }
     this.collide();
@@ -550,7 +553,7 @@ export class Player {
     this.vehicle = null; this.visible = true; this.vx = this.vz = this.vy = 0;
     G.audio.exitCar();
     const air = v.T.plane && !v.grounded && v.y - W.groundHeight(v.x, v.z) > 6;
-    if (air) { this.x = v.x - Math.cos(v.h) * 3; this.z = v.z + Math.sin(v.h) * 3; this.y = v.y - 1; this.state = 'foot'; this.onGround = false; this.parachute = true; this.vx = (v.vx || 0) * 0.6; this.vz = (v.vz || 0) * 0.6; this.vy = 0; this.yaw = v.h; G.hud.toast('🪂 Fallschirm offen! Lenken mit Bewegung, Sprint = schneller sinken'); }
+    if (air) { this.x = v.x - Math.cos(v.h) * 3; this.z = v.z + Math.sin(v.h) * 3; this.y = v.y - 1; this.state = 'foot'; this.onGround = false; this.parachute = false; this.chuteReady = true; this.vx = (v.vx || 0) * 0.6; this.vz = (v.vz || 0) * 0.6; this.vy = 0; this.yaw = v.h; G.hud.bigToast('🪂 FREIER FALL', G.isTouch ? 'Tippe auf FALLSCHIRM, um ihn zu öffnen!' : 'Drück die LEERTASTE, um den Fallschirm zu öffnen!'); }
     else if (best) { this.x = best[0]; this.z = best[1]; this.y = this.gy = best[2]; this.state = 'foot'; G.hud.fadeIn(); }
     else if (v.T.boat) { this.x = v.x + Math.cos(v.h) * (v.hw + 0.8); this.z = v.z - Math.sin(v.h) * (v.hw + 0.8); this.y = C.WATER_Y - 0.25; this.state = 'swim'; G.effects.splash(this.x, C.WATER_Y, this.z, 10); G.audio.splash(); }
     else { this.x = v.x + Math.cos(v.h) * 2.2; this.z = v.z - Math.sin(v.h) * 2.2; this.y = this.gy = W.groundHeight(this.x, this.z); this.state = 'foot'; }
@@ -576,6 +579,14 @@ export class Player {
     inp.throttle = gas; inp.brake = brk;
     let st = I.moveX;
     if (G.isTouch) st = Math.sign(st) * Math.pow(Math.abs(st), 1.4);
+    else if (Math.abs(st) === 1 || st === 0) {
+      // Tastatur (3.13): kurz antippen = leicht lenken, halten = voll einlenken
+      const dir = Math.sign(st);
+      if (dir !== 0 && dir === this._kDir) this._kSt = Math.min(1, this._kSt + dt * 2.6);
+      else this._kSt = dir !== 0 ? 0.22 : 0;
+      this._kDir = dir;
+      st = dir * this._kSt;
+    }
     inp.steer = clamp(st, -1, 1);
     inp.handbrake = I.held('handbrake');
     inp.noReverse = false;
@@ -590,22 +601,23 @@ export class Player {
       const rel = G.cam.yaw - v.h;
       const tu = v.parts.turret, ba = v.parts.barrel;
       tu.rotation.y = dampAngleT(tu.rotation.y, rel, 3, dt);
-      ba.rotation.x = clamp(-(G.cam.pitch + 0.2) * 0.8, -0.35, 0.12);
+      const aim = this.vehAim(v, 300);
+      const elev = Math.atan2(aim[1] - (v.y + 2.2), Math.hypot(aim[0] - v.x, aim[2] - v.z));
+      ba.rotation.x = dampAngleT(ba.rotation.x, clamp(-elev, -0.75, 0.12), 6, dt);
       v.cannonT = (v.cannonT || 0) - dt;
-      if (I.held('fire') && v.cannonT <= 0) { v.cannonT = 1.8; G.combat.fireShell(v); }
+      if (I.held('fire') && v.cannonT <= 0) { v.cannonT = 1.8; G.combat.fireShell(v, aim); }
     } else if (v.T.mg) {
       // Bord-MG: dreht mit der Kamera (Touch: zum Ziel), verbraucht keine Munition
       const mg = v.parts.mg, tgt = G.isTouch ? this.findDriveByTarget(v) : null;
-      const rel = G.isTouch ? (tgt ? Math.atan2(tgt.x - v.x, tgt.z - v.z) - v.h : 0) : G.cam.yaw - v.h;
+      const rel = G.isTouch && tgt ? Math.atan2(tgt.x - v.x, tgt.z - v.z) - v.h : G.cam.yaw - v.h;
       if (mg) mg.rotation.y = dampAngleT(mg.rotation.y, rel, 9, dt);
       v.mgT = (v.mgT || 0) - dt;
       if (I.held('fire') && v.mgT <= 0) {
         v.mgT = 0.085;
         const a = v.h + (mg ? mg.rotation.y : 0), ox = v.x + Math.sin(a) * 1.2, oy = v.y + v.height + 0.45, oz = v.z + Math.cos(a) * 1.2;
         let tx, ty, tz;
-        if (!G.isTouch) { const c = G.camera.position, f = G.cam.dir, h = G.combat.raycast(c.x, c.y, c.z, f.x, f.y, f.z, 160, v); tx = h.type ? h.x : c.x + f.x * 160; ty = h.type ? h.y : c.y + f.y * 160; tz = h.type ? h.z : c.z + f.z * 160; }
-        else if (tgt) { tx = tgt.x; ty = tgt.y + (tgt.isPed ? 1.2 : 0.8); tz = tgt.z; }
-        else { tx = ox + Math.sin(a) * 60; ty = oy - 0.5; tz = oz + Math.cos(a) * 60; }
+        if (G.isTouch && tgt) { tx = tgt.x; ty = tgt.y + (tgt.isPed ? 1.2 : tgt.isHeli ? 0 : 0.8); tz = tgt.z; }
+        else [tx, ty, tz] = this.vehAim(v, 220);
         const dx = tx - ox, dy = ty - oy, dz = tz - oz, L = Math.hypot(dx, dy, dz) || 1;
         G.combat.playerShot('mg', ox, oy, oz, dx / L, dy / L, dz / L, v);
         G.cam.kick(0.003);
@@ -620,8 +632,8 @@ export class Player {
       const t = this.findDriveByTarget(v);
       const ox = v.x + Math.cos(v.h) * (v.hw + 0.2), oy = v.y + 1.3, oz = v.z - Math.sin(v.h) * (v.hw + 0.2);
       let tx, ty, tz;
-      if (!G.isTouch) { const c = G.camera.position, f = G.cam.dir; tx = c.x + f.x * 60; ty = c.y + f.y * 60; tz = c.z + f.z * 60; }
-      else if (t) { tx = t.x; ty = t.y + (t.isPed ? 1.2 : 0.8); tz = t.z; }
+      if (!G.isTouch) [tx, ty, tz] = this.vehAim(v, 120);
+      else if (t) { tx = t.x; ty = t.y + (t.isPed ? 1.2 : t.isHeli ? 0 : 0.8); tz = t.z; }
       else { tx = v.x + Math.sin(v.h) * 50; ty = oy; tz = v.z + Math.cos(v.h) * 50; }
       const dx = tx - ox, dy = ty - oy, dz = tz - oz, L = Math.hypot(dx, dy, dz) || 1;
       G.combat.playerShot(this.weapon, ox, oy, oz, dx / L, dy / L, dz / L, v);
@@ -631,6 +643,12 @@ export class Player {
       G.stats.distanceDriven += v.speed * dt;
       G.stats.bestSpeed = Math.max(G.stats.bestSpeed, v.speed * 3.6);
     }
+  }
+  // Ziel unter dem Fahrzeug-Fadenkreuz (im oberen Bildschirmteil, NDC y = VEH_AIM_Y)
+  vehAim(v, range) {
+    const cam = G.camera, d = (this._aimV || (this._aimV = new THREE.Vector3())).set(0, VEH_AIM_Y, 0.5).unproject(cam).sub(cam.position).normalize();
+    const c = cam.position, h = G.combat.raycast(c.x, c.y, c.z, d.x, d.y, d.z, range, v);
+    return h.type ? [h.x, h.y, h.z] : [c.x + d.x * range, c.y + d.y * range, c.z + d.z * range];
   }
   findDriveByTarget(v) {
     let best = null, bd = 45 * 45;
@@ -645,6 +663,8 @@ export class Player {
       const d = dist2(o.x, o.z, v.x, v.z);
       if (d < bd && (o.police || o.missionTarget)) { bd = d; best = o; }
     }
+    const PL = G.police;
+    if (!best && PL.heliActive && !PL.heliDown && dist2(PL.heliPos.x, PL.heliPos.z, v.x, v.z) < 160 * 160) return { x: PL.heliPos.x, y: PL.heliPos.y, z: PL.heliPos.z, isHeli: true };
     return best;
   }
 
@@ -753,5 +773,17 @@ export class Player {
     G.hud.money(0);
     G.hud.toast(where === 'hospital' ? `Krankenhausrechnung: -$${cost}` : `Kaution bezahlt: -$${cost}`);
     G.hud.fadeIn();
+    if (where === 'hospital') this.spawnPickupCar(poi);
+  }
+  // 3.13: am Krankenhaus steht ein Auto bereit
+  spawnPickupCar(poi) {
+    const W = G.world, spots = (W.parkingSpots || []).filter((s) => dist2(s[0], s[1], poi.x, poi.z) < 28 * 28).sort((a, b) => dist2(a[0], a[1], poi.x, poi.z) - dist2(b[0], b[1], poi.x, poi.z));
+    const free = spots.find((s) => !G.vehicles.some((o) => dist2(o.x, o.z, s[0], s[1]) < 16));
+    let x, z, h;
+    if (free) [x, z, h] = free;
+    else { const n = W.nearestNode(poi.x, poi.z), o = W.nodes[n.nbr[0]], dx = Math.sign(o.x - n.x), dz = Math.sign(o.z - n.z); const t = Math.min(14, Math.hypot(poi.x - n.x, poi.z - n.z)); x = n.x + dx * (t + 10) - dz * 6; z = n.z + dz * (t + 10) + dx * 6; h = Math.atan2(dx, dz); }
+    const keys = ['marina', 'kiwi', 'taxi', 'zephyra'];
+    const v = G.vm.spawn(keys[Math.floor(Math.random() * keys.length)], x, z, h || 0);
+    if (v) { v.parked = true; v.persistent = true; setTimeout(() => { v.persistent = false; }, 120000); this.lastVehicle = v; G.hud.toast('🚗 Vor dem Krankenhaus steht ein Wagen für dich bereit.'); }
   }
 }

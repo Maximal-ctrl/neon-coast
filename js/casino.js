@@ -21,10 +21,10 @@ function canvasTex(w, h, draw, repeat = false) {
 
 // ------------------------------------------------------------ Automaten-Designs
 export const SLOT_THEMES = {
-  lucky: { name: 'LUCKY SOLERA', sub: '★ SLOT DELUXE ★', col: 0xff2e88, c1: '#ff2e88', c2: '#8a1050', frame: '#ffd23f', bets: [5, 10, 25, 50, 100], syms: [['🍒', 30, 5], ['🍋', 24, 8], ['🍊', 20, 12], ['🔔', 12, 20], ['⭐', 8, 40], ['💎', 4, 100], ['7️⃣', 2, 250]] },
-  gold: { name: 'GOLDRAUSCH', sub: '♛ HIGH ROLLER ♛', col: 0xd4a017, c1: '#f0c040', c2: '#6b4a05', frame: '#fff1b8', bets: [25, 50, 100, 250, 500], syms: [['🪙', 30, 5], ['💰', 24, 8], ['🔔', 18, 12], ['🏆', 12, 20], ['👑', 8, 45], ['💎', 4, 110], ['7️⃣', 2, 300]] },
-  tropic: { name: 'TROPIC NIGHTS', sub: '~ ISLAND SPIN ~', col: 0x19e6c1, c1: '#19c6a6', c2: '#0b4f5c', frame: '#ff8fab', bets: [5, 10, 25, 50, 100], syms: [['🍍', 30, 5], ['🥥', 24, 8], ['🌺', 20, 12], ['🐠', 12, 20], ['🦜', 8, 40], ['🌴', 4, 100], ['🌞', 2, 250]] },
-  galaxy: { name: 'GALAXY SPIN', sub: '✦ COSMIC JACKPOT ✦', col: 0x8a5cff, c1: '#7b4dff', c2: '#1a0d4a', frame: '#19e6ff', bets: [10, 25, 50, 100, 250], syms: [['🌙', 30, 5], ['⭐', 24, 8], ['🪐', 20, 12], ['☄️', 12, 20], ['👽', 8, 45], ['🚀', 4, 120], ['🌌', 1.5, 400]] },
+  lucky: { name: 'LUCKY SOLERA', sub: '★ SLOT DELUXE ★', col: 0xff2e88, c1: '#ff2e88', c2: '#8a1050', frame: '#ffd23f', bets: [5, 25, 100, 250, 500, 1000], syms: [['🍒', 30, 5], ['🍋', 24, 8], ['🍊', 20, 12], ['🔔', 12, 20], ['⭐', 8, 40], ['💎', 4, 100], ['7️⃣', 2, 250]] },
+  gold: { name: 'GOLDRAUSCH', sub: '♛ HIGH ROLLER ♛', col: 0xd4a017, c1: '#f0c040', c2: '#6b4a05', frame: '#fff1b8', bets: [50, 250, 500, 1000, 2500, 5000], syms: [['🪙', 30, 5], ['💰', 24, 8], ['🔔', 18, 12], ['🏆', 12, 20], ['👑', 8, 45], ['💎', 4, 110], ['7️⃣', 2, 300]] },
+  tropic: { name: 'TROPIC NIGHTS', sub: '~ ISLAND SPIN ~', col: 0x19e6c1, c1: '#19c6a6', c2: '#0b4f5c', frame: '#ff8fab', bets: [5, 25, 100, 250, 500, 1000], syms: [['🍍', 30, 5], ['🥥', 24, 8], ['🌺', 20, 12], ['🐠', 12, 20], ['🦜', 8, 40], ['🌴', 4, 100], ['🌞', 2, 250]] },
+  galaxy: { name: 'GALAXY SPIN', sub: '✦ COSMIC JACKPOT ✦', col: 0x8a5cff, c1: '#7b4dff', c2: '#1a0d4a', frame: '#19e6ff', bets: [10, 50, 100, 250, 1000, 2500], syms: [['🌙', 30, 5], ['⭐', 24, 8], ['🪐', 20, 12], ['☄️', 12, 20], ['👽', 8, 45], ['🚀', 4, 120], ['🌌', 1.5, 400]] },
 };
 
 // ------------------------------------------------------------ Innenraum
@@ -153,6 +153,8 @@ function frame(title, sub, logo, accent, inner, cls = '') {
 const stats = () => (G.player.casinoStats = G.player.casinoStats || { won: 0, lost: 0, biggest: 0 });
 function settle(stake, payout) {
   const P = G.player, S = stats();
+  S.staked = (S.staked || 0) + stake; S.paid = (S.paid || 0) + payout; S.games = (S.games || 0) + 1;
+  G.stats.gambleStaked = (G.stats.gambleStaked || 0) + stake; G.stats.gamblePaid = (G.stats.gamblePaid || 0) + payout; G.stats.gambleGames = (G.stats.gambleGames || 0) + 1;
   if (payout > 0) { P.addMoney(payout); if (payout > stake) G.audio.jingle(); }
   const net = payout - stake;
   if (net > 0) { S.won += net; S.biggest = Math.max(S.biggest, net); } else S.lost += -net;
@@ -171,7 +173,7 @@ function rain(n) {
 export function slots(themeKey = 'lucky') {
   const T = SLOT_THEMES[themeKey], SY = T.syms;
   const pickSym = () => { let r = Math.random() * SY.reduce((s, x) => s + x[1], 0); for (const s of SY) { if ((r -= s[1]) < 0) return s[0]; } return SY[0][0]; };
-  let bet = T.bets[1], spinning = false;
+  let bet = T.bets[1], spinning = false, taps = 0, lastTap = 0, rigged = false;
   const Hh = 96;
   const reel = (i) => `<div class="sl-reel"><div class="sl-strip" id="sl-s${i}">${[SY[0][0], SY[6][0], SY[1][0]].map((s) => `<div>${s}</div>`).join('')}</div></div>`;
   const html = `<div class="sl" style="--c1:${T.c1};--c2:${T.c2};--fr:${T.frame}">
@@ -186,6 +188,8 @@ export function slots(themeKey = 'lucky') {
     <div class="sl-pay"><b>GEWINNE</b>${SY.slice().reverse().map(([s, , m]) => `<div><span>${s}${s}${s}</span><em>×${m}</em></div>`).join('')}<div><span>${SY[0][0]}${SY[0][0]} ·</span><em>×2</em></div><div><span>Paar</span><em>×1</em></div><button class="sl-close" data-x>Aufstehen</button></div>
   </div>`;
   if (!G.ui.open(html, 'ui-slots')) return;
+  const top = document.querySelector('.sl-top');
+  if (top && themeKey === 'lucky') top.addEventListener('pointerdown', () => { const now = performance.now(); taps = now - lastTap < 2500 ? taps + 1 : 1; lastTap = now; if (taps >= 7) { taps = 0; rigged = true; } });
   const finish = (r) => {
     spinning = false;
     let mult = 0;
@@ -205,7 +209,8 @@ export function slots(themeKey = 'lucky') {
     spinning = true;
     $('sl-lever').classList.remove('pull'); void $('sl-lever').offsetWidth; $('sl-lever').classList.add('pull');
     $('sl-msg').textContent = 'Die Walzen drehen …'; $('sl-msg').className = 'sl-msg';
-    const res = [pickSym(), pickSym(), pickSym()];
+    const res = rigged ? [SY[6][0], SY[6][0], SY[6][0]] : [pickSym(), pickSym(), pickSym()];
+    rigged = false;
     const tick = setInterval(() => G.audio.click(), 90);
     res.forEach((sym, i) => {
       const strip = $('sl-s' + i), n = 26 + i * 8, syms = [];
@@ -247,7 +252,7 @@ export function roulette() {
   };
   const render = (msg = 'Setz deine Chips und drück auf <b>Drehen</b>.') => {
     const inner = `<div class="rl"><div class="rl-left"><canvas id="rl-wheel" width="360" height="360"></canvas><div class="rl-last">${last.map((n) => `<span style="--c:${numCol(n)}">${n}</span>`).join('')}</div></div>
-      <div class="rl-right">${board()}<div class="cas-row">${chips([10, 50, 100, 500, 1000, 5000], chip)}</div>
+      <div class="rl-right">${board()}<div class="cas-row">${chips([10, 100, 500, 1000, 5000, 10000, 25000], chip)}</div>
       <div class="cas-msg" id="cas-msg">${msg}</div>
       <div class="cas-row"><button class="st-sec" data-clear>Einsätze löschen</button><div class="cas-total">Einsatz <b>${money(total())}</b></div><button class="st-buy" id="rl-spin" ${spinning ? 'disabled' : ''}>Drehen</button></div></div></div>`;
     $('ui-layer').innerHTML = frame('ROULETTE', 'Europäisch · Einzelnull', '🎡', '#d62828', inner, 'wide');
@@ -334,7 +339,7 @@ export function blackjack() {
       <div class="bj-hand"><div class="bj-lbl">Croupier ${hide ? '' : `<b>${val(dealer)}</b>`}</div><div class="bj-cards">${dealer.map((c, i) => card(c, hide && i === 1, i)).join('')}</div></div>
       <div class="cas-msg" id="cas-msg">${msg}</div>
       <div class="bj-hand"><div class="bj-lbl">Du ${player.length ? `<b>${val(player)}</b>` : ''}</div><div class="bj-cards">${player.map((c, i) => card(c, false, i)).join('')}</div></div>
-      <div class="cas-row">${phase === 'play' ? `<button class="st-sec" data-a="hit">Karte</button><button class="st-sec" data-a="stand">Stehen</button>${player.length === 2 && G.player.money >= bet ? '<button class="st-sec" data-a="double">Verdoppeln</button>' : ''}` : `${chips([25, 50, 100, 250, 500, 1000, 2500], bet, 'bet')}<button class="st-buy" data-a="deal">Austeilen · ${money(bet)}</button>`}</div>
+      <div class="cas-row">${phase === 'play' ? `<button class="st-sec" data-a="hit">Karte</button><button class="st-sec" data-a="stand">Stehen</button>${player.length === 2 && G.player.money >= bet ? '<button class="st-sec" data-a="double">Verdoppeln</button>' : ''}` : `${chips([25, 100, 250, 1000, 2500, 5000, 10000], bet, 'bet')}<button class="st-buy" data-a="deal">Austeilen · ${money(bet)}</button>`}</div>
       <div class="bj-rules">Blackjack zahlt 3:2 · Croupier steht ab 17 · 4 Kartendecks</div></div>`;
     $('ui-layer').innerHTML = frame('BLACKJACK', 'Tisch 21 · Limit $25 – $2.500', '🃏', '#1f9d55', inner);
   };
@@ -428,7 +433,7 @@ export function horses() {
       <div class="hr-track" id="hr-track">${HORSES.map(([n], i) => `<div class="hr-lane"><span class="hr-num">${i + 1}</span><i class="hr-horse" id="hr-h${i}">🏇</i></div>`).join('')}<div class="hr-goal"></div></div>
       <div class="hr-list">${HORSES.map(([n, o], i) => `<button class="dl-car ${i === pick1 ? 'on' : ''}" data-h="${i}"><div><b>${i + 1}. ${n}</b><span>Quote ${o}:1</span></div><em>×${o}</em></button>`).join('')}</div>
       <div class="cas-msg" id="cas-msg">${msg}</div>
-      <div class="cas-row">${chips([25, 50, 100, 250, 500, 1000], bet, 'bet')}<button class="st-buy" id="hr-go" ${racing ? 'disabled' : ''}>Wetten & starten</button></div></div>`;
+      <div class="cas-row">${chips([25, 100, 500, 1000, 2500, 5000, 10000], bet, 'bet')}<button class="st-buy" id="hr-go" ${racing ? 'disabled' : ''}>Wetten & starten</button></div></div>`;
     $('ui-layer').innerHTML = frame('PFERDEWETTEN', 'Live-Rennen aus Los Ranchos', '🏇', '#7cff6b', inner, 'wide');
   };
   const race = () => {

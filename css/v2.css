@@ -304,3 +304,46 @@ body.scoped #crosshair { opacity: 0; }
 #altimeter.warn .alt-main span { color: #ff4d6d; }
 @keyframes altwarn { from { background: rgba(10,14,26,.62); } to { background: rgba(120,10,30,.62); } }
 body.touch #altimeter { bottom: auto; left: auto; top: calc(200px + var(--sat)); right: calc(16px + var(--sar)); width: 150px; }
+
+/* ---------- Fadenkreuz Fahrzeugwaffen (3.13) ---------- */
+#veh-cross { position: absolute; left: 50%; top: 32%; width: 40px; height: 40px; transform: translate(-50%, -50%); opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 3; }
+#veh-cross.show { opacity: .95; }
+#veh-cross i { position: absolute; background: #fff; box-shadow: 0 0 3px #000; }
+#veh-cross i:nth-child(1) { left: 19px; top: 0; width: 2px; height: 12px; }
+#veh-cross i:nth-child(2) { left: 19px; bottom: 0; width: 2px; height: 12px; }
+#veh-cross i:nth-child(3) { top: 19px; left: 0; height: 2px; width: 12px; }
+#veh-cross i:nth-child(4) { top: 19px; right: 0; height: 2px; width: 12px; }
+#veh-cross b { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); border: 2px solid rgba(255, 70, 90, .9); border-radius: 50%; box-shadow: 0 0 4px #000; }
+
+/* ---------- Fallschirm-Taste (3.13) ---------- */
+#chute-btn { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%) scale(.9); z-index: 40; display: none; flex-direction: column; align-items: center; gap: 2px; padding: 16px 30px; border: 2px solid #ffd23f; border-radius: 14px; background: rgba(10,14,26,.82); color: #fff; font: 700 22px/1.1 var(--head); letter-spacing: .06em; pointer-events: auto; cursor: pointer; box-shadow: 0 0 24px rgba(255,210,63,.45); animation: chutepulse .8s infinite alternate; }
+#chute-btn small { font: 600 12px var(--ui); opacity: .75; letter-spacing: .12em; text-transform: uppercase; }
+#chute-btn.show { display: flex; }
+#chute-btn.urgent { border-color: #ff4d6d; box-shadow: 0 0 30px rgba(255,77,109,.7); }
+body.touch #chute-btn small { display: none; }
+@keyframes chutepulse { from { transform: translate(-50%, -50%) scale(.92); } to { transform: translate(-50%, -50%) scale(1.04); } }
+
+/* ---------- Handy: Autos & Taxi (3.13) ---------- */
+.ph-sec { margin: 14px 4px 6px; font-weight: 700; font-size: 14px; letter-spacing: .02em; display: flex; justify-content: space-between; align-items: baseline; }
+.ph-sec small { font-weight: 500; font-size: 11px; opacity: .6; }
+.ph-btn2[disabled] { opacity: .45; pointer-events: none; }
+
+/* ---------- Titelbild (3.13): schlicht, modern, Kino-Look ---------- */
+#title::before, #title::after { content: ''; position: absolute; left: 0; right: 0; height: 7vh; background: #000; z-index: 0; pointer-events: none; }
+#title::before { top: 0; } #title::after { bottom: 0; }
+#title > .title-card { position: relative; z-index: 1; }
+#title > .credits { z-index: 2; bottom: max(10px, var(--sab)) !important; }
+#title { background: linear-gradient(90deg, rgba(4,5,9,.86) 0%, rgba(4,5,9,.55) 30%, rgba(4,5,9,0) 58%) !important; }
+.title-card .logo .l1 { font-weight: 300 !important; letter-spacing: .14em !important; font-size: clamp(44px, 6.4vw, 86px) !important; }
+.title-card .logo .l2 { font-weight: 800 !important; letter-spacing: .02em !important; font-size: clamp(60px, 9vw, 120px) !important; }
+.title-card .tagline { display: flex; align-items: center; gap: 14px; }
+.title-card .tagline::before { content: ''; width: 34px; height: 2px; background: linear-gradient(90deg, #ff2e88, #ffb347); }
+.tbtn { font-size: 20px !important; letter-spacing: .14em !important; padding-top: 9px !important; padding-bottom: 9px !important; transition: color .2s, padding-left .2s, background .2s !important; }
+.tbtn:hover, .tbtn:focus-visible { padding-left: 26px !important; }
+#title-cap { position: absolute; right: max(4vw, var(--sar)); bottom: calc(7vh + 18px); z-index: 2; display: flex; align-items: center; gap: 12px; font: 600 12px/1 var(--ui); letter-spacing: .28em; text-transform: uppercase; color: rgba(255,255,255,.88); opacity: 0; transform: translateY(8px); transition: opacity .8s, transform .8s; text-shadow: 0 1px 8px rgba(0,0,0,.8); }
+#title-cap.show { opacity: 1; transform: none; }
+#title-cap i { width: 8px; height: 8px; border-radius: 50%; background: #ff3b30; box-shadow: 0 0 10px #ff3b30; animation: livedot 1.2s infinite; }
+#title-cap i::after { content: 'LIVE'; margin-left: 14px; color: #ff6b61; font-style: normal; letter-spacing: .2em; }
+#title-cap i { position: relative; margin-right: 46px; }
+@keyframes livedot { 50% { opacity: .25; } }
+@media (max-width: 700px) { #title::before, #title::after { height: 4vh; } #title-cap { bottom: calc(4vh + 10px); font-size: 10px; } }

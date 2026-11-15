@@ -141,9 +141,10 @@ export class Effects {
       this.alpha.emit(x + rand(-1, 1), y + 0.2, z + rand(-1, 1), rand(-2, 2), rand(0.3, 1.2), rand(-2, 2), rand(0.6, 1.2), rand(0.8, 1.6), col[0], col[1], col[2], 0.45, 0, 2.0, 1.5);
     }
   }
-  tireSmoke(x, y, z, amt) {
+  tireSmoke(x, y, z, amt, col = null) {
     if (Math.random() > amt) return;
-    this.alpha.emit(x, y + 0.25, z, rand(-0.6, 0.6), rand(0.4, 1.0), rand(-0.6, 0.6), rand(0.8, 1.5), rand(0.7, 1.2), 0.85, 0.85, 0.85, 0.35, -0.1, 2.4, 1.2);
+    const r = col == null ? 0.85 : ((col >> 16) & 255) / 255, g = col == null ? 0.85 : ((col >> 8) & 255) / 255, b = col == null ? 0.85 : (col & 255) / 255;
+    this.alpha.emit(x, y + 0.25, z, rand(-0.6, 0.6), rand(0.4, 1.0), rand(-0.6, 0.6), rand(0.8, 1.5), rand(0.7, 1.2), r, g, b, col == null ? 0.35 : 0.6, -0.1, 2.4, 1.2);
   }
   fire(x, y, z, n = 1) {
     for (let k = 0; k < n; k++) {

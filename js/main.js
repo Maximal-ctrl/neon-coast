@@ -50,7 +50,9 @@ import { Interiors } from './interiors.js';
 import { Multiplayer } from './multiplayer.js';
 import { UI, Inventory, ITEMS } from './ui.js';
 import { CAR_TYPES, CAR_SHOP } from './models.js';
-import { fmtTime } from './utils.js';
+import { fmtTime, fmtMoney } from './utils.js';
+import { NET } from './terrain.js';
+import { Attract } from './attract.js';
 import { Trip, TRIP_GLSL } from './drugs.js';
 import { Attractions, setupAttractions } from './attractions.js';
 import { chunkScene, DynRes } from './perf.js';
@@ -252,7 +254,7 @@ function beginPlay(isNew) {
   const P = G.player;
   G.cam.clearCine();
   G.state = 'playing';
-  $('title').classList.add('hidden');
+  $('title').classList.add('hidden'); if (G.attract) G.attract.stop();
   $('creator').classList.add('hidden');
   G.hud.show(true);
   G.hud.weapon();
@@ -296,7 +298,7 @@ function openCreator() {
   prepareWorld(null);
   const P = G.player;
   G.state = 'creator';
-  $('title').classList.add('hidden');
+  $('title').classList.add('hidden'); if (G.attract) G.attract.stop();
   $('creator').classList.remove('hidden');
   P.x = 1500; P.z = 304.5; P.yaw = Math.PI;
   G.cam.setCine(new THREE.Vector3(1500.9, 1.55, 301.2), new THREE.Vector3(1500, 1.15, 304.5));
@@ -476,7 +478,23 @@ function statsHTML() {
   <span>Fahrzeuge „geliehen“</span><b>${S.carsStolen}</b>
   <span>Schüsse</span><b>${S.shotsFired}</b>
   <span>Sprünge</span><b>${S.stunts}</b>
-  <span>Polizei abgehängt</span><b>${S.copsEvaded}×</b></div>`;
+  <span>Polizei abgehängt</span><b>${S.copsEvaded}×</b>
+  <span>Höchste Fahndung</span><b>${'★'.repeat(S.maxWanted || 0) || '–'}</b>
+  <span>Polizisten ausgeschaltet</span><b>${S.copsKilled || 0}</b>
+  <span>Hubschrauber abgeschossen</span><b>${S.helisDown || 0}</b>
+  <span>Granaten geworfen</span><b>${S.nades || 0}</b>
+  <span>Weitester Treffer</span><b>${S.longShot || 0} m</b>
+  <span>Höchster Flug</span><b>${Math.round(S.maxAlt || 0)} m</b>
+  <span>Tuning-Teile eingebaut</span><b>${S.tuned || 0}</b>
+  <span>Riesenradfahrten</span><b>${S.wheelRides || 0}</b>
+  <span>Taxi-Teleports</span><b>${S.taxiRides || 0} · ${fmtMoney(S.taxiSpent || 0)}</b>
+  <span>Glücksspiele gespielt</span><b>${S.gambleGames || 0}</b>
+  <span>Glücksspiel: eingesetzt</span><b>${fmtMoney(S.gambleStaked || 0)}</b>
+  <span>Glücksspiel: ausgezahlt</span><b>${fmtMoney(S.gamblePaid || 0)}</b>
+  <span>Glücksspiel: Bilanz</span><b>${((S.gamblePaid || 0) - (S.gambleStaked || 0)) >= 0 ? '+' : '−'}${fmtMoney(Math.abs((S.gamblePaid || 0) - (S.gambleStaked || 0)))}</b>
+  <span>Größter Gewinn</span><b>${fmtMoney((P.casinoStats && P.casinoStats.biggest) || 0)}</b>
+  <span>Autos in der Garage</span><b>${P.garage.length}</b>
+  <span>Erfolge</span><b>${(P.ach || []).length}</b></div>`;
 }
 
 
@@ -491,6 +509,7 @@ G.openMenu = function (title, html, items) {
 
 let phoneOpen = false;
 const ICON = {
+  taxi: '<svg viewBox="0 0 24 24"><path d="M9 3h6l1 2.2h1.5a2 2 0 0 1 1.9 1.4L21 11a1.5 1.5 0 0 1 1 1.4V18h-2v2h-3v-2H7v2H4v-2H2v-5.6A1.5 1.5 0 0 1 3 11l1.6-4.4a2 2 0 0 1 1.9-1.4H8zm-2.6 4.2L5.2 11h13.6l-1.2-3.8zM6.5 13a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6zm11 0a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 0 0 0-2.6z"/></svg>',
   ach: '<svg viewBox="0 0 24 24"><path d="M7 3h10v3h3v2a4 4 0 0 1-4 4h-.4A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.4 12H8a4 4 0 0 1-4-4V6h3zm0 5V8H6a2 2 0 0 0 1 1.7zm10 0v1.7A2 2 0 0 0 18 8z"/></svg>',
   jobs: '<svg viewBox="0 0 24 24"><path d="M6 3h4v4H6zM14 3h4v4h-4zM10 15h4v4h-4zM7 7v3h10V7h-2v1H9V7zM11 10h2v5h-2z"/></svg>',
   contacts: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7z"/></svg>',
@@ -506,7 +525,7 @@ const ICON = {
   save: '<svg viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 2v5h9V5zm5 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
 };
 const APPS = [['jobs', 'Aufträge', '#ffd23f,#ff7b00'], ['contacts', 'Kontakte', '#34c759,#0a8f3c'], ['messages', 'Nachrichten', '#19e6ff,#1567d3'], ['map', 'Karte', '#ff9f1c,#e8590c'], ['radio', 'Radio', '#ff2e88,#a01458'],
-  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3'], ['garage', 'Garage', '#ff7b00,#b5179e'], ['inv', 'Inventar', '#06d6a0,#118ab2'], ['ach', 'Erfolge', '#ffe14d,#c77d00']];
+  ['stats', 'Statistik', '#b26bff,#5b2bb5'], ['photo', 'Kamera', '#8e9aaf,#3a4357'], ['settings', 'Einstellungen', '#6c7a91,#2b3445'], ['save', 'Speichern', '#ffd23f,#d18e00'], ['mp', 'Multiplayer', '#4dd2ff,#2b5bd3'], ['garage', 'Autos', '#ff7b00,#b5179e'], ['taxi', 'Taxi', '#ffd23f,#e0a100'], ['inv', 'Inventar', '#06d6a0,#118ab2'], ['ach', 'Erfolge', '#ffe14d,#c77d00']];
 
 function openPhone() {
   if (G.state !== 'playing' || G.player.state === 'dead' || G.player.state === 'busted') return;
@@ -573,7 +592,7 @@ function phoneContact(c) {
   const P = G.player;
   let actions = '';
   if (c.id === 'dex') {
-    actions += `<button class="ph-btn2" data-act="car">🚗 Auto liefern lassen <em>$250</em></button>`;
+    actions += `<button class="ph-btn2" data-act="carapp">🚗 Auto bestellen (App „Autos“)</button>`;
     if (P.inCar) actions += `<button class="ph-btn2" data-act="repair">🔧 Wagen reparieren <em>$150</em></button>`;
   }
   if (c.id === 'anwalt') actions += G.police.level > 0 ? `<button class="ph-btn2" data-act="lawyer">⚖️ Fahndung löschen <em>$${G.police.level * 600}</em></button>` : '<div class="ph-note">Du wirst gerade nicht gesucht.</div>';
@@ -592,6 +611,7 @@ function phoneContact(c) {
 function phoneAction(a) {
   const P = G.player;
   const pay = (n) => { if (P.money < n) { G.hud.toast('Nicht genug Geld.'); return false; } P.addMoney(-n); return true; };
+  if (a === 'carapp') { phoneGarage(); return; }
   if (a === 'car') {
     if (G.interior) { G.hud.toast('Dex: Ich kann dir kein Auto in ein Gebäude stellen!'); return; }
     if (P.inCar) { G.hud.toast('Dex: Du sitzt doch schon in einem Auto.'); return; }
@@ -699,29 +719,92 @@ function phoneRadio() {
   });
 }
 let lastDelivered = null;
+// Lieferpunkt am Straßenrand – in der Stadt an einer Kreuzung, in den Solera Hills an der nächsten Landstraße
+function deliverySpot(px, pz) {
+  const W = G.world;
+  if (W.inHills(px, pz)) {
+    const l = W.netLocate(px, pz), E = l ? NET.edges[l.edge] : null;
+    if (E && E.pts && E.pts.length > 2) {
+      const n = E.pts.length, k = Math.min(n - 2, Math.max(1, l.idx + (l.idx + 6 < n - 1 ? 5 : -5)));
+      const [ax, az] = E.pts[k], [bx, bz] = E.pts[k + 1], L = Math.hypot(bx - ax, bz - az) || 1, tx = (bx - ax) / L, tz = (bz - az) / L;
+      return { x: ax - tz * 5.6, z: az + tx * 5.6, h: Math.atan2(tx, tz) };
+    }
+  }
+  const nd = W.nearestNode(px, pz);
+  const o = W.nodes[nd.nbr[Math.floor(Math.random() * nd.nbr.length)]];
+  const dx = Math.sign(o.x - nd.x), dz = Math.sign(o.z - nd.z);
+  return { x: nd.x + dx * 22 - dz * 6, z: nd.z + dz * 22 + dx * 6, h: Math.atan2(dx, dz) };
+}
+// Leihwagen von Dex (frei wählbar, gestaffelte Preise)
+const RENTALS = [['kiwi', 150, null], ['marina', 200, null], ['brutus', 300, null], ['atlas', 350, null], ['coyote', 300, null], ['zephyra', 500, 'm2'], ['vortex', 800, 'm5'], ['brecher', 900, 'tb2']];
 function phoneGarage() {
   const P = G.player;
-  const list = P.garage;
-  phoneScreen('Garage', list.length ? list.map((c, i) => { const T = CAR_TYPES[c.key]; return `<div class="ph-car"><i style="background:#${c.color.toString(16).padStart(6, '0')}"></i><div><b>${T.name}</b><span>${CAR_SHOP[c.key] ? CAR_SHOP[c.key].cls : ''} · ${Math.round(T.maxSpeed * 3.6)} km/h</span></div><button class="ph-btn2 small" data-deliver="${i}">Liefern</button></div>`; }).join('')
-    + '<div class="ph-note">Deine Autos werden kostenlos in deine Nähe geliefert.</div>'
-    : '<div class="ph-empty">🚗<b>Noch keine Autos</b><span>Kauf dein erstes Auto bei <b>Solera Motors</b> in Midtown (pinkes A auf der Karte).</span></div>');
-  $('ph-screen').querySelectorAll('[data-deliver]').forEach((b) => b.onclick = () => {
-    if (G.interior) { G.hud.toast('Geh erst nach draußen.'); return; }
-    if (P.inCar) { G.hud.toast('Steig erst aus.'); return; }
-    const c = list[+b.dataset.deliver];
+  const list = P.garage, D = G.missions.done;
+  const own = list.length ? list.map((c, i) => { const T = CAR_TYPES[c.key]; return `<div class="ph-car"><i style="background:#${c.color.toString(16).padStart(6, '0')}"></i><div><b>${T.name}</b><span>${CAR_SHOP[c.key] ? CAR_SHOP[c.key].cls : ''} · ${Math.round(T.maxSpeed * 3.6)} km/h</span></div><button class="ph-btn2 small" data-deliver="${i}">Liefern</button></div>`; }).join('')
+    : '<div class="ph-note">Noch keine eigenen Autos – kauf eins bei <b>Solera Motors</b> (pinkes A) oder nimm einen Leihwagen.</div>';
+  const rent = RENTALS.filter(([, , req]) => !req || D.has(req)).map(([key, price]) => { const T = CAR_TYPES[key]; return `<div class="ph-car"><i style="background:#${(T.colors[0]).toString(16).padStart(6, '0')}"></i><div><b>${T.name}</b><span>Leihwagen · ${Math.round(T.maxSpeed * 3.6)} km/h</span></div><button class="ph-btn2 small" data-rent="${key}">${money2(price)}</button></div>`; }).join('');
+  phoneScreen('Autos', `<div class="ph-sec">🏠 Deine Garage <small>kostenlose Lieferung</small></div>${own}
+    <div class="ph-sec">🔧 Dex' Leihwagen <small>wird sofort gebracht</small></div>${rent}
+    <div class="ph-note">Geliefert wird an den nächsten Straßenrand – in der Stadt und in den Solera Hills.</div>`);
+  const place = (key, color, tune, garageId) => {
+    if (G.interior) { G.hud.toast('Geh erst nach draußen.'); return null; }
+    if (P.inCar) { G.hud.toast('Steig erst aus.'); return null; }
     if (lastDelivered && !lastDelivered.removed && lastDelivered.driver !== 'player' && lastDelivered.alive) lastDelivered.remove();
-    const n = G.world.nearestNode(P.x, P.z);
-    const o = G.world.nodes[n.nbr[Math.floor(Math.random() * n.nbr.length)]];
-    const dx = Math.sign(o.x - n.x), dz = Math.sign(o.z - n.z);
-    const v = G.vm.spawn(c.key, n.x + dx * 22 - dz * 6, n.z + dz * 22 + dx * 6, Math.atan2(dx, dz), c.color);
-    if (v) {
-      v.parked = true; v.ownedByPlayer = true; v.persistent = true; v.missionCar = true; P.lastVehicle = v; lastDelivered = v;
-      v.garageId = c.id; if (c.tune) applyTune(v, c.tune);
-      setTimeout(() => { v.missionCar = false; }, 60000);
-      G.hud.toast(`🚗 Dein ${v.T.name} wurde geliefert – blauer Punkt auf der Karte.`);
-    }
-    closePhone();
+    const s = deliverySpot(P.x, P.z);
+    G.missions.clearArea && G.missions.clearArea(s.x, s.z, 6);
+    const v = G.vm.spawn(key, s.x, s.z, s.h, color);
+    if (!v) return null;
+    v.parked = true; v.ownedByPlayer = true; v.persistent = true; v.missionCar = true; P.lastVehicle = v; lastDelivered = v;
+    if (garageId) v.garageId = garageId; if (tune) applyTune(v, tune);
+    setTimeout(() => { v.missionCar = false; }, 60000);
+    return v;
+  };
+  $('ph-screen').querySelectorAll('[data-deliver]').forEach((b) => b.onclick = () => {
+    const c = list[+b.dataset.deliver], v = place(c.key, c.color, c.tune, c.id);
+    if (v) G.hud.toast(`🚗 Dein ${v.T.name} wurde geliefert – blauer Punkt auf der Karte.`);
+    if (v) closePhone();
   });
+  $('ph-screen').querySelectorAll('[data-rent]').forEach((b) => b.onclick = () => {
+    const r = RENTALS.find((q) => q[0] === b.dataset.rent);
+    if (P.money < r[1]) { G.hud.toast('Nicht genug Geld.'); return; }
+    const v = place(r[0]);
+    if (v) { P.addMoney(-r[1]); G.hud.toast(`Dex: Dein ${v.T.name} steht bereit – blauer Punkt auf der Karte.`); closePhone(); }
+  });
+}
+const money2 = (n) => '$' + Math.round(n).toLocaleString('de-DE');
+// Taxi-App: bringt dich (gegen viel Geld) direkt zum markierten Wegpunkt
+function taxiPrice(d) { return Math.round((450 + d * 3.2 + d * d * 0.0009) / 50) * 50; }
+function phoneTaxi() {
+  const P = G.player, wp = G.missions.waypoint;
+  const px = P.inCar ? P.vehicle.x : P.x, pz = P.inCar ? P.vehicle.z : P.z;
+  if (!wp) { phoneScreen('Taxi', '<div class="ph-empty">🚕<b>Kein Ziel markiert</b><span>Setz zuerst auf der großen Karte (M) einen <b>Wegpunkt</b>. Das Taxi bringt dich dann direkt hin.</span></div>'); return; }
+  const d = Math.hypot(wp.x - px, wp.z - pz), price = taxiPrice(d);
+  phoneScreen('Taxi', `<div class="ph-profile"><div style="font-size:54px">🚕</div><b>Solera Cabs</b><span>Express zum Wegpunkt</span></div>
+    <div class="kv"><span>Entfernung</span><b>${(d / 1000).toFixed(2).replace('.', ',')} km</b><span>Fahrpreis</span><b>${money2(price)}</b><span>Dein Geld</span><b>${money2(P.money)}</b></div>
+    <div class="ph-actions"><button class="ph-btn2" data-taxi="go" ${P.money < price ? 'disabled' : ''}>🚕 Taxi rufen · ${money2(price)}</button></div>
+    <div class="ph-note">Je weiter das Ziel, desto teurer. Nicht während eines Auftrags oder einer Fahndung.</div>`);
+  const b = $('ph-screen').querySelector('[data-taxi]');
+  if (b) b.onclick = () => {
+    if (G.police.level > 0) { G.hud.toast('🚕 Kein Fahrer nimmt dich mit, solange die Polizei dich sucht.'); return; }
+    if (G.missions.active && !G.missions.active.side) { G.hud.toast('🚕 Nicht während eines Auftrags.'); return; }
+    if (G.interior) { G.hud.toast('Geh erst nach draußen.'); return; }
+    if (P.money < price) { G.hud.toast('Nicht genug Geld.'); return; }
+    P.addMoney(-price);
+    G.stats.taxiRides = (G.stats.taxiRides || 0) + 1; G.stats.taxiSpent = (G.stats.taxiSpent || 0) + price;
+    closePhone();
+    if (P.inCar) P.exitVehicle(true);
+    const W = G.world;
+    // Ankunft am Straßenrand nahe dem Ziel (nie im Wasser oder in Gebäuden)
+    const s = deliverySpot(wp.x, wp.z);
+    let tx = Math.hypot(s.x - wp.x, s.z - wp.z) < 60 ? wp.x : s.x, tz = Math.hypot(s.x - wp.x, s.z - wp.z) < 60 ? wp.z : s.z;
+    if (W.groundHeight(tx, tz) < 0.1) { tx = s.x; tz = s.z; }
+    G.hud.fadeIn && G.hud.fadeIn();
+    P.state = 'foot'; P.x = tx; P.z = tz; P.y = W.groundHeight(tx, tz); P.vx = P.vz = P.vy = 0; P.onGround = true;
+    P.collide && P.collide();
+    G.cam.snap();
+    G.missions.waypoint = null;
+    G.hud.toast(`🚕 Angekommen! Fahrpreis ${money2(price)}.`);
+  };
 }
 function setupPhone() {
   $('inv-btn').addEventListener('click', () => { if (G.state === 'playing') G.ui.inventory(); });
@@ -757,6 +840,7 @@ function setupPhone() {
     else if (app === 'mp') { closePhone(); openMultiplayer(); }
     else if (app === 'inv') { closePhone(); G.ui.inventory(); }
     else if (app === 'garage') phoneGarage();
+    else if (app === 'taxi') phoneTaxi();
     else if (app === 'jobs') phoneJobs();
     else if (app === 'save') {
       if (G.missions.active && !G.missions.active.side) G.hud.toast('Während eines Auftrags kann nicht gespeichert werden.');
@@ -959,8 +1043,8 @@ function update(now, step, I) {
   if (G.state === 'title') {
     G.time += step;
     G.timeOfDay = (G.timeOfDay + step * 0.01) % 24;
-    G.cam.attract(step, now / 1000);
-    G.player.x = 40 + Math.cos(now / 1000 * 0.035) * 120; G.player.z = Math.sin(now / 1000 * 0.035) * 120;
+    if (!G.attract) G.attract = new Attract();
+    G.attract.update(step);
     G.traffic.update(step);
     G.vm.step(step);
     G.peds.update(step);
@@ -1041,7 +1125,7 @@ function skids() {
       G.effects.skid(prev[1][0], prev[1][1], wr[0], wr[1], y, 0.24, 0.55);
       const amt = Math.min(1, (v.slip - 2) / 6 + (v.input.handbrake ? 0.4 : 0));
       if (G.world.surfaceAt(v.x, v.z) === 'sand') { if (Math.random() < 0.5) G.effects.dust(wl[0], y, wl[1], 1); }
-      else { G.effects.tireSmoke(wl[0], y, wl[1], amt); G.effects.tireSmoke(wr[0], y, wr[1], amt); }
+      else { const sc = v.smokeCol ?? null, a2 = sc != null ? Math.min(1, amt * 1.6) : amt; G.effects.tireSmoke(wl[0], y, wl[1], a2, sc); G.effects.tireSmoke(wr[0], y, wr[1], a2, sc); }
     }
     if (sliding) _last.set(v.id, [wl, wr]); else _last.delete(v.id);
   }
@@ -1066,7 +1150,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = 'Beta 3.12';
+export const GAME_VERSION = 'Beta 3.13';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

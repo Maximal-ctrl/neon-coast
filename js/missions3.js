@@ -501,7 +501,7 @@ add({ id: 'pp6', title: 'Freier Fall', sub: 'Paco', contact: 'paco', req: ['pp5'
     m.fails = [];
     m.objective('Flieg über <b>Port Solera</b> auf über <b>300 m</b> Höhe.');
     yield* m.until(() => P().vehicle === plane && Math.abs(plane.x - 100) < 450 && Math.abs(plane.z) < 420 && plane.y > 300);
-    m.objective('Spring ab! (F / AUS) – der Fallschirm öffnet sich automatisch.');
+    m.objective('Spring ab (F / AUS) und öffne den <b>Fallschirm</b> mit der <b>LEERTASTE</b> bzw. der 🪂-Taste!');
     yield* m.until(() => !P().inCar);
     const tx = 620, tz = 40;
     const mk = m.marker(tx, tz, 0xffd23f, { r: 6, blipCol: '#ffd23f' });

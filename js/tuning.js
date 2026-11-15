@@ -17,12 +17,16 @@ export const TUNE = {
   turbo: { name: 'Turbo', icon: '🌀', opts: [{ v: 0, name: 'Ohne', price: 0 }, { v: 1, name: 'Turbolader', price: 9000 }] },
   brakes: { name: 'Bremsen', icon: '🛑', opts: [{ v: 0, name: 'Serie', price: 0 }, { v: 1, name: 'Sport', price: 1500 }, { v: 2, name: 'Rennsport', price: 4000 }] },
   susp: { name: 'Fahrwerk', icon: '⬇️', opts: [{ v: 0, name: 'Serie', price: 0 }, { v: 1, name: 'Tiefer', price: 2000 }, { v: 2, name: 'Extra tief', price: 5000 }] },
-  armor: { name: 'Panzerung', icon: '🛡️', opts: [{ v: 0, name: 'Ohne', price: 0 }, { v: 1, name: '+25 %', price: 3000 }, { v: 2, name: '+50 %', price: 8000 }, { v: 3, name: '+100 %', price: 15000 }] },
+  armor: { name: 'Panzerung', icon: '🛡️', opts: [{ v: 0, name: 'Ohne', price: 0 }, { v: 1, name: '+25 %', price: 3000 }, { v: 2, name: '+50 %', price: 8000 }, { v: 3, name: '+100 %', price: 15000 }, { v: 4, name: '+400 % Haltbarkeit', price: 95000 }] },
   neon: { name: 'Unterboden-Neon', icon: '💡', opts: [{ v: null, name: 'Aus', price: 0 }, ...[[0xff2e88, 'Pink'], [0x19e6ff, 'Türkis'], [0x7cff6b, 'Grün'], [0xb26bff, 'Lila'], [0xffd60a, 'Gelb'], [0xff3b30, 'Rot']].map(([c, n]) => ({ v: c, name: n, price: 2500, color: c }))] },
   spoiler: { name: 'Spoiler', icon: '🪽', opts: [{ v: 0, name: 'Ohne', price: 0 }, { v: 1, name: 'Abrisskante', price: 1500 }, { v: 2, name: 'Heckflügel', price: 3500 }] },
   tint: { name: 'Scheiben', icon: '🕶️', opts: [{ v: 0, name: 'Klar', price: 0 }, { v: 1, name: 'Getönt', price: 400 }, { v: 2, name: 'Limousine', price: 900 }] },
   nitro: { name: 'Nitro', icon: '🔥', opts: [{ v: 0, name: 'Ohne', price: 0 }, { v: 1, name: 'Nitro-Einspritzung', price: 7000 }] },
+  tires: { name: 'Reifen', icon: '💨', opts: [{ v: null, name: 'Serie (weißer Rauch)', price: 0, color: 0xdddddd }, ...[[0xff2e88, 'Pink'], [0x19e6ff, 'Türkis'], [0x7cff6b, 'Grün'], [0xb26bff, 'Lila'], [0xffd60a, 'Gelb'], [0xff3b30, 'Rot'], [0x2a2a2a, 'Schwarz'], [0xff8c1a, 'Orange']].map(([c, n]) => ({ v: c, name: n + 'er Driftrauch', price: 1800, color: c }))] },
+  steering: { name: 'Lenkung', icon: '🎯', opts: [{ v: 0, name: 'Serie', price: 0 }, { v: 1, name: 'Direkt (präziser)', price: 2500 }, { v: 2, name: 'Rennsport (max. Grip)', price: 6000 }, { v: 3, name: 'Drift-Setup (weite Drifts)', price: 4500 }, { v: 4, name: 'Extrem-Drift (steil & lang)', price: 9000 }] },
 };
+// Lenkung: [Lenkfaktor, Driftfaktor] – Driftfaktor > 1 = mehr Schlupf, steilere und längere Drifts
+export const STEER_SET = [[1, 1], [1.18, 0.9], [1.25, 0.7], [1.12, 1.45], [1.16, 1.9]];
 const CATS = Object.keys(TUNE);
 
 // ------------------------------------------------------------ Materialien
@@ -50,9 +54,11 @@ export function applyTune(v, t = {}) {
   v.tune = { ...t };
   const eng = [1, 1.1, 1.2, 1.32][t.engine || 0] * (t.turbo ? 1.15 : 1);
   const top = [1, 1.04, 1.08, 1.12][t.engine || 0] * (t.turbo ? 1.05 : 1);
-  v.T = { ...base, accel: base.accel * eng, maxSpeed: base.maxSpeed * top, brake: base.brake * [1, 1.2, 1.4][t.brakes || 0], grip: base.grip * [1, 1.06, 1.12][t.susp || 0] };
+  const ss = STEER_SET[t.steering || 0] || STEER_SET[0];
+  v.T = { ...base, accel: base.accel * eng, maxSpeed: base.maxSpeed * top, brake: base.brake * [1, 1.2, 1.4][t.brakes || 0], grip: base.grip * [1, 1.06, 1.12][t.susp || 0], steer: base.steer * ss[0], drift: ss[1] };
+  v.smokeCol = t.tires || null;
   const frac = v.maxHealth ? v.health / v.maxHealth : 1;
-  v.maxHealth = base.hp * [1, 1.25, 1.5, 2][t.armor || 0]; v.health = v.maxHealth * frac; v.mass = base.mass * (1 + (t.armor || 0) * 0.08);
+  v.maxHealth = base.hp * [1, 1.25, 1.5, 2, 5][t.armor || 0]; v.health = v.maxHealth * frac; v.mass = base.mass * (1 + (t.armor || 0) * 0.08);
   if (v.alive && !base.tank) {
     const m = tunedPaint(t.paint ?? v.baseColor, t.finish || 'gloss');
     v.parts.body.material = m; if (v.parts.doorMesh) v.parts.doorMesh.material = m;

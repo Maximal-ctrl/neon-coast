@@ -43,8 +43,10 @@ function cone(x, y, z) {
 const BLINK = new Set();
 export function tickBarriers() { for (const g of BLINK) { if (!g.parent) { BLINK.delete(g); continue; } g.userData.tick(); } }
 
-const HEAT = [0, 1, 6, 14, 26, 42];
-const CRIME_HEAT = { shoot: 1, hitPed: 2, killPed: 4, hitCop: 3, killCop: 8, copcar: 2, explode: 4, carjack: 1, stealCop: 6 };
+// 3.13: Sterne steigen langsamer (höhere Schwellen, weniger Hitze pro Tat)
+const HEAT = [0, 1, 10, 26, 48, 76];
+const CRIME_HEAT = { shoot: 1, hitPed: 2, killPed: 3, hitCop: 2, killCop: 5, copcar: 1, explode: 3, carjack: 1, stealCop: 4 };
+const COP_CRIMES = new Set(['hitCop', 'killCop', 'copcar', 'stealCop', 'explode']);
 
 export class Police {
   constructor(scene) {
@@ -69,7 +71,7 @@ export class Police {
     if (type === 'killCop') G.stats.copsKilled = (G.stats.copsKilled || 0) + 1;
     if (this.locked) return;
     const now = G.time;
-    if (this.lastCrime[type] && now - this.lastCrime[type] < (type === 'shoot' ? 2 : 0.5)) return;
+    if (this.lastCrime[type] && now - this.lastCrime[type] < (type === 'shoot' ? 2 : type === 'copcar' ? 3 : 0.5)) return;
     this.lastCrime[type] = now;
     let seen = witnessed || this.copNear(type === 'shoot' ? 45 : 60);
     if (type === 'killPed' || type === 'killCop' || type === 'hitCop' || type === 'copcar' || type === 'explode' || type === 'stealCop') seen = true;
@@ -78,10 +80,10 @@ export class Police {
       else return;
     }
     this.heat += CRIME_HEAT[type] || 1;
+    if (COP_CRIMES.has(type)) this.lastCopCrime = now;
     let lvl = 0;
     for (let k = 1; k < HEAT.length; k++) if (this.heat >= HEAT[k]) lvl = k;
     lvl = Math.max(lvl, this.level === 0 ? 1 : this.level);
-    if (type === 'killCop' && this.level >= 1) lvl = Math.max(lvl, this.level + 1);
     this.setLevel(Math.min(5, lvl));
     this.lastSeen = now;
   }
@@ -91,7 +93,7 @@ export class Police {
     if (this.locked && !force) return;
     const before = this.level;
     this.level = Math.max(l, this.minLevel);
-    if (this.level > before) { this.lastSeen = G.time; this.heat = Math.max(this.heat, HEAT[this.level]); G.hud.wantedPulse(); G.audio.wantedUp(); }
+    if (this.level > before) { this.lastSeen = G.time; this.lastDecay = G.time; this.heat = Math.max(this.heat, HEAT[this.level]); G.hud.wantedPulse(); G.audio.wantedUp(); }
     if (this.level === 0 && before > 0) this.clear();
   }
 
@@ -106,7 +108,7 @@ export class Police {
 
   spotted() { this.lastSeen = G.time; const P = G.player; this.lastPos = { x: P.inCar ? P.vehicle.x : P.x, z: P.inCar ? P.vehicle.z : P.z }; }
   get searching() { return this.level > 0 && G.time - this.lastSeen > 2.5; }
-  evadeTime() { return 8 + this.level * 4; }
+  evadeTime() { return 14 + this.level * 5; } // länger unentdeckt bleiben, um abzuhängen
   unitRemoved(v) {}
 
   arresting(cop, dt) { this.arrestCop = cop; }
@@ -122,6 +124,15 @@ export class Police {
       G.hud.toast('Polizei abgehängt!');
       if (G.missions.onEvaded) G.missions.onEvaded();
       return;
+    }
+    // Abklingen: lange nichts gegen die Polizei getan -> Sterne sinken bis auf 2
+    if (this.level > 2 && this.level > this.minLevel && !this.locked) {
+      const quiet = G.time - Math.max(this.lastCopCrime || -999, this.lastDecay || -999);
+      if (quiet > 40) {
+        this.lastDecay = G.time; this.level -= 1; this.heat = Math.min(this.heat, HEAT[this.level] + 2);
+        G.hud.toast('⭐ Die Fahndung lässt nach …');
+        if (G.hud.wantedPulse) G.hud.wantedPulse();
+      }
     }
     // Einheiten
     const cars = G.vehicles.filter((v) => v.police && v.alive && v.ai && v.ai.mode === 'police');
@@ -248,7 +259,7 @@ export class Police {
       if (G.vehicles.some((o) => dist2(o.x, o.z, x, z) < 9)) continue;
       const v = G.vm.spawn(this.level >= 5 && k % 2 ? 'kodiak' : 'police', x, z, Math.atan2(px, pz) + (k % 2 ? Math.PI : 0), this.level >= 5 && k % 2 ? 0x1b2b48 : undefined);
       if (!v) continue;
-      v.parked = true; v.persistent = true; v.siren = true; v.police = true; v.roadblock = true; v.mass = v.T.mass * 9;
+      v.parked = true; v.persistent = true; v.siren = true; v.police = true; v.roadblock = true; v.mass = v.T.mass * 6;
       cars.push(v);
     }
     // Absperrgitter auf Bankett/Gehweg, damit niemand außen herum fährt
@@ -364,15 +375,18 @@ export class Police {
     if (!this.heliActive) { G.audio.setHeli(0); return; }
     let tx, tz, ty;
     if (want) {
-      this.heliAng += dt * 0.25;
-      tx = px + Math.cos(this.heliAng) * 26; tz = pz + Math.sin(this.heliAng) * 26; ty = 42;
+      // 3.13: weite Kreise um den Spieler, Höhe über Gelände
+      this.heliAng += dt * 0.42;
+      const rr = 52 + Math.sin(G.time * 0.21) * 16;
+      tx = px + Math.cos(this.heliAng) * rr; tz = pz + Math.sin(this.heliAng) * rr;
+      ty = Math.max(G.world.groundHeight(px, pz), G.world.groundHeight(tx, tz)) + 40 + Math.sin(G.time * 0.33) * 6;
     } else {
       tx = this.heliPos.x + (this.heliPos.x - px) * 2; tz = this.heliPos.z + (this.heliPos.z - pz) * 2; ty = 90;
       if (dist2(this.heliPos.x, this.heliPos.z, px, pz) > 400 * 400) { this.heliActive = false; g.visible = false; this.beam.visible = false; this.spot.visible = false; G.audio.setHeli(0); return; }
     }
     const dx = tx - this.heliPos.x, dy = ty - this.heliPos.y, dz = tz - this.heliPos.z;
     const L = Math.hypot(dx, dz);
-    const sp = Math.min(32, L * 0.8);
+    const sp = Math.min(36, L * 0.9);
     this.heliVel.x = damp(this.heliVel.x, (dx / (L || 1)) * sp, 1.5, dt);
     this.heliVel.z = damp(this.heliVel.z, (dz / (L || 1)) * sp, 1.5, dt);
     this.heliVel.y = damp(this.heliVel.y, dy * 0.6, 1.5, dt);

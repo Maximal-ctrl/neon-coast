@@ -173,6 +173,17 @@ export class HUD {
     document.body.classList.toggle('scoped', !G.isTouch && !P.inCar && P.weapon === 'sniper' && !!P.anim.aim);
     document.body.classList.toggle('armed', P.weapon !== 'fists');
     // Fadenkreuz / Ziel
+    // Fallschirm-Taste im freien Fall
+    const cb = $('chute-btn');
+    if (cb) {
+      const ff = !!(P.chuteReady && !P.parachute && P.state === 'foot');
+      cb.classList.toggle('show', ff);
+      if (!cb._bound) { cb._bound = true; cb.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); G.player._chuteTap = true; }); }
+      if (ff) { const agl = P.y - P.gy; cb.classList.toggle('urgent', agl < 120); }
+    }
+    // Fadenkreuz für Fahrzeugwaffen (oberer Bildschirmteil – dorthin wird gezielt)
+    const vc = $('veh-cross');
+    if (vc) { const v = P.inCar ? P.vehicle : null; vc.classList.toggle('show', !!(v && !v.T.plane && !v.T.boat && (v.T.tank || v.T.mg || (P.weapon !== 'fists' && !WEAPONS[P.weapon].throw)))); }
     const ch = $('crosshair');
     ch.classList.toggle('show', !G.isTouch && !P.inCar && P.weapon !== 'fists' && P.state === 'foot');
     ch.classList.toggle('aim', P.anim.aim);

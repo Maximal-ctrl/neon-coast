@@ -73,7 +73,7 @@ export class CameraRig {
       let off = ((this.carOff || 0) + Math.PI) % (Math.PI * 2); if (off < 0) off += Math.PI * 2; off -= Math.PI;
       if (this.userT <= 0 && (sp > 1.5 || this.carView === 2)) {
         off = damp(off, 0, this.carView === 2 ? 10 : 2.2, dt);
-        this.pitch = damp(this.pitch, this.carView === 2 ? -0.05 : v.T.plane && !v.grounded ? clamp(v.pitch * 0.8 - 0.14, -0.9, 0.8) : -0.2, v.T.plane ? 3 : 2, dt);
+        if (!(v.T.tank || v.T.mg)) this.pitch = damp(this.pitch, this.carView === 2 ? -0.05 : v.T.plane && !v.grounded ? clamp(v.pitch * 0.8 - 0.14, -0.9, 0.8) : -0.2, v.T.plane ? 3 : 2, dt); // mit Bordwaffe bleibt der Blick, wo der Spieler hinzielt
       }
       this.carOff = off;
       // Fahrzeugrichtung weich nachführen (kein Ruckeln bei Lenkstößen)
