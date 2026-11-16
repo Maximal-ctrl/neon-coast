@@ -1,5 +1,7 @@
 // Automatisch erzeugt – englische Übersetzung (Schlüssel = deutscher Originaltext)
 export const EN = {
+"Straßensperren weiter entfernt": "Roadblocks farther away",
+"Zeit zum Abbiegen": "Time to turn off",
 "! (3 Sekunden in 7 m Nähe bleiben)": "! (stay within 7 m for 3 seconds)",
 "! Komm im Diner vorbei.": "! Come by the diner.",
 "\">Liefern": "\">Deliver",

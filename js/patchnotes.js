@@ -1,5 +1,6 @@
 // Patch-Notes im Titelbild (neueste Version zuerst) – kurze Stichpunkte
 export const PATCH_NOTES = [
+  ['4.21', ['Straßensperren weiter entfernt', 'Zeit zum Abbiegen']],
   ['4.2', ['Accounts mit Profilbild', 'Freundescodes & Online-Status', 'Spielstand im Account', 'Neue Wohnung', 'Neue Menüs', 'Größeres Handy', 'Auftrags-Stammbaum', 'Patch-Notes']],
   ['3.14', ['Englisch & Deutsch', 'Sprachwahl im Titel']],
   ['3.13', ['Sterne seltener', 'Fadenkreuz im Fahrzeug', 'Fallschirm per Leertaste', 'Taxi-App', 'Mehr Garagen', 'Reifen & Lenkung tunen', 'Live-Titelbild']],

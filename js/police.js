@@ -210,13 +210,15 @@ export class Police {
     if (!road) return;
     if (this.level >= 5 && this.blocks.length < 3) {
       this.blockT = 26;
-      const ahead = this.along(road, 75), behind = this.along(road, -60);
+      // 4.21: weiter entfernt (je nach Tempo), damit man noch abbiegen kann
+      const lead = Math.max(190, v0.speed * 7);
+      const ahead = this.alongFar(road, lead, 130), behind = this.alongFar(road, -Math.max(110, v0.speed * 4), -80);
       if (ahead) this.makeBlock(ahead);
       if (behind) this.makeBlock(behind);
       G.hud.bigToast('EINGEKESSELT', 'Sperren vor und hinter dir!');
     } else if (this.blocks.length < 2) {
       this.blockT = 28;
-      const p = this.along(road, 140);
+      const p = this.alongFar(road, Math.max(260, v0.speed * 9), 170);
       if (p) { this.makeBlock(p); G.hud.toast('🚧 Polizeifunk: Straßensperre voraus!'); }
     }
   }
@@ -249,6 +251,21 @@ export class Police {
     if (left > 40) return null;
     const a = E.pts[i - 1], b = E.pts[i + 1]; let dx = b[0] - a[0], dz = b[1] - a[1]; const l = Math.hypot(dx, dz) || 1;
     return { x: E.pts[i][0], z: E.pts[i][1], dx: dx / l, dz: dz / l, hw: r.hw, side: r.hw + 1.5 };
+  }
+  // Sperre möglichst weit voraus (fällt bis minD zurück); in der Stadt mitten im Block, damit davor eine Kreuzung liegt
+  alongFar(r, dist, minD) {
+    const sg = Math.sign(dist);
+    for (let d = Math.abs(dist); d >= Math.abs(minD); d -= 30) {
+      const p = this.along(r, sg * d);
+      if (!p) continue;
+      if (!r.net) {
+        const mid = (q) => -C_HALF + (Math.floor((q + C_HALF) / 80) + 0.5) * 80;
+        if (r.dx) p.x = mid(p.x); else p.z = mid(p.z);
+        if (p.x < -640 || p.x > 372 || p.z < -384 || p.z > 384) continue;
+      }
+      return p;
+    }
+    return null;
   }
   makeBlock(p) {
     const W = G.world, px = -p.dz, pz = p.dx, cars = [], props = [], cols = [];
