@@ -508,51 +508,32 @@ body.touch #chute-btn small { display: none; }
 @media (max-width: 700px) { .pn { bottom: calc(4vh + 40px) !important; } .fb-btn { bottom: calc(4vh + 8px); } }
 .pn { width: 190px; } .pn-tab { white-space: nowrap; }
 
-/* ===== 4.24 Radio-Overlay ===== */
-#radio-box { top: calc(12px + var(--sat)) !important; z-index: 40; pointer-events: none; opacity: 0; transform: translate(-50%, -18px) scale(.96) !important; transition: opacity .35s ease, transform .45s cubic-bezier(.2,1.4,.4,1) !important; text-shadow: none !important; --c1: #ff2e88; --c2: #7b2cbf; }
-#radio-box.show { opacity: 1; transform: translate(-50%, 0) scale(1) !important; }
-#radio-box .rb-card { position: relative; display: flex; align-items: center; gap: 14px; min-width: 340px; max-width: min(520px, 92vw); padding: 12px 18px 12px 12px; border-radius: 18px; text-align: left; overflow: hidden;
-  background: linear-gradient(135deg, rgba(10,10,18,.86), rgba(10,10,18,.72)); backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
-  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 10px 40px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.4), 0 0 32px color-mix(in srgb, var(--c1) 35%, transparent); }
-#radio-box .rb-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, color-mix(in srgb, var(--c1) 30%, transparent), transparent 55%); pointer-events: none; }
-#radio-box .rb-card::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--c1), var(--c2)); }
-#radio-box .rb-logo { position: relative; flex: 0 0 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 32px;
-  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c1) 85%, #fff), var(--c2)); box-shadow: 0 0 22px color-mix(in srgb, var(--c1) 60%, transparent), inset 0 -4px 10px rgba(0,0,0,.35); animation: rbSpin 6s linear infinite; }
-#radio-box .rb-logo::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--c1) 70%, transparent); animation: rbPulse 1.6s ease-out infinite; }
-#radio-box .rb-main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-#radio-box .rb-kicker { font: 700 11px var(--ui); letter-spacing: .18em; color: rgba(255,255,255,.7); }
-#radio-box .rb-kicker em { font-style: normal; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #ff3355; color: #fff; letter-spacing: .1em; animation: rbBlink 1.2s steps(2) infinite; }
-#radio-box .rb-name { font: 800 26px/1.05 var(--head) !important; letter-spacing: .02em; color: #fff !important; background: linear-gradient(90deg, #fff, var(--c1)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none !important; filter: drop-shadow(0 2px 4px rgba(0,0,0,.7)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#radio-box .rb-tag { font: 500 12px var(--ui); color: rgba(255,255,255,.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#radio-box .rb-song { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.1); min-width: 0; }
-#radio-box .rb-title { font: 700 15px var(--ui); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#radio-box .rb-artist { font: 500 13px var(--ui); color: var(--c1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#radio-box .rb-soon span { font: 600 13px var(--ui); color: rgba(255,255,255,.55); font-style: italic; }
-#radio-box .rb-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; align-self: center; }
-#radio-box .rb-eq i { width: 3px; height: 100%; border-radius: 2px; background: var(--c1); transform-origin: bottom; animation: rbEq .9s ease-in-out infinite; }
-#radio-box .rb-eq i:nth-child(2) { animation-delay: -.3s; } #radio-box .rb-eq i:nth-child(3) { animation-delay: -.6s; } #radio-box .rb-eq i:nth-child(4) { animation-delay: -.15s; } #radio-box .rb-eq i:nth-child(5) { animation-delay: -.45s; }
-#radio-box .rb-prog { height: 3px; margin-top: 7px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
-#radio-box .rb-prog div { height: 100%; width: 0; background: linear-gradient(90deg, var(--c1), var(--c2)); transition: width .3s linear; }
-#radio-box .rb-dots { position: relative; display: flex; flex-direction: column; gap: 5px; }
-#radio-box .rb-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.22); }
-#radio-box .rb-dots i.on { background: var(--c1); box-shadow: 0 0 8px var(--c1); }
-#radio-box .rb-off { min-width: 220px; --c1: #888; --c2: #333; }
-#radio-box .rb-off .rb-logo { animation: none; font-size: 26px; color: #ccc; }
-#radio-box .rb-off .rb-logo::after { display: none; }
-@keyframes rbSpin { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
-@keyframes rbPulse { from { transform: scale(1); opacity: .9; } to { transform: scale(1.25); opacity: 0; } }
-@keyframes rbBlink { 50% { opacity: .55; } }
-@keyframes rbEq { 0%,100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
-@media (max-width: 600px) { #radio-box .rb-card { min-width: 0; gap: 10px; padding: 9px 12px 9px 9px; } #radio-box .rb-logo { flex-basis: 48px; height: 48px; font-size: 24px; } #radio-box .rb-name { font-size: 20px !important; } }
-/* 4.25 Kein Signal */
-#radio-box .rb-nosig { filter: saturate(.35); }
-#radio-box .rb-nosig .rb-logo { animation: rbFlicker 2.2s steps(1) infinite; }
-#radio-box .rb-nosig .rb-logo::after { animation: none; opacity: .25; }
-#radio-box .rb-kicker em.off { background: #555; animation: none; }
-#radio-box .rb-nosig-txt span:last-child { font: 700 13px var(--ui); color: #ff6b6b; letter-spacing: .04em; animation: rbFlicker 1.6s steps(1) infinite; }
-#radio-box .rb-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; align-self: center; }
-#radio-box .rb-bars i { width: 3px; border-radius: 1px; background: rgba(255,255,255,.18); }
-#radio-box .rb-bars i:nth-child(1) { height: 30%; background: #ff6b6b; } #radio-box .rb-bars i:nth-child(2) { height: 55%; } #radio-box .rb-bars i:nth-child(3) { height: 80%; } #radio-box .rb-bars i:nth-child(4) { height: 100%; }
-#radio-box .rb-nosig::before { background: repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 1px, transparent 1px 3px); animation: rbStatic .25s steps(3) infinite; }
-@keyframes rbFlicker { 0%,100% { opacity: 1; } 47% { opacity: .35; } 52% { opacity: 1; } 80% { opacity: .6; } }
-@keyframes rbStatic { to { background-position: 0 3px; } }
+/* ===== 4.31 Radio-Overlay: schlicht & durchsichtig ===== */
+#radio-box { top: calc(14px + var(--sat)) !important; z-index: 40; pointer-events: none; opacity: 0; transform: translate(-50%, -10px) !important; transition: opacity .4s ease, transform .5s cubic-bezier(.2,.9,.3,1) !important; text-shadow: none !important; --c1: #ff2e88; }
+#radio-box.show { opacity: 1; transform: translate(-50%, 0) !important; }
+#radio-box .rb { position: relative; display: flex; align-items: center; gap: 11px; min-width: 250px; max-width: min(420px, 90vw); padding: 8px 14px 9px 8px; border-radius: 999px; text-align: left; overflow: hidden;
+  background: rgba(12, 12, 18, .38); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 6px 24px rgba(0, 0, 0, .25); }
+#radio-box .rb-ic { flex: 0 0 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 19px;
+  background: color-mix(in srgb, var(--c1) 26%, rgba(255,255,255,.06)); border: 1px solid color-mix(in srgb, var(--c1) 55%, transparent); }
+#radio-box .rb-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#radio-box .rb-l1 { display: flex; align-items: baseline; gap: 8px; }
+#radio-box .rb-l1 b { font: 700 15px/1.1 var(--ui) !important; letter-spacing: .08em; color: #fff !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,.5) !important; }
+#radio-box .rb-fq { font: 600 11px var(--ui); color: rgba(255,255,255,.5); letter-spacing: .06em; }
+#radio-box .rb-l2 { display: flex; align-items: center; gap: 6px; min-width: 0; font: 500 12.5px var(--ui); color: rgba(255,255,255,.82); text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+#radio-box .rb-t { font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#radio-box .rb-a { color: rgba(255,255,255,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#radio-box .rb-t + .rb-a::before { content: '· '; }
+#radio-box .rb-ns { color: rgba(255,255,255,.55); letter-spacing: .04em; }
+#radio-box .rb-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 10px; flex: none; }
+#radio-box .rb-eq i { width: 2px; height: 100%; border-radius: 1px; background: var(--c1); transform-origin: bottom; animation: rbEq .9s ease-in-out infinite; }
+#radio-box .rb-eq i:nth-child(2) { animation-delay: -.3s; } #radio-box .rb-eq i:nth-child(3) { animation-delay: -.6s; }
+#radio-box .rb-dots { display: flex; gap: 4px; flex: none; padding-left: 2px; }
+#radio-box .rb-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.25); }
+#radio-box .rb-dots i.on { background: var(--c1); }
+#radio-box .rb-pr { position: absolute; left: 22px; right: 22px; bottom: 0; height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
+#radio-box .rb-pr i { display: block; height: 100%; width: 0; background: var(--c1); opacity: .85; transition: width .3s linear; }
+#radio-box .rb-nosig .rb-ic { filter: grayscale(1); opacity: .7; }
+#radio-box .rb-off { min-width: 0; }
+@keyframes rbEq { 0%,100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@media (max-width: 600px) { #radio-box .rb { min-width: 0; } #radio-box .rb-l1 b { font-size: 13px !important; } }

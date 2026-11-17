@@ -99,19 +99,20 @@ export class HUD {
     const el = $('radio-box'); if (!el) return;
     const R = RADIO[si];
     if (!R) {
-      el.style.cssText = '';
-      el.innerHTML = '<div class="rb-card rb-off"><div class="rb-logo">⏻</div><div class="rb-main"><small class="rb-kicker">RADIO</small><b class="rb-name">RADIO AUS</b></div></div>';
+      el.style.setProperty('--c1', '#9aa0aa');
+      el.innerHTML = '<div class="rb rb-off"><div class="rb-ic">⏻</div><div class="rb-tx"><div class="rb-l1"><b>RADIO AUS</b></div></div></div>';
     } else {
-      el.style.setProperty('--c1', R.c1); el.style.setProperty('--c2', R.c2);
+      el.style.setProperty('--c1', R.c1);
       const dots = RADIO.map((_, i) => `<i class="${i === si ? 'on' : ''}"></i>`).join('');
-      const song = R.nosignal ? '<div class="rb-song rb-nosig-txt"><span class="rb-bars"><i></i><i></i><i></i><i></i></span><span>Kein Signal – Sender nicht erreichbar</span></div>'
-        : track ? `<div class="rb-song"><span class="rb-eq"><i></i><i></i><i></i><i></i><i></i></span><span class="rb-title">${track.title || ''}</span><span class="rb-artist">${track.artist || ''}</span></div><div class="rb-prog"><div></div></div>`
-        : `<div class="rb-song rb-soon"><span>${R.tracks.length ? R.tagline : 'Bald verfügbar'}</span></div>`;
-      el.innerHTML = `<div class="rb-card${R.nosignal ? ' rb-nosig' : ''}"><div class="rb-logo">${R.nosignal ? '📡' : R.logo}</div><div class="rb-main"><small class="rb-kicker">FM ${R.freq} ${R.nosignal ? '<em class="off">OFFLINE</em>' : '<em>LIVE</em>'}</small><b class="rb-name">${R.name}</b><span class="rb-tag">${R.tagline}</span>${song}</div><div class="rb-dots">${dots}</div></div>`;
+      const l2 = R.nosignal ? '<span class="rb-ns">Kein Signal</span>'
+        : track ? `<span class="rb-eq"><i></i><i></i><i></i></span><span class="rb-t">${track.title || ''}</span><span class="rb-a">${track.artist || ''}</span>`
+        : `<span class="rb-a">${R.tagline}</span>`;
+      el.innerHTML = `<div class="rb${R.nosignal ? ' rb-nosig' : ''}"><div class="rb-ic">${R.nosignal ? '📡' : R.logo}</div><div class="rb-tx"><div class="rb-l1"><b>${R.name}</b><span class="rb-fq">${R.freq}</span></div><div class="rb-l2">${l2}</div></div><div class="rb-dots">${dots}</div>${track ? '<div class="rb-pr"><i></i></div>' : ''}</div>`;
     }
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
-    this.radioT = track ? 6 : R && R.nosignal ? 5 : 4;
+    this.radioT = track ? 5 : 3.5;
   }
+
   radio(st) { const el = $('radio-box'); el.innerHTML = `<b>${st.name}</b>${st.genre ? '<span>' + st.genre + '</span>' : ''}`; el.classList.add('show'); this.radioT = 3; }
   hitMarker(kill) { const el = $('hitmark'); el.className = kill ? 'show kill' : 'show'; this.hitT = 0.25; }
   damageFlash(a) { this.dmg = Math.min(1, this.dmg + a * 0.8); }
@@ -159,7 +160,7 @@ export class HUD {
     if ((this.areaT -= dt) <= 0) $('area-name').classList.remove('show');
     if ((this.vehT -= dt) <= 0) $('veh-name').classList.remove('show');
     if ((this.radioT -= dt) <= 0) $('radio-box').classList.remove('show');
-    else { const pb = document.querySelector('#radio-box .rb-prog div'), RP = G.audio && G.audio.radio; if (pb && RP) pb.style.width = `${(RP.progress || 0) * 100}%`; }
+    else { const pb = document.querySelector('#radio-box .rb-pr i'), RP = G.audio && G.audio.radio; if (pb && RP) pb.style.width = `${(RP.progress || 0) * 100}%`; }
     if ((this.bannerT -= dt) <= 0) $('banner').classList.remove('show');
     if ((this.bigT -= dt) <= 0) $('bigtoast').classList.remove('show');
     if ((this.hitT -= dt) <= 0) $('hitmark').className = '';

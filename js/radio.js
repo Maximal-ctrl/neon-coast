@@ -8,6 +8,12 @@ import { RADIO } from './radio-stations.js';
 const FADE = 2.6, GUESS = 180; // Sekunden Überblendung, angenommene Songlänge bis zur echten Länge
 const IDENT_FADE = 5, IDENT_LEAD = 2.6; // Ausblendung vor dem Einsprecher, Einsatz des Einsprechers
 
+// winzige stille WAV-Datei – zum Freischalten der Audio-Elemente beim ersten Antippen (iPad/iPhone/Safari)
+const SILENT = (() => { const n = 800, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 16000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  try { return URL.createObjectURL(new Blob([b], { type: 'audio/wav' })); } catch (e) { return ''; } })();
+
 export class RadioPlayer {
   constructor(audio) {
     this.A = audio; this.ctx = audio.ctx;
@@ -18,15 +24,37 @@ export class RadioPlayer {
     try { this.ctx.createMediaElementSource(this.identEl).connect(this.identG); } catch (e) { /* */ }
     this.identG.connect(audio.musicBus);
     this.state = RADIO.map((st) => ({ cur: Math.floor(Math.random() * Math.max(1, st.tracks.length)), lastIdent: -1, offset: Math.random() * 0.6, left: null, n: 0 }));
-    this.dur = new Map(); this.active = -1; this.playing = false; this.duck = 1;
+    this.dur = new Map(); this.active = -1; this.playing = false; this.duck = 1; this.retryT = 0;
+    // Browser (v. a. Safari/iPad) erlauben Musik erst nach einer Berührung: bei jeder Eingabe freischalten / fortsetzen
+    const kick = () => this.unlock();
+    for (const ev of ['pointerdown', 'touchend', 'keydown', 'click']) window.addEventListener(ev, kick, { capture: true, passive: true });
+    this.unlock(); // init läuft meist selbst in einer Geste (erstes Antippen)
   }
   deck() {
-    const el = new Audio(); el.preload = 'auto';
+    const el = new Audio(); el.preload = 'auto'; el.setAttribute('playsinline', ''); el.playsInline = true;
     const g = this.ctx.createGain(); g.gain.value = 0;
     try { this.ctx.createMediaElementSource(el).connect(g); } catch (e) { /* */ }
     g.connect(this.out);
     el.addEventListener('loadedmetadata', () => { if (isFinite(el.duration)) this.dur.set(el.dataset.url, el.duration); });
-    return { el, g };
+    return { el, g, want: false };
+  }
+  // in einer Nutzer-Geste aufrufen: jedes Element einmal abspielen, damit es später ohne Geste spielen darf
+  unlock() {
+    if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+    const all = [...this.decks.map((D) => [D.el, D.want]), [this.identEl, this.inIdent]];
+    for (const [el, want] of all) {
+      if (want) { if (el.paused && !el.ended) this.play(el); continue; }
+      if (el._ok || !SILENT) continue;
+      const own = !el.getAttribute('src') || el.src === SILENT;
+      if (el === this.identEl && !own) continue; // Einsprecher nie hörbar „anspielen“
+      if (own) el.src = SILENT;
+      const p = el.play();
+      if (p && p.then) p.then(() => { el._ok = true; if (!this.decks.some((D) => D.el === el && D.want) && !(el === this.identEl && this.inIdent)) el.pause(); }).catch(() => {});
+    }
+  }
+  play(el) {
+    const p = el.play();
+    if (p && p.then) p.then(() => { el._ok = true; this.blocked = false; }).catch((e) => { if (e && e.name === 'NotAllowedError') { if (!this.blocked && G.hud && G.state === 'playing') G.hud.toast('🔈 Tippe kurz auf den Bildschirm, damit das Radio spielt.'); this.blocked = true; } });
   }
   url(st, t) { return `assets/radio/${st.key}/songs/${t.file}`; }
   track(si) { const st = RADIO[si], S = this.state[si]; if (!st || !st.tracks.length) return null; return st.tracks[S.cur % st.tracks.length]; }
@@ -62,8 +90,8 @@ export class RadioPlayer {
   start(si, offset, fadeIn) {
     const st = RADIO[si], t = this.track(si); if (!t) return;
     const D = this.decks[this.cur = 1 - this.cur], c = this.ctx.currentTime, u = this.url(st, t);
-    D.el.dataset.url = u; D.el.src = u;
-    const go = () => { const d = this.dur.get(u); if (d && offset) D.el.currentTime = Math.min(d - 8, d * offset); D.el.play().catch(() => {}); };
+    D.el.dataset.url = u; D.el.src = u; D.want = true;
+    const go = () => { if (D.el.dataset.url !== u) return; const d = this.dur.get(u); if (d && offset) { try { D.el.currentTime = Math.min(d - 8, d * offset); } catch (e) { /* */ } } this.play(D.el); };
     if (this.dur.has(u)) go(); else D.el.addEventListener('loadedmetadata', go, { once: true });
     D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(t.gain || 1, c + fadeIn);
     this.playing = true; this.changing = false; this.inIdent = false;
@@ -71,7 +99,7 @@ export class RadioPlayer {
   }
   stopDecks(fade) {
     const c = this.ctx.currentTime;
-    for (const D of this.decks) { D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(0, c + fade); setTimeout(() => { if (D.g.gain.value < 0.02) D.el.pause(); }, fade * 1000 + 80); }
+    for (const D of this.decks) { D.want = false; D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(0, c + fade); setTimeout(() => { if (!D.want) D.el.pause(); }, fade * 1000 + 80); }
   }
   // Übergang zum nächsten Song. Nach jedem zweiten Song: Song blendet über ~5 s aus,
   // in die Ausblendung hinein spricht der Moderator, danach startet der nächste Song.
@@ -83,7 +111,7 @@ export class RadioPlayer {
     const fade = ident ? IDENT_FADE : FADE;
     const old = this.decks[this.cur], c = this.ctx.currentTime;
     old.g.gain.cancelScheduledValues(c); old.g.gain.setValueAtTime(old.g.gain.value, c); old.g.gain.linearRampToValueAtTime(0, c + fade);
-    setTimeout(() => old.el.pause(), fade * 1000 + 100);
+    old.want = false; setTimeout(() => { if (!old.want) old.el.pause(); }, fade * 1000 + 100);
     const prev = S.cur;
     let id = null;
     if (ident) { // Einsprecher wählen: nicht derselbe wie zuletzt, und keiner, der den gerade gelaufenen Song erzwingen würde
@@ -101,7 +129,7 @@ export class RadioPlayer {
       if (tok !== this.tok || !this.playing) return;
       this.identG.gain.setValueAtTime(id.gain || 1, this.ctx.currentTime);
       this.identEl.src = `assets/radio/${st.key}/idents/${id.file}`;
-      this.identEl.play().catch(() => { if (tok === this.tok) { this.inIdent = false; this.start(si, 0, 1); } });
+      const p = this.identEl.play(); if (p && p.catch) p.catch(() => { if (tok === this.tok) { this.inIdent = false; this.start(si, 0, 1); } });
     }, IDENT_LEAD * 1000);
     this.identEl.onended = () => { if (tok !== this.tok || !this.playing) return; this.inIdent = false; this.start(si, 0, 0.8); };
   }
@@ -121,5 +149,11 @@ export class RadioPlayer {
     if (!this.changing && el.duration && isFinite(el.duration) && el.duration - el.currentTime < lead + 0.3) this.next();
     if (el.ended && !this.changing) this.next();
     this.progress = el.duration ? el.currentTime / el.duration : 0;
+    // hängt ein Song (blockiert / Netz)? regelmäßig neu anstoßen; bei Ladefehler nächsten Song nehmen
+    if (D.want && !this.changing && (this.retryT -= 1 / 60) <= 0) {
+      this.retryT = 1.5;
+      if (el.error) this.next();
+      else if (el.paused && !el.ended && el.readyState >= 1) this.play(el);
+    }
   }
 }
