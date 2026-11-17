@@ -17,8 +17,7 @@ Die Version steht in `js/main.js` (`GAME_VERSION`) und wird im Titelbildschirm n
   (Schlüssel = deutscher Originaltext, `{0}`, `{1}` … für Platzhalter in Template-Strings).
   Neue oder geänderte Texte immer auch übersetzen: in `tools/i18n/build.py` (EXTRA) eintragen und
   `python3 tools/i18n/build.py` ausführen – das erzeugt `js/lang-en.js` neu (direkte Änderungen dort gehen verloren).
-- Feedback der Spieler: `node tools/feedback.mjs` holt die Vorschläge nach `feedback/FEEDBACK.md`
-  (braucht den Cloud-Speicher, siehe docs/ACCOUNTS.md); nach dem Umsetzen `node tools/feedback.mjs --clear`.
-  Über GitHub gesendete Vorschläge: Issues mit dem Label `feedback`.
+- Feedback der Spieler: GitHub-Issues mit Label `feedback` (über den Vermittler, docs/FEEDBACK-RELAY.md).
+  `node tools/feedback.mjs` holt sie nach `feedback/FEEDBACK.md`; nach dem Umsetzen `node tools/feedback.mjs --clear`.
 - Spiel ist ein eigenständiges Werk (keine Namen, Figuren oder Inhalte aus GTA o. Ä.).
 - Änderungen direkt auf `main` committen und pushen (GitHub Pages veröffentlicht von `main`).
