@@ -5,12 +5,12 @@ import { PulseRadio } from './pulse.js';
 
 const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
+// 4.22: Radio wird neu aufgebaut – keine selbst komponierte Musik mehr.
+// Drei Sender, noch ohne Songs (tracks: [{ name, artist, url }] kommen mit dem Radio-Update).
 export const STATIONS = [
-  { name: 'NEON 88.3', genre: 'Synthwave', bpm: 104, root: 57, scale: [0, 2, 3, 5, 7, 8, 10], prog: [[0, 3, 7], [-4, 0, 3], [-9, -5, -2], [-2, 2, 5]], style: 'synth' },
-  { name: 'BAY BEATS 97.1', genre: 'Lo-Fi Hip-Hop', bpm: 84, root: 50, scale: [0, 2, 3, 5, 7, 9, 10], prog: [[0, 3, 7, 10], [5, 9, 12, 15], [-2, 2, 5, 9], [-5, -2, 2, 5]], style: 'lofi' },
-  { name: 'TROPICAL 104.5', genre: 'Latin Dance', bpm: 96, root: 57, scale: [0, 2, 3, 5, 7, 8, 10], prog: [[0, 3, 7], [-2, 2, 5], [-4, 0, 3], [-2, 2, 5]], style: 'latin' },
-  { name: 'PULSE 132', genre: 'Techno', bpm: 132, root: 45, scale: [0, 3, 5, 7, 10], prog: [[0, 3, 7], [0, 3, 7], [-2, 2, 5], [-4, 0, 3]], style: 'techno' },
-  { name: 'MEIN RADIO', genre: 'Deine eigene Musik', style: 'user' },
+  { name: 'SUNSHINE RADIO', genre: 'Bald verfügbar', style: 'radio', tracks: [] },
+  { name: 'MOONSHINE RADIO', genre: 'Bald verfügbar', style: 'radio', tracks: [] },
+  { name: 'STARSHINE RADIO', genre: 'Bald verfügbar', style: 'radio', tracks: [] },
   { name: 'RADIO AUS', style: 'off' },
 ];
 
@@ -259,14 +259,14 @@ export class AudioSys {
     this.station = (this.station + 1) % STATIONS.length;
     this.nextBar = 0;
     G.hud.radio(this.stationInfo(this.station));
-    if (STATIONS[this.station].style === 'user' && !this.tracks.length) G.hud.toast('Noch keine eigene Musik – im Handy unter Radio hinzufügen.');
+    if (STATIONS[this.station].style === 'radio' && !STATIONS[this.station].tracks.length) G.hud.toast('📻 Noch keine Songs – das Radio-Update kommt bald.');
     this.noiseHit(0.25, 'bandpass', 2500, 0.15, 800, 1);
-    if (STATIONS[this.station].style === 'techno' && this.pulse && this.pulse.cur) setTimeout(() => { const i = this.pulse.cur.info; G.hud.nowPlaying('PULSE 132', i.artist, i.name); }, 1500);
   }
 
   // ------------------------------------------------- Prozedurale Musik
   schedule() {
-    const ctx = this.ctx;
+    return; // 4.22: keine prozedurale Musik mehr – Sender bekommen echte Songs mit dem Radio-Update
+    const ctx = this.ctx; // eslint-disable-line no-unreachable
     const club = G.interior && G.interior.kind === 'club' && !(G.player && G.player.inCar);
     if (this.titleSt == null) this.titleSt = [0, 1, 2, 0, 1, 2][Math.floor(Math.random() * 6)]; // zufälliger Sender im Titel
     const st = G.state === 'title' || club ? STATIONS[club ? (G.interior.station ?? 3) : this.titleSt] : STATIONS[this.station];

@@ -43,6 +43,22 @@ create policy "eigenes profil ändern" on public.profiles for update to authenti
 create policy "eigener spielstand" on public.saves for all to authenticated using (auth.uid() = id) with check (auth.uid() = id);
 ```
 
+### Feedback-Tabelle (für „Feedback & Ideen“ im Titelbild)
+Jeder – auch ohne Account – darf Vorschläge lesen, hinzufügen und löschen:
+
+```sql
+create table public.feedback (
+  id bigint generated always as identity primary key,
+  created timestamptz default now(),
+  kind text, text text not null check (char_length(text) <= 1200),
+  name text, version text
+);
+alter table public.feedback enable row level security;
+create policy "feedback lesen" on public.feedback for select to anon, authenticated using (true);
+create policy "feedback schreiben" on public.feedback for insert to anon, authenticated with check (true);
+create policy "feedback löschen" on public.feedback for delete to anon, authenticated using (true);
+```
+
 ## 2. Schlüssel eintragen
 Unter **Project Settings → API** die **Project URL** und den **anon public** Key kopieren und in
 `js/cloud-config.js` eintragen:

@@ -25,7 +25,7 @@ export const G = {
   isTouch: false,
   quality: 'medium',
   settings: {
-    quality: 'auto',
+    quality: 'low',
     musicVol: 0.6,
     sfxVol: 0.8,
     sensitivity: 1.0,

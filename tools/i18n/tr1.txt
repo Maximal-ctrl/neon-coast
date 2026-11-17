@@ -1,0 +1,416 @@
+0	! (stay within 7 m for 3 seconds)
+1	! Come by the diner.
+3	">Deliver
+5	(Ride no.
+6	(you're wearing)
+7	(step into the marker on foot)
+8	) will be overwritten.
+9	) was saved to your phone
+10	) – stake returned.
+11	+15 health and 30 seconds of faster sprinting.
+12	+45 % damage (instead of +20 %). Requires hollow points.
+13	+60 % rounds per magazine – reload less often.
+14	, you
+15	. Please reload both devices!
+16	. Jackpot: <b>$50,000</b>!
+19	/3 to <b>
+20	/3 · Tip +$
+21	/30</b> · Don't lose your stars!
+22	/3: Take it to the <b>quay wall</b>.
+23	/3: Load up at the <b>container yard</b> – the Tiburones want to stop you!
+24	/4 · Tip +$
+25	/4: Drive to the <b>customer</b> in the city.
+26	1st Dozen
+27	10 of them, cheaper than the store. Don't ask where they're from.
+28	12 money bags · 3 minutes · team shares
+29	2nd Dozen
+40	3 matching amounts = win!
+41	3rd Dozen
+42	Take out 30 cops without losing your wanted stars.
+44	35 % less spread.
+45	60 seconds of sprint boost, colours pulse to the beat, extra bass.
+49	: <b>Deliver water</b>
+50	: Wave
+51	</b> / 3000 · Combo ×
+52	</b> (fly over low).
+53	</b>.
+54	</b> out of the water.
+55	</b> through
+56	</b> · Yours: <b>
+57	</b> – win
+58	</b> – lost, sorry.
+59	</b> – get out! (green <b>X</b>)
+60	</b><br>Biggest single win: <b>
+61	</b><br>Total lost: <b style="color:#ff6b6b">
+62	<b>Hill Climb</b>
+63	<b>Loot Hunt (Co-op)</b>
+64	<b>DEX'</b> GARAGE
+65	<b>PURCHASED!</b>
+66	<b>CO-OP MISSIONS</b>
+67	<b>PAYOUTS</b>
+68	<b>Harbor Defense (Co-op)</b>
+69	<b>LEGEND <em>▾</em></b>
+73	<b>Street Race</b>
+74	<b>Arrange buttons</b>
+75	<b>Pursuit</b>
+76	<b>WASD</b> walk · <b>Mouse</b> look around · <b>F</b> get in.<br>Save at the bed (<b>S</b>) · Door (<b>X</b>) to go outside.
+77	<b>Continue</b>
+79	<b>{0}/{1} completed</b>
+80	<b>{0}</b> – lost, sorry.
+121	<em>You own
+122	<em>You own {0}×</em>
+125	>Spin
+126	>Spin ·
+127	>Buy
+128	>Bet & start
+129	>🚕 Call taxi ·
+132	ALL MISSIONS COMPLETE
+133	OLD TOWN
+135	ESTATE
+139	MISSION COMPLETE
+140	MISSION FAILED
+141	OFF
+142	WASTED
+143	From today? Not yours anymore.
+144	Cancel
+145	But take care of yourself, mijo. And … not too much trouble, okay?
+146	Ducktail
+147	Kills  ·  +$
+148	Team kills
+149	Eagle Eye
+150	Ah, the young man from the city! Ortiz, mayor of Valverde – and hopefully soon of all of Solera County.
+151	Grab the rival candidate's files from Santa Cruz.
+152	Currently equipped.
+153	Current mission:
+155	Buy Albatros
+156	Alcohol
+157	All
+158	All missions done – hunt for neon shells, stunt jumps or try the bank.
+159	Everybody down – hands up!
+160	All found! Bonus +$10,000
+161	Everyone starts side by side · Winner $2,000
+162	Reveal all
+163	Everything is so … soft.
+164	Everything is glowing!
+165	Everyday
+166	Old Town
+167	Old Town Quay
+168	Old Town Courier
+169	Call
+170	Lawyer
+171	Valcourt Estate
+176	Up on Monte Solera lives a certain Don Aurelio. Rich, old, and crazy about cars.
+177	There are checkpoints on every road. So you fly: a plane is waiting on the airstrip at the finca.
+178	Harvest at a remote finca – and sell the goods in the city.
+179	Resolution adjusted for smooth gameplay
+180	Stand up
+181	Attachments
+182	Mission
+183	Mission:
+184	Mission: {0}
+185	Missions
+186	Missions completed
+187	Missions available – see the "Missions" app
+188	Missions · $
+190	Get Aurelio's supercar back from the container yard.
+191	Off
+192	The View
+193	Decommissioned battle tank with a working cannon. Don't ask.
+194	Gear
+195	Gear for hard times
+196	You can only get off when the gondola is at the bottom.
+197	Deal ·
+198	Deal · {1}
+199	Select to equip. Tip: hold Tab (or tap the weapon icon) to open the weapon wheel.
+200	car(s) ready
+201	Car Dealer
+202	Automatic
+203	Cars
+204	Cars in the garage
+205	Car Collector
+206	GANG WAR · SOLERA GANG VS. THE POLICE
+213	HILL CLIMB
+215	BED
+216	LOOT  $
+217	LOOT  ${0}
+218	LOOT SECURED
+219	LOOT HUNT (CO-OP)
+220	LOOT HUNT OVER
+222	DRILL
+223	DRILL  {0}{1}  {2}%
+225	BRAKE
+228	Bank Robbery
+229	Bank Robbery · +$
+230	Bank Robbery · +${0}
+232	Bar / Saloon
+233	Cash
+235	Install 5 tuning parts.
+236	Get yourself nitro at Dex's – I'll pay you back if you hit 300 with it. Take something fast – a Zephyra or a Vortex – and find a long straight.
+237	Farmer
+238	Impressive drive. Visit me at my villa on Monte Solera.
+239	Keep it. It's in your garage from now on. And if you ever need friends on the mountain …
+240	Dinghy
+241	Both devices need internet. You see each other, drive together, can chat and duel. Traffic and pedestrians run independently on each device.
+242	Join
+243	Siege
+245	Recover Benito's family treasure at the Mirador.
+246	Comfortable everyday car with plenty of room.
+247	Ready? I want to see what you can do behind the wheel.
+248	Already owned
+249	Shaping mountains …
+250	King of the Hill
+251	Hill climb from the causeway all the way up to the Mirador in the Sierra.
+252	Mountain Sprint
+253	Mountain Sprint: Checkpoint
+254	Mountain Sprint: Checkpoint {0}/{1}
+255	Mountain Road
+256	Acceleration
+257	Own $1,000,000.
+258	Own 5 cars.
+259	Own a boat.
+260	Order
+261	Order {0}/4: <b>{1}</b>
+262	Visit the debtor in <b>
+263	Visit the debtor in <b>{0}</b>.
+264	Visit every town in Solera County.
+266	Loot: <b>$
+267	Loot: <b>${0}</b> – get out! (green <b>X</b>)
+268	Before I give you real jobs, I want to see if you can handle a boat.
+269	Evidence
+270	Blackjack pays 3:2 · Dealer stands on 17 · 4 decks
+271	Blue lights in the mirror? Only one thing helps: turn it up. Pulse one three two.
+272	Stay on the water and survive the <b>Coast Guard</b>!
+273	Bahía Lightning
+275	Buoy
+276	Buoy {0}/{1}
+277	Buoy Course
+278	Buoy course along the south coast.
+279	Buoy course {0}/{1}
+280	Buy boats
+281	Boat dealer · Moorings · Rentals
+282	Boat Heist
+283	Boat race against three pros around the island.
+284	Jetty
+285	Mounted MG
+286	Message delivered.
+288	Brandt here. Harbor's quiet. For now.
+289	Brandt, harbor office. Dex says you drive well. I might have work.
+290	Brandt: "The Solera Star is loaded – despite the Tiburones. Respect, kid."
+292	Brakes
+293	Take everyone to the <b>Beach Jetty</b>.
+294	Take the boat to the <b>Southwest Marina</b>.
+295	Take the money to <b>Solera Bank</b>.
+296	Take the gold to <b>Benito</b> in Los Ranchos.
+297	Take the cross back to <b>Café Vieja</b>.
+298	Take the passenger to the <b>destination</b>.
+299	Take the Vortex to <b>Dex's Garage</b>.
+300	Take the Vortex back to <b>Villa Aurelio</b>.
+301	Carefully take the wine to <b>Rosa's Diner</b>.
+302	Take the files to <b>Ortiz</b> in Valverde.
+303	Take the crates to the <b>Beach Jetty</b>.
+304	Take the wounded to the <b>Valverde Clinic</b>.
+305	Take the goods to the freighter's <b>gangway</b> – the Cuervos are attacking!
+306	Take the yacht to <b>Solera Marina</b>.
+307	Finish it. After that, Port Solera belongs to us.
+308	Take him to <b>Solera Marina</b>.
+310	Bridge Blockade
+311	STAGE
+312	Mayor Ortiz
+330	Café Vieja · Old Town
+336	Casino winnings: <b>
+337	Casino winnings: <b>{0}${1}</b> / $3,000
+345	Cheeseburger – $9
+346	Chill, Leo. Chill.
+347	Chrome
+348	Churros with chocolate – $9
+350	Club Sandwich
+352	Timed container runs at the harbor.
+356	Dealer
+357	Dealer {0}
+362	YOUR CHARACTER
+363	YOUR APARTMENT
+367	SPIN
+368	DRIFT KING
+369	YOU'RE THE FUGITIVE!
+370	There he is! Get the goods!
+371	There's a Zephyra GT up ahead. Drive my lap through the city – all checkpoints, and make it quick.
+372	Missed the target.
+373	Then she leaves without the cargo – and the gang has won.
+374	Then we'll be seeing each other often. Cigarettes, snacks, newspapers – and sometimes I hear things that might interest you.
+375	Then we split it. Generously.
+377	The Estate
+378	The boat sank.
+379	The village festival! People want to see flying trucks.
+380	The plane crashed.
+381	The house always wins … mostly.
+382	The house always wins, Leo. Unless you work for the house.
+383	Raid the Coyote gang's camp in Tierra Seca.
+384	The wheel is spinning …
+385	The radio plays in the car. Your own songs and jingles stay on this device only. Without your own jingles, the station host speaks.
+386	Defend the town hall on election night.
+387	The fastest thing Port Solera has to offer.
+388	The time lock! You'll never open it without a drill …
+389	The Grand Finale
+390	That's … more scrap than car. Oh well, parts sell too.
+391	Recover the silver cross of San Telmo.
+392	That's a good three kilometers of hairpins, bridges and passes. Drive clean – every second counts.
+393	Your cash. Earn more with missions, taxi rides or … other methods.
+394	Your boat
+395	Your boat sank.
+396	Your plane
+397	Your plane is rolled onto the runway.
+398	Your money
+399	Your money: <b style="color:#7dffa0">$
+400	Your money: <b style="color:#7dffa0">${0}</b>
+401	Your car was destroyed.
+402	Your new
+403	Your new {0} is parked on the street outside the dealership!
+404	Your new boat is at the jetty
+405	Your Apartment
+406	Your own music
+408	Escort the mayor safely to the opening ceremony in Lago Verde.
+409	Stop the cattle thieves' pickup.
+410	The alarm goes off!
+411	The Albatros is fully fueled. Come by!
+412	The Brecher is wrecked.
+413	The mayor was hit.
+414	The code has 5 characters.
+415	The DJ is playing your request!
+416	The thief got away.
+417	The armored truck was destroyed.
+418	The host can start co-op missions (race, hill climb, pursuit, loot hunt, harbor defense).
+419	The Church Treasure
+420	The Kiwi was destroyed.
+421	The fishing boat sank.
+422	The pickup with the goods is wrecked.
+423	The pickup was destroyed.
+424	The room is full.
+425	The tanker is destroyed.
+426	The van is destroyed.
+427	The van was destroyed.
+428	The guy in the yellow shirt is counting cards. I don't want him arrested – just my winnings back.
+429	The Vortex was destroyed.
+430	The Zephyra was destroyed.
+431	The Stolen Vortex
+432	The golden Zephyra is in your garage
+433	The Big Score
+434	The young man who broke my mountain record. Sit down. Wine?
+435	Then he'll run all by himself. That's the message.
+436	The Solera Bank heist.
+438	Dex says you're reliable. We should talk. Club Velvet.
+439	Dex's Tuning
+440	Dex's Garage
+441	Dex's Garage · Tuning
+442	Dex: Your
+443	Dex: Your {0} is ready – blue dot on the map.
+444	Dex: You're already sitting in a car.
+445	Dex: I can't put a car inside a building for you!
+446	Dex: Good as new!
+447	The <b>Solera Bank</b>.<br>With a weapon, start a <b>robbery</b> at the red <b>!</b>: take out the guards, drill the vault, grab the loot, escape.
+448	The files are in his beach apartment in Santa Cruz. Get them before he burns them.
+449	The alarm system goes off!
+450	The Old Town has been quieter since you arrived.
+451	The gang wants to stop the cargo from getting on board. They'll try to stop you – with cars, with guns, with everything.
+452	The bank has restocked … just so you know.
+453	The bank downtown has surprisingly few guards …
+454	The Barracuda sank.
+455	The Barracuda is ready. I put a submachine gun in the glovebox for you.
+456	The wells are dry. Take the water tank to the farms in the countryside.
+457	The cops tore the club apart yesterday. In front of my guests.
+458	The Cuervos are storming the casino – defend the entrance.
+459	The Cuervos are raiding the airfield – escape in the Albatros.
+460	The thieves spotted you!
+461	The thieves got away.
+462	The Opening
+463	The Valcourt family. Their estate sits right at the top of the peak behind Monte Solera.
+464	The colours! The COLOURS!
+465	The finca has goods again. Come by if you want work.
+466	The ferry is broken and people are waiting at three jetties. Today you're the water taxi!
+467	The Coyotes are getting cocky, muchacho.
+468	The Coast Guard wants to shut down my harbor. I need a distraction.
+469	The pine road is best driven at night.
+470	The police got you …
+471	The police are informed and moving in on the Tiburones. They won't bother with you today.
+472	The mail for Santa Cruz, Valverde and Pinar Alto is lying around here. The roads are too slow.
+473	The show crew thanks you with a pirouette!
+474	Solera Bank downtown. My crew empties the vault, you drive.
+475	The Solera Regatta! Three pros, one course, one winner.
+476	The votes are being counted. And Salgado's thugs want the ballot boxes.
+477	The day's takings have to go to Solera Bank downtown. The van is out front.
+478	Take the day's takings to Solera Bank.
+479	The Tiburones are attacking!
+480	The Tiburones blew up the Solera Star.
+481	The Tiburones are finished. Nothing stands in our way now. Come to the club.
+482	The dancers are giving it everything.
+483	The election isn't won until the votes are counted.
+484	The reels are spinning …
+485	The goods are ruined – too many crashes.
+486	The world spins a little afterwards …
+487	The effect is wearing off.
+488	The Yacht
+489	The yacht sank.
+490	Time's up.
+491	The Old Mine
+492	The golden Barracuda is yours
+493	The big shipment has to go onto the freighter in the harbor tonight.
+494	They'll be back for sure … but today you scared them. Thank you!
+495	The new quality takes effect after a restart. Your game is saved first.
+496	The new valley bridges! Beautiful. And there's enough room underneath for an Albatros.
+497	The next wave is coming!
+498	The "Esperanza" checks in – everyone on board is fine. Good work!
+499	Defend the "Solera Star" against the Tiburones gang.
+500	The "Solera Star" – the most beautiful yacht in the marina – has been hijacked.
+501	Same gang as before. They're driving a black Atlas through the Old Town right now!
+502	This browser doesn't support multiplayer.
+504	Direct (more precise)
+506	Canned beer
+508	He's waiting outside for a taxi. Grab him.
+509	Spin
+510	Spin · {2}
+511	Three orders have to go out while the food is still hot. The delivery van is out front.
+512	Visit three gamblers with debts.
+513	Three jumps, each at least one second in the air. The hills here are perfect for it.
+514	Three regulars owe me 30,000 between them. In Santa Cruz, Lago Verde and San Lúcar.
+515	Three big jumps with the monster truck.
+516	Three hot orders with Rosa's delivery van.
+517	Drift setup (wide drifts)
+518	Drift Queen
+519	Drift points: <b>
+520	Drift points: <b>{0}</b> / 3000 · Combo ×{1}
+522	Drinks & Vibes
+523	Press SPACE to open your parachute!
+524	You
+525	So you're Dex's new driver. He says you're fast.
+526	So you're the new guy Dex keeps talking about. I'm Nina.
+527	So you're this Leo. Do you know who owns this city?
+528	You're the driver Dex told me about? Good. The "Solera Star" sails tonight.
+529	You only finished in place
+530	You only finished in place {0}.
+531	You're connected.
+532	You'll fly twice through the street canyons of downtown – below the rooftops, between the towers. Don't scratch it!
+533	You have
+534	You left the car.
+535	You left the water.
+536	You lost sight of the mayor.
+537	You left the delivery van behind.
+538	You abandoned the crew.
+539	You lost your wanted stars.
+540	You really did it! Padre Tomás will weep with joy.
+541	You saved my casino. Now I want to see if you're lucky too.
+542	You saved my till! Come by, I have news.
+543	You took out {0}!
+544	You buy from me a lot. I like that. I've got something bigger.
+545	You must be Leo. Rosa has told me all about you.
+546	You're on the guest list from now on.
+547	You wake up in the hospital …
+548	You're not wanted right now.
+549	You were taken out.
+550	You were arrested.
+552	Smash through the <b>gate</b>!
+553	BREAKING NEWS · PLANE CRASHES INTO DOWNTOWN TOWER
+554	ON
+555	ON / OFF
+556	SURROUNDED
+557	SETTINGS
+558	ACHIEVEMENT:
+559	Bring fine wine from the mountain to Rosa without breaking it.

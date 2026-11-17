@@ -1,0 +1,512 @@
+560	Effects
+561	Your own music
+562	Your music was deleted
+563	Get your own Albatros
+564	One spin costs
+565	One spin costs {0}. Jackpot: <b>$50,000</b>!
+566	One spin · one dream
+567	A rockslide in Pinar Alto! Two injured people need to get to the clinic in Valverde.
+568	A freighter lost some crates last night. Officially: spare parts.
+569	A jet ski for a joyride.
+570	A rental plane for a sightseeing flight. Controls: W/S or stick up/down = climb/descend, A/D = turn, Shift/Gas = faster, Space = slower.
+571	A tank? Of course he had a tank.
+572	Board a show-off's speedboat and bring it to the marina.
+573	An inflatable to try out – it's not yours.
+574	Some guy is cruising off the coast in a stolen speedboat – supposedly it belongs to a friend of mine.
+575	A storm! Three surfers were swept out to sea.
+576	A commercial for the Albatros! The camera is mounted on the bank tower.
+577	Your own Albatros awaits at the airfield
+578	A certain Marco owes me a lot of money. He thinks he can just ignore me.
+579	A good wine takes time. So do good friends.
+580	A few dents … but it still runs. Good job.
+581	Install
+582	A gang has blocked the new valley bridge and is charging a toll. A toll! On MY bridge!
+583	A gang is blocking the new valley bridge.
+584	One round
+585	Take a nap?
+586	Pocketed a pack. Not exactly healthy …
+587	One full rotation (about 1 minute) overlooking Port Solera and the sea.
+588	Recover a stolen yacht off Santa Cruz.
+589	Catch a thief who robbed Sami's till.
+590	Catch a card counter before he bails.
+591	"Acquire" a Vortex from Coral Heights.
+592	One flees, everyone else hunts
+593	There's one outside a villa in Coral Heights. The owner is on vacation.
+594	Installed
+595	Single-engine sport plane. Take off and land at Los Ranchos airfield – or on any long straight.
+596	Stake <b>
+597	Stake <b>{4}</b>
+598	Choose your stake and <b>Deal</b>.
+599	Stake returned:
+600	Stake returned: {0}
+601	jingle(s) added to PULSE 132
+602	Get in
+603	Settings
+604	Clear bets
+605	Finally! Here, the money.
+606	Energized: +20 health
+607	Energy drink – $10
+608	Energy drink – $4 (+15 health)
+610	Distance
+611	Escape for 2:30 minutes!
+612	Escape the hunters! Don't stop.
+613	Relaxed … but that wasn't healthy.
+614	Relaxed: time slows down, the image turns soft and warm, sound gets muffled. +25 health and slow healing.
+615	He's got a bet going: whoever makes it from the causeway all the way up to the Mirador in the Sierra in record time gets his SUV.
+616	He hangs out on Seaside Boulevard, near the pier. Yellow Brutus. Turn his car into scrap.
+617	He got away.
+618	He's racing along the coast road toward Bahía right now. Stop him – however you can. If you get him, the car is yours.
+619	Achievements
+620	achievements unlocked
+621	Requires:
+622	Refreshing.
+623	Refreshing. +6 health.
+624	Complete 10 missions.
+625	Complete 30 missions.
+626	Complete all missions.
+627	Harvest the plants <b>
+628	Harvest the plants <b>{0}/{1}</b> {2}
+629	Harvest time. Help them, take the goods to the city and hand them out to my customers. Payment is in ammo. Lots of ammo.
+630	Reach 200 km/h.
+631	Reach 5 wanted stars.
+632	Reach <b>300 km/h</b> (hold Shift / NITRO, long straight).
+633	First
+634	Buy the weapon first
+635	Buy first
+636	First Aid Kit
+637	First Score
+638	First flight through six rings – and a clean landing.
+639	First place!
+640	Extended Magazine
+641	It's over. The Valcourts are history.
+642	A co-op mission is already running.
+643	At least one other player has to be in the game.
+646	Food
+647	Food & Drinks
+648	European · single zero
+649	Express to your waypoint
+650	Extra low
+651	Extreme
+652	Extreme drift (steep & long)
+653	WANTED
+654	BUSTED
+655	FIRE
+658	LOS RANCHOS AIRFIELD
+659	AIRFIELD
+660	Show FPS
+664	Drive through all the <b>checkpoints</b>!
+665	Drive up to the <b>Valcourt Estate</b> on the summit.
+666	Ride the Ferris wheel.
+667	Drive a car into the <b>tuning entrance</b> (🔧) and install <b>nitro</b>.
+668	Drive to <b>Pinar Alto</b>.
+669	Pull up, jump over (F next to the boat) and bring it to the new Southwest Marina.
+670	Drive to <b>Santa Cruz</b> as fast as you can.
+671	Drive carefully – crashes break the bottles!
+672	Drive to <b>Dex's Garage</b>.
+673	Drive to your <b>safehouse</b>.
+674	Drive to <b>Café Vieja</b> in the Old Town.
+675	Drive to the <b>container yard</b> at the harbor.
+676	Drive to the <b>Coyote camp</b>.
+677	Drive to the <b>fishing boat</b> off the Old Town.
+678	Drive to the <b>harbor warehouse</b>.
+679	Drive to the <b>Mirador</b> in the Sierra.
+680	Drive to the <b>north end of the causeway</b> – Rico is waiting there.
+681	Drive to the <b>start at the causeway</b> (north of the city).
+682	Drive to the <b>pink speedboat</b> and board it (F).
+683	Drive to the start on the west edge of <b>Valverde</b>.
+684	Drive to <b>Finca Escondida</b> deep in the Solera Hills (dirt road off the valley road).
+685	Drive to the <b>finca airstrip</b>.
+686	Drive to <b>Solera Bank</b> downtown.
+687	Drive to the <b>yacht</b> off Santa Cruz.
+688	Drive to the blocked <b>valley bridge</b>.
+689	Drive 50 km in total.
+690	Take passengers from three jetties to the marina.
+691	Fare
+692	Fare +$
+693	Fare +${0}  (ride no. {1})
+694	Suspension
+695	Cars "borrowed"
+696	Skydive over Port Solera – land on Sunset Pier.
+697	Wrong answer.
+698	Cheater
+699	Family Ties
+700	Catch
+701	Catch <b>
+702	Catch <b>{0}</b>!
+703	Catch {0}! (stay within 7 m for 3 seconds)
+704	Shade
+705	Almost done …
+706	Error while loading:
+707	Dirt road to the finca
+708	Rims
+709	Done
+710	Done!
+711	Fire, jump, sprint · in a car: gas, brake, handbrake
+712	Firework Maker
+713	Branch Manager
+714	Finale complete! The tank is in your garage.
+715	Finale: storm the Valcourt family's estate on the summit.
+717	Find 10 neon shells.
+718	Find all neon shells.
+719	Fish out <b>crate
+720	Fish <b>crate {0}/{1}</b> out of the water.
+721	Fishing boat
+722	Fly through the rings and land back here. You pay for scratches!
+723	Fly higher than 300 m.
+724	Fly low over the towns – below 120 meters – and the bag drops by itself.
+725	Fly under <b>bridge
+726	Fly under <b>bridge {0}/{1}</b>
+727	Fly to the <b>harbor</b> of Port Solera (south of the city).
+728	Fly over <b>Port Solera</b> above <b>300 m</b>.
+729	Escape Flight
+730	Airfield
+731	Los Ranchos Airfield
+732	Los Ranchos Airfield
+733	Flight Lesson
+734	Flight lesson: Ring
+735	Flight lesson: Ring {0}/{1}
+736	Planes
+737	Follow the <b>mayor's car</b> and protect it.
+738	Follow my car and keep the Cuervos off my back.
+739	Photo mode – tap anywhere or press Esc to exit
+740	Loading photo textures & sky …
+741	Cargo for the Ship
+742	Freighter in Danger
+743	Free Fall
+744	Scratch
+745	Friends of mine have a finca. Deep in the Solera Hills, far from everything – no neighbors, no police.
+746	Freshly made. Restores 30 health.
+747	Freshly roasted in the Old Town.
+748	The fresh newspaper is in, come by!
+749	Hairstyle
+751	Fuego (street dealer) – he has a job for you
+752	Fuego throws in ammo & a sniper rifle
+753	Fuego sent you? Good. The plants are ripe – cut them before the rain comes.
+754	Fuego sent you? Perfect.
+755	Run
+756	Run {0}/3: Take it to the <b>quay wall</b>.
+757	Run {0}/3: Load up at the <b>container yard</b> – the Tiburones want to stop you!
+758	Absorbs 70 % of damage.
+759	Fists
+760	Five landmarks from the air – in seven minutes.
+761	For the people here? Everything. Bring it back – Padre Tomás will give you his old car for it.
+762	You need a weapon for a robbery (gun shop "W").
+764	GAMEPAD
+766	GAS
+767	WIN! +
+768	WIN! +{0}
+769	YOU WON!
+770	WHEEL OF FORTUNE
+771	LUCKY RAIN
+772	GOLD RUSH
+775	Hit the gas, pull up above 100 km/h. A and D to turn, S to descend, Space to brake.
+776	Guest
+778	Distance driven
+779	item(s)
+780	Enemies
+781	Go outside first.
+782	Go to <b>Salgado's apartment</b> in Santa Cruz.
+783	Go <b>outside</b>.
+784	Go see Dex. He has a garage down south, by the harbor. He's looking for a good driver.
+785	Walk up to a car and press <b>F</b> to get in.
+786	Walk up to a car and tap <b>IN</b>.
+787	Go to the <b>Solera Star's gangway</b>.
+788	Yellow
+789	Team money bags: <b>
+790	Team money bags: <b>{0}/{1}</b>
+791	Money bags in 3 minutes!
+792	Cash Transport
+793	Delivered to the nearest roadside – in the city and in the Solera Hills.
+794	Borrowed. So to speak.
+795	Off-road pickup with a swiveling machine gun on the bed.
+796	Protect the freighter from the Tiburones together
+797	Merging geometry …
+798	Armored
+799	Even
+800	Not possible right now.
+801	Rumor has it the Cuervos are waiting somewhere on the coast road. Don't let them stop you.
+802	Total
+803	Done! Now <b>lose the police</b>.
+804	Saved
+805	Saved to slot
+806	Saved to slot {0}
+807	Saved to slot {0} · health restored
+808	Health
+809	Health restored
+810	Hit by
+811	Hit by {0}!
+812	Drinks
+813	Tinted
+814	Win 3,000 dollars net – then my golden Zephyra is yours.
+815	Win 3,000 dollars net at the tables.
+816	Win a total of $10,000 at the casino.
+817	Winnings are paid out immediately.
+818	If you win, you get a golden Barracuda. Off to the start!
+819	Total won: <b style="color:#7cff6b">
+820	Total won: <b style="color:#7cff6b">{0}</b><br>Total lost: <b style="color:#ff6b6b">{1}</b><br>Biggest single win: <b>{2}</b><br>
+821	You won! +$
+822	You won! +${0}
+823	Give this code to your friends.
+824	Summit Road
+825	Gloss
+826	Bald
+827	Glides over the water at over 110 km/h. For smugglers and show-offs.
+828	Lucky Devil
+829	Lucky Rain
+830	Gambling: balance
+831	Gambling: paid out
+832	Gambling: staked
+833	Gambling games played
+834	Congratulations!
+836	Golden Mane
+837	Gold Rush
+838	Gracias, Leo! Come by the café sometime, I've got something for you.
+839	Graphics quality
+840	Graphics quality (current:
+841	Graphics quality (current: {0})
+843	Gran Casino · Bahía Blanca
+844	Grenade
+845	Grenades thrown
+846	Free – the bartender is nice.
+847	Big news: I've opened a branch in the Old Town! But the shelves are empty.
+848	Big SUV with presence on every road.
+849	Size
+850	Size <input type="range" id="tb-size" min="0.7" max="1.4" step="0.05" value="
+851	Biggest win
+852	Green
+853	Green Harvest
+854	Green Thumb
+855	Say hi to Nina for me.
+856	Greetings to everyone cruising down Seaside Boulevard right now. Windows down, volume up!
+857	Slept well. Game saved.
+858	HARBOR
+859	HARBOR SECURED!
+860	HARBOR OFFICE
+861	HARBOR DEFENSE (CO-OP)
+863	HORN
+864	Ha! I like you. Come back when you want to make real money.
+865	Hair color
+866	Heard you can drive. Come to the garage.
+867	Do clouds have feelings?
+868	Harbor
+869	Harbor Office
+870	Harbor Lights
+871	Harbor master · Solera Marina
+872	Half the recoil, 12 % faster rate of fire.
+873	Hi, Aunt Rosa. I'm back – this time for good.
+874	Hold off the <b>police</b> until the drill is through!
+875	Keep them away from the town hall until the count is done!
+876	Keep the Tiburones away from the freighter! Goal:
+877	Keep the Tiburones away from the freighter! Goal: {0} team kills
+878	Pull the handbrake, keep the gas on, let the car dance. 3,000 points in 90 seconds!
+880	Phone
+881	Hangar · Sightseeing flights · Flight school
+882	Have you eaten anything proper today?
+884	Main menu
+885	Homemade, hot and greasy.
+886	Skin tone
+888	Pick up the <b>silver cross</b>.
+889	Rear wing
+890	Hot and strong. +8 health.
+891	Hot Goods
+892	Wide awake!
+894	Hunt at Sea
+895	Gala at the casino tonight. Dress code: gold.
+896	Tonight: DJ set & show! Entrance at Club Velvet, east Midtown.
+897	There's a race today. Three drivers, one lap through all of Port Solera.
+898	Today I'm opening the lake road in Lago Verde. Salgado has sworn revenge.
+899	Hey! This is our turf. Get lost before it hurts!
+900	Hey, buddy. Good stuff, fair prices.
+901	You're safe here. Save slot
+902	You're safe here. Save slot {0}.
+903	Nobody can hear you up here. But don't dawdle.
+904	Here's 500 dollars – on the house. Play a round, anything you like.
+905	Here's my number. If I hear anything, I'll let you know.
+906	Here, take my old rifle. And come back in one piece, muchacho.
+907	Help out at the farm in the hills.
+908	High
+909	Building skyscrapers …
+910	High-proof. Proper dizziness for a while.
+911	Farm
+912	Farm {0}/{1}: <b>Deliver water</b>
+913	Hollow-point ammo
+914	Pick up the <b>passenger</b>.
+915	Get the <b>Vortex</b> in Coral Heights.
+916	Pick up the passenger at the <b>
+917	Pick up the passenger at the <b>{0}</b>.
+918	Get the <b>gold chest</b> – the Cuervos are already there!
+919	Pick up the delivery at the harbor and bring it over. You can keep the van afterwards – I bought myself a new one.
+920	Get the money from the <b>fleeing debtor</b>!
+921	Grab the <b>day's takings</b>.
+922	Get it back. If you pull it off, keep it. I'll buy myself a new one.
+923	Grab it, shake off the police and bring it here. The fewer scratches, the more money.
+924	Get them out and take them to the beach jetty. Hurry – the water is ice cold!
+926	Pants
+927	Host · You
+928	Helicopters shot down
+929	Chopper Hunter
+930	Horn
+931	ALTITUDE
+933	Dealer
+934	Lose the <b>police helicopter</b>.
+935	Lose the <b>Coast Guard</b>.
+936	Lose the <b>police</b> before you keep selling.
+937	Lose the police 10 times.
+938	Lose the <b>police</b>!
+939	Lose the <b>police</b> to secure the loot ($
+940	Lose the <b>police</b> to secure the loot (${0}).
+941	Lose the <b>police</b>.
+942	Street Canyon
+943	Street canyon: Ring
+944	Street canyon: Ring {0}/{1}
+945	Highest wanted level
+946	Highest flight
+947	Top speed
+948	Top speed
+951	INPUT
+953	Me
+954	I declare the lake road open! And Leo, my official car is yours.
+955	I race. Illegal, fast, loud. Show me if you can keep up.
+956	I'm still driving.
+957	I heard something … I'll get in touch when it's concrete.
+958	I put a Zephyra at the causeway for you. Show him what you've got.
+959	I always have a car for you.
+960	I'm so hungry for donuts.
+961	I put a Zephyra on the starting line for you. Only winning counts.
+962	I've got a job for you. A collector wants a Vortex – a supercar, gorgeous.
+963	I've got a job for you: "
+964	I've got a job for you: "{0}". Come by!
+965	I could run all night!
+966	I'll take care of it.
+967	I love you all!
+968	Now I know where the Coyotes hang out: a camp in the rocks of Tierra Seca.
+969	I don't want violence. But I want my money.
+970	I want the whole city to see who's in charge here. Thirty of them. And don't let them lose you – let them come.
+971	I live right next door. I'm Leo.
+972	You're listening to Pulse one three two – the heartbeat of Port Solera.
+973	You're listening to the night shift on Pulse. Hang in there, the sun's coming anyway.
+974	Owned
+975	Fish tacos at the diner today!
+976	In vehicle
+977	In inventory:
+978	In inventory: {0}
+979	I've got nothing for you right now. I'll get in touch.
+980	Rescue three swimmers from the sea during a storm.
+981	Low-level flight between the skyscrapers of downtown.
+982	Finished! Waiting for the others …
+983	Unofficially: goods the Coast Guard would love to get. Fish them out before they do.
+984	Inventory
+986	JACKPOT
+987	JACKPOT! +
+988	JACKPOT! +{0}
+989	HUNTING SUPPLIES
+991	Yeah, yeah … here. Tell her I'm sorry.
+992	Yes, overwrite
+994	The farther the destination, the pricier. Not during a mission or while wanted.
+995	Every year the village boys drive the desert rally. This year you're driving!
+996	Someone was dumb enough to steal my Vortex. From my own driveway.
+997	Jet ski
+998	Rent a jet ski
+999	Now <b>lose them</b>!
+1000	Now Port Solera belongs to us. That was only the beginning.
+1001	Restart now
+1003	Joystick: walk or steer (forward = gas)
+1004	CAMERA
+1005	TILL
+1006	CLINIC
+1008	ACCOUNT
+1009	Coffee delivered
+1010	Coffee delivered {0}/4 · Tip +${1}
+1011	Coffee to go
+1012	Deliver coffee and churros through the narrow alleys.
+1013	Quay wall
+1014	Cactus Bloom
+1015	Camera
+1016	Camera (in car)
+1017	Camera sensitivity
+1018	Captain
+1019	Captain Brandt
+1020	Map
+1021	Hit or stand?
+1022	Drawing the map …
+1023	Buy more at one of the Sami's 24/7 stores.
+1024	Buy your first boat in the "Buy boats" tab.
+1025	Buy
+1026	Bail paid: -$
+1027	Bail paid: -${0}
+1028	Not a scratch? … Almost not a scratch. You've got style, Leo.
+1029	No audio files found
+1030	No boats
+1031	No questions · cash only
+1032	No songs – add them on your phone
+1033	No connection to the matchmaking server. Are you online?
+1035	Kessler & Partners. We solve problems with the police.
+1036	Kessler: Even I can't do anything about that.
+1037	Kessler: Done. The file has disappeared.
+1043	Kiosk next door
+1045	Clear
+1046	Classic
+1047	Steal your first car.
+1048	A Small Favor
+1049	Smart. Then drive for me: twenty crates of my best vintage are going to a diner in the city.
+1050	Kodiak (armored)
+1051	Coyote Camp
+1052	Come in whenever you like. And if I need help, I'll let you know.
+1053	Come by for a barbecue when the sun goes down.
+1054	Compact
+1055	Compensator & grip
+1056	Contact
+1057	Contacts
+1058	Hospital
+1059	Hospital bill: -$
+1060	Hospital bill: -${0}
+1061	Ambulance Run
+1062	Strong, tall and indestructible.
+1063	Customer
+1064	Short
+1065	Short and sharp.
+1066	Short, loud, insanely fast. Jumps over every wave.
+1067	Short break – the next wave is coming …
+1068	Boat in Distress
+1069	Fishing boat "Marisol"
+1071	Fight your way through to Silvio Valcourt!
+1072	Cold beer. +5 health, the world sways a little.
+1073	Coastal Path
+1074	Coast Road
+1075	East Coast Road
+1076	Coast Guard
+1080	DELIVERY COMPLETE
+1081	GO!
+1084	Finish
+1085	Paint
+1086	Load the harvest into the <b>pickup</b> and get in.
+1087	Loading …
+1088	Shoplifter
+1090	Lazy Lorenzo
+1091	Land on <b>Sunset Pier</b>.
+1092	Land on the quay road at the harbor. And Leo … the Cuervos know. Be armed.
+1093	Land on Sunset Pier. After that I'll give you your own Albatros. Promise.
+1094	Land on the <b>quay road</b> at the harbor (straight stretch, touch down slowly).
+1095	Land on the <b>runway</b> at Los Ranchos (S = descend, Space = slower).
+1096	Long
+1097	Laser sight
+1099	Walk 10 km on foot.
+1100	Walk / Drive
+1101	Walk / Steer
+1102	Loud V8, long hood, pure power.
+1103	Delicious!
+1104	Empty
+1105	Empty.
+1106	Space
+1107	Legend of Port Solera
+1108	Light, nimble and cheap – perfect for your first laps around the island.
+1109	No luck this time.
+1110	No win, sorry. Next time!
+1111	Nothing, sorry – again?
+1112	Rental ·
+1113	Rental · {2} km/h
+1114	Suppressed: pedestrians notice less, police only react nearby.
+1115	Steering
+1117	Leo! Three years gone and not a single call. Come here, let me look at you.
+1118	Leo! Just now – some guy grabbed the day's takings and ran out!
+1119	Leo! Rico – the guy I beat last week – stole my Vortex!

@@ -56,6 +56,7 @@ import { NET } from './terrain.js';
 import { Attract } from './attract.js';
 import { Account, openAccounts, accountBadge } from './accounts.js';
 import { PATCH_NOTES } from './patchnotes.js';
+import { openFeedback } from './feedback.js';
 import { Trip, TRIP_GLSL } from './drugs.js';
 import { Attractions, setupAttractions } from './attractions.js';
 import { chunkScene, DynRes } from './perf.js';
@@ -76,6 +77,7 @@ let frameNo = 0;
 function detectQuality() {
   const s = G.settings.quality;
   if (s && s !== 'auto') return s;
+  return 'low'; // 4.22: Standard ist immer Niedrig – Mittel/Hoch nur, wenn selbst eingestellt
   const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   const mem = navigator.deviceMemory || 4;
   const small = Math.min(screen.width, screen.height) < 500;
@@ -150,20 +152,21 @@ async function boot() {
 
   // Nachbearbeitung (Leuchteffekte)
   if (q !== 'low') {
-    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: q === 'high' ? 4 : G.isTouch ? 0 : 2 });
+    const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: q === 'high' ? 2 : 0 });
     composer = new EffectComposer(renderer, rt);
     composer.setPixelRatio(pixelRatio(q));
     composer.addPass(new RenderPass(scene, camera));
     if (q === 'high') {
       const ao = new GTAOPass(scene, camera, window.innerWidth, window.innerHeight);
       ao.blendIntensity = 0.85;
-      ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 2, thickness: 2, scale: 1, samples: 12 });
-      ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+      ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 2, thickness: 2, scale: 1, samples: 8 });
+      ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 6 });
       composer.addPass(ao);
       G.aoPass = ao;
     }
     const res = new THREE.Vector2(window.innerWidth, window.innerHeight);
     bloom = new UnrealBloomPass(res, 0.4, 0.35, 0.9);
+    { const bs = bloom.setSize.bind(bloom); bloom.setSize = (w, h) => bs(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2))); } // Leuchten in halber Auflösung
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
     G.gradePass = new ShaderPass(GRADE_SHADER);
@@ -448,7 +451,7 @@ function controlsHTML() {
 function settingsHTML() {
   const s = G.settings;
   const opt = (v, l) => `<option value="${v}" ${s.quality === v ? 'selected' : ''}>${l}</option>`;
-  return `<div class="row"><label>Grafikqualität (aktuell: ${G.quality})</label><select id="set-q">${opt('auto', 'Automatisch')}${opt('low', 'Niedrig')}${opt('medium', 'Mittel')}${opt('high', 'Hoch')}</select></div>
+  return `<div class="row"><label>Grafikqualität (aktuell: ${G.quality})</label><select id="set-q">$${opt('low', 'Niedrig')}${opt('medium', 'Mittel')}${opt('high', 'Hoch')}</select></div>
   <div class="row"><label>Musik</label><input id="set-mus" type="range" min="0" max="1" step="0.05" value="${s.musicVol}"></div>
   <div class="row"><label>Effekte</label><input id="set-sfx" type="range" min="0" max="1" step="0.05" value="${s.sfxVol}"></div>
   <div class="row"><label>Kamera-Empfindlichkeit</label><input id="set-sens" type="range" min="0.3" max="2.5" step="0.05" value="${s.sensitivity}"></div>
@@ -716,16 +719,13 @@ function phoneRadio() {
   const n = A.tracks ? A.tracks.length : 0;
   const pc = A.pulseCounts || { songs: 0, idents: 0 };
   const cur = A.ready ? A.stationInfo(A.station) : STATIONS[A.station];
-  phoneScreen('Radio', `<div class="ph-now"><div class="eq"><i></i><i></i><i></i><i></i><i></i></div><b>${cur.name}</b><span>${cur.genre || ''}</span>
+  A.station = A.station % STATIONS.length;
+  const cur2 = A.ready ? A.stationInfo(A.station) : STATIONS[A.station];
+  phoneScreen('Radio', `<div class="ph-now"><div class="eq"><i></i><i></i><i></i><i></i><i></i></div><b>${cur2.name}</b><span>${cur2.genre || ''}</span>
       <div class="ph-ctrl"><button data-step="-1">⏮</button><button data-step="1">⏭</button></div></div>`
     + STATIONS.map((s, i) => { const info = A.ready ? A.stationInfo(i) : s; return `<button class="ph-row ${A.station === i ? 'on' : ''}" data-st="${i}"><b>${info.name}</b><span>${info.genre || ''}</span></button>`; }).join('')
-    + (A.station === 3 && A.pulse ? `<div class="ph-note">▶ Läuft gerade: <b>${A.pulse.lastName || '–'}</b></div>` : '')
-    + `<div class="ph-actions"><button class="ph-btn2" data-mus="add">🎵 Eigene Musik hinzufügen</button>${n ? `<button class="ph-btn2" data-mus="clear">🗑 Eigene Musik löschen (${n})</button>` : ''}</div>
-       <div class="ph-sec">PULSE 132 · Techno</div>
-       <div class="ph-actions"><button class="ph-btn2" data-mus="padd">🎧 Songs zu PULSE 132 hinzufügen${pc.songs ? ` <em>${pc.songs}</em>` : ''}</button>
-         <button class="ph-btn2" data-mus="iadd">🎙️ Eigene Einspieler hinzufügen${pc.idents ? ` <em>${pc.idents}</em>` : ''}</button>
-         ${pc.songs || pc.idents ? '<button class="ph-btn2" data-mus="pclear">🗑 PULSE-Dateien löschen</button>' : ''}</div>
-       <div class="ph-note">Das Radio läuft im Auto. Eigene Songs und Einspieler bleiben nur auf diesem Gerät. Ohne eigene Einspieler spricht die Sender-Moderatorin.</div>`);
+    + '<div class="ph-note">📻 Das große Radio-Update kommt bald – dann laufen hier echte Songs.</div>');
+  void n; void pc; void cur;
   const set = (i) => { A.station = (i + STATIONS.length) % STATIONS.length; A.nextBar = 0; if (A.ready) G.hud.radio(A.stationInfo(A.station)); phoneRadio(); };
   $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => set(+b.dataset.st));
   $('ph-screen').querySelectorAll('[data-step]').forEach((b) => b.onclick = () => set(A.station + +b.dataset.step));
@@ -1022,6 +1022,8 @@ function setupUI() {
     Save.setSlot(n); startGame(true);
   };
   $('btn-account').onclick = () => openAccounts();
+  $('btn-feedback').onclick = () => openFeedback();
+  window.__ncVersion = GAME_VERSION;
   Account.restore().then(refreshTitle);
   const pn = $('patchnotes');
   pn.querySelector('.pn-list').innerHTML = PATCH_NOTES.map(([v, items], i) => `<section${i ? '' : ' class="new"'}><h4>Version ${v}${i ? '' : ' <em>NEU</em>'}</h4><ul>${items.map((t) => `<li>${t}</li>`).join('')}</ul></section>`).join('');
@@ -1059,7 +1061,7 @@ function frame(now) {
       G.vm.render();
       G.peds.render();
       // Tablets: Schattenkarte nur jedes zweite Bild neu zeichnen
-      if (G.isTouch && G.renderer.shadowMap.enabled) { G.renderer.shadowMap.autoUpdate = false; G.renderer.shadowMap.needsUpdate = (frameNo++ & 1) === 0; }
+      if (G.renderer.shadowMap.enabled) { G.renderer.shadowMap.autoUpdate = false; G.renderer.shadowMap.needsUpdate = (frameNo++ & 1) === 0; } // Schatten jedes 2. Bild
       if (composer) {
         bloom.strength = 0.22 + G.world.env.night * 0.18;
         composer.render();
@@ -1187,7 +1189,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = 'Beta 4.21';
+export const GAME_VERSION = 'Beta 4.22';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

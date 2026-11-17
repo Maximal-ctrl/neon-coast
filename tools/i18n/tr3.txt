@@ -1,0 +1,440 @@
+1120	Leo! Since you chased off the thugs, customers are coming back. Too many, actually!
+1121	Leo, something terrible happened! The silver cross from the church of San Telmo was stolen.
+1122	Leo, good thing you're here! My driver called in sick.
+1123	Leo, I need your help. My cousin Inés has a little café in the Old Town.
+1124	Leo, can you come by? It's about my cousin Inés.
+1125	Leo, trouble! The Cuervos want my hangar. And me along with it.
+1126	Leo. The view up here is especially clear today.
+1127	Leo. You've proven yourself. Now comes the big one.
+1128	Leo. I now know who paid the Tiburones. And who has the police in their pocket.
+1129	Final test. Climb to 300 meters over Port Solera – and jump.
+1130	Lighthouse
+1132	Speed of Light
+1133	Deliver order
+1134	Deliver order {0}/3 to <b>{1}</b>.
+1135	Deliver the goods to <b>Sami's 24/7 Old Town</b>!
+1136	Deliver
+1137	Delivery Service
+1138	Delivery
+1139	Delivery {0}/3 · Tip +${1}
+1140	Purple
+1142	Left thumb
+1143	Left thumb: <b>walk</b> · swipe right side: <b>look around</b>.<br>Save at the bed (<b>S</b>) · Door (<b>X</b>) to go outside.
+1144	Left stick
+1145	Left click
+1146	Live racing from Los Ranchos
+1149	Let's go
+1150	Tickets
+1152	Air Mail
+1156	Luna sent me.
+1157	Luna sent me. 10,000.
+1158	Luna treats you to chips – try a game.
+1159	Luna?! Never heard of her!
+1161	MY RADIO
+1171	MULTIPLAYER RACE
+1172	AMMO RECEIVED
+1174	Get their attention and keep them busy on the water for two minutes. Then you're out.
+1175	Marco saw you – he's running!
+1176	Marco got away.
+1177	Wreck Marco's Brutus.
+1182	Marshal (MG pickup)
+1183	Submachine gun
+1184	Matte
+1185	Mouse
+1186	Move mouse · release Tab
+1187	My Brecher is behind the house. No roads, just dust!
+1188	My opponent Salgado is paid by the Cuervos. I have proof – almost.
+1189	My grandfather hid gold in the old mine at the Mirador. The Cuervos stole the map.
+1190	My boats
+1191	My people say it's in the container yard at the harbor. Guarded by the Tiburones gang.
+1192	My people are on strike – and for weeks the Tiburones gang has been terrorizing the harbor. Protection money, robberies, burning containers.
+1193	My posters have to go up in Lago Verde, Pinar Alto, Santa Cruz and San Lúcar. Today!
+1194	My security guards are overwhelmed. Hold the entrance, Leo!
+1196	Rent
+1197	Milkshake – $5
+1198	Military
+1199	Military pickup
+1200	Millionaire
+1201	Mineral water
+1202	Minimap
+1204	Mission target
+1205	Scratch it off with your finger
+1206	Across Tierra Seca in the monster truck.
+1207	Survive two minutes on the water with three stars.
+1208	With a winemaker, Aunt Rosa. Just a winemaker.
+1209	Medium
+1211	Fashion
+1212	Monster truck
+1215	Montenegro Hairpins
+1218	Multiplayer ended.
+1219	Leave multiplayer
+1220	Multiplayer mission
+1221	Multiplayer mission ended.
+1223	Ammo
+1224	Ammo:
+1225	Ammo: {0}
+1226	Shell Collector
+1227	Muscle car
+1228	Music
+1229	RELOADING …
+1233	NEON SHELL
+1234	NEON SHELL {0}/{1}
+1235	NEW CONTACT
+1236	NEW CAR IN THE GARAGE
+1237	NEW GAME – SAVE SLOT
+1239	Well look at that – a new face in the neighborhood! I'm Sami, I own the kiosk here.
+1240	Hey, neighbor! The kiosk is always open.
+1241	Broke something again?
+1242	Message
+1243	Messages
+1244	Restock
+1245	Night
+1246	Nightclub
+1247	Night Moth
+1248	Night Current
+1249	Melee
+1253	Neon cocktail
+1254	Neon cocktail – $25
+1255	Neon donut
+1256	Neon shells
+1257	Neon Rain
+1258	Nice car. I'd rather not ask where you got it.
+1259	Fresh Start
+1260	New missions unlock soon – check the "Missions" app.
+1261	New season, new looks. Every outfit $150.
+1262	New mayor of Solera County
+1263	New Game
+1264	New cars · Port Solera
+1265	Not enough money
+1266	Not enough money for these bets.
+1267	Not enough money!
+1268	Not enough money.
+1269	Unsaved progress will be lost.
+1270	Not owned
+1271	Don't shoot! I … I'll enter the code!
+1272	Untouchable
+1273	Nothing here
+1274	Low
+1275	Blank
+1276	Blank – next time!
+1277	Take the <b>files</b>.
+1278	Take the <b>chips</b>.
+1279	Take the Barracuda at the jetty and run the buoy course to the beach jetty. Not too slow!
+1280	Take that crate – a rifle and ammo. Keep them away from the ship until the Coast Guard arrives.
+1281	Take my van. Fast – but no accidents, or it gets worse.
+1282	Take my Zephyra. All the way to the harbor of Santa Cruz – over the west causeway. The clock is ticking!
+1284	Nina is impressed
+1286	Nina's Zephyra is scrap.
+1288	Nitro on, brain off? No. Nitro on, brain ON.
+1289	Install nitro and break the 300 km/h mark.
+1290	Nitro injection
+1291	Nitro Cure
+1292	No boats yet
+1293	No music of your own yet – add some on your phone under Radio.
+1294	No cars of your own yet – buy one at <b>Solera Motors</b> (pink A) or take a rental.
+1295	Distress call from the fishing boat "Esperanza" off the Old Town! Two speedboats are circling it.
+1296	Zero (green)
+1297	Just shopping
+1299	Utility vehicle
+1300	NEXT TARGET
+1302	ORTIZ WINS
+1303	Top
+1304	Unpaid Debts
+1305	Open sea
+1306	None
+1307	Without nitro you're just decoration on the coast road.
+1308	Okay, okay! Take the car!
+1309	Okay, "enough" is relative. Fly under three of them. I'll look the other way.
+1312	East Route
+1313	Change outfit
+1314	Outfit:
+1315	P · UNDERGROUND GARAGE
+1317	PAUSED
+1318	HORSE BETTING
+1320	PLACE
+1321	PLACE {0}
+1322	PLACE {0}/4
+1323	POLICE
+1325	PORT SOLERA IS YOURS
+1329	PULSE files deleted
+1330	BULLSEYE LANDING
+1331	Pair
+1334	Paco: "This will be the best commercial ever!"
+1335	Armor-piercing ammo
+1336	Bulletproof glass, reinforced body and a roof MG. Fire: mouse button / FIRE – needs no ammo.
+1337	Armor
+1338	Parking garage
+1339	Party pills
+1340	Take care of yourself, mijo.
+1341	Watch out for the Coast Guard – they shoot first.
+1342	Pass Road
+1344	PeerJS missing
+1345	PeerJS could not be loaded
+1346	Pearl
+1351	Pine Road
+1352	Pine road, bridges, hairpins. The record is three minutes.
+1354	Pink glaze, lots of sugar. +12 health.
+1355	Pirates are attacking a fishing boat off the Old Town.
+1356	Pistol
+1357	Pistol, SMG, shotgun, rifle & grenades
+1358	Poster
+1359	Poster {0}/4: <b>{1}</b>
+1360	Place
+1361	Place {0} – only the winner counts.
+1364	Police
+1365	Police evaded
+1366	Police evaded!
+1367	Police station
+1368	Cops taken out
+1369	Cops taken out: <b>
+1370	Cops taken out: <b>{0}/30</b> · Don't lose your stars!
+1371	Fries – $4
+1373	Port Solera is yours!
+1374	Port Solera has changed. If you want to be somebody here, you need the right friends.
+1375	Port Solera never sleeps – and neither do we.
+1376	Building Port Solera …
+1379	Drop mail bags over three towns.
+1380	Price
+1381	Premium scratch card: better odds, up to $5,000.
+1382	Test drive
+1383	Pro
+1384	Propeller plane
+1385	Cheers! The world spins a little …
+1386	Precise steering, strong acceleration.
+1387	Psst … you look like you need something.
+1388	Psst … I'm always somewhere in the city. Keep your eyes open.
+1390	Pulse one three two. No breaks, just bass.
+1391	Points
+1392	Q / Mouse wheel
+1393	Odds
+1394	Odds {4}:1
+1396	RADIO OFF
+1397	RANCH HOUSE
+1398	TOWN HALL
+1399	ROOM CODE
+1400	RACE
+1401	RACE OVER
+1407	Radio station
+1409	Race up the hairpins to the <b>Mirador</b>!
+1410	Valverde Town Hall
+1411	Smoking
+1412	Tobacco
+1413	Room not found – is the code right?
+1414	Right side
+1415	Right stick
+1416	Right click
+1418	Regatta: Buoy
+1419	Regatta: Buoy {0}/{1}
+1420	Tires
+1421	Speedboat
+1422	Race
+1423	Race across Port Solera – only winning counts.
+1424	Race engine
+1425	Racing
+1426	Racing (max. grip)
+1428	Rescue the <b>swimmer</b> (approach slowly).
+1430	Rico floors it!
+1431	Rico stole Nina's Vortex – get it back.
+1432	Rico got away.
+1434	Ferris Wheel · Sunset Pier
+1435	Ferris wheel rides
+1436	Huge wheels, endless displacement. Rolls over anything.
+1439	Sturdy work boat with a cabin. Indestructible, but cozy.
+1440	Sturdy van for any load.
+1441	Durability
+1444	Rosa's Diner. And Leo – every broken bottle is a piece of my heart.
+1445	Rosa's cousin Inés is being extorted in the Old Town.
+1446	Rosa's delivery van was destroyed.
+1447	Red
+1448	Red hoodie, running east. Please, that's my whole day's earnings!
+1449	Scratch card – $5
+1450	Scratch card: 3 matching amounts win. Up to $500.
+1451	Call of the Street
+1452	Only call me if it's important.
+1454	Round at the night show
+1455	Sightseeing flight (rental)
+1456	Tourist sightseeing flight
+1457	Empty the <b>vault</b> before SWAT arrives!
+1458	Get rid of them. Discreetly, if possible.
+1464	SHIP
+1465	SHIP  {0}{1}  {2}%
+1467	LAKE HOUSE
+1468	SINCE 1924
+1469	VICTORY!
+1477	LOAD GAME
+1478	JUMP
+1479	JUMP {0}/3
+1480	STATISTICS
+1481	CONTROLS
+1482	BEACH APARTMENT
+1483	STREET DEALER
+1484	STUNT JUMP COMPLETE!
+1490	Salgado's thugs
+1491	Salt Wind
+1493	Sami (kiosk) was saved to your phone
+1494	Sami: "The branch is open! The van is now in your garage."
+1495	Sami: "What'll it be,
+1496	Sami: "What'll it be, {0}?"
+1497	Sami's 24/7
+1498	Sami's Kiosk
+1499	Collect together
+1500	Collect {0} money bags together in 3 minutes!
+1501	Collect 3,000 drift points in 90 seconds.
+1503	Sandwich – $6 (+25 health)
+1505	Full and happy: full health
+1506	Clean work, Leo. The city talks about nothing else.
+1507	Pack of 10. Briefly relaxing – not healthy.
+1508	Damage
+1509	Damage {0}{1} · incl. {2} rounds
+1510	Complete 3 stunt jumps.
+1511	If you make it in time, the car is yours.
+1512	Suppressor
+1513	Take out <b>Silvio Valcourt</b> on the pool terrace!
+1514	Take out the <b>bridge gang</b>.
+1515	Take out the <b>Coyotes</b>.
+1516	Take out the <b>Tiburones</b>.
+1517	Take out the <b>guards</b>!
+1518	Take out the remaining <b>Cuervos</b>.
+1519	Sniper rifle
+1520	Stop by <b>Sami's 24/7</b> (yellow <b>24</b>) right next to your apartment tower.
+1521	Windows
+1522	Shift Change
+1523	Shoot down a police helicopter.
+1524	Sleep (+6 h)
+1525	Sleep (8 hours)
+1526	Punch / Shoot
+1527	Headline:
+1528	Inflatable boat
+1529	Rent an inflatable
+1530	Complete 10 taxi rides.
+1531	Close
+1532	Thug
+1533	Fish smuggled crates out of the sea – and escape the Coast Guard.
+1534	Catch the <b>thief</b>!
+1535	Catch the <b>card counter</b>!
+1536	Grab the <b>branch manager</b> behind the counter.
+1537	Anyone can be fast. But can you go sideways?
+1538	Quick, before the cops come.
+1539	Quick, before anyone looks.
+1540	Faster, faster!
+1541	Cut
+1542	Gearhead
+1543	Shotgun
+1544	Shoes
+1545	Debtor
+1546	rounds
+1547	rounds)
+1548	Body armor
+1549	Body armor equipped
+1550	Black
+1551	Nice that you live next door now. If I hear anything, I'll let you know!
+1552	Shots fired
+1556	Seaman's Test
+1557	Lake Road
+1558	Valverde Lakeway
+1559	Landmark
+1560	Landmark {0}/{1}
+1561	His old Marina is yours now – it's in your garage. Call it with your phone.
+1562	For weeks thugs have been coming by demanding protection money. She doesn't dare go to the police.
+1563	seconds!
+1564	Send
+1565	Stock
+1566	Stock (white smoke)
+1567	Hairpins up to Monte Solera · Winner $2,000
+1568	Place your chips and press <b>Spin</b>.
+1569	First set a <b>waypoint</b> on the big map (M). The taxi then takes you straight there.
+1570	Place the <b>drill</b> on the vault.
+1571	Preparing shaders …
+1573	Shorts
+1574	She's anchored off Santa Cruz, guarded by two speedboats. Bring her back and the owner will let you keep her.
+1575	They're heading for the pass road. Stop them!
+1576	They're coming. The Cuervos want the casino – tonight.
+1577	They're already on their way. Be faster – and bring the chest here!
+1578	They want to plant explosives on the gangway. The police? Bought.
+1579	Seven minutes, then they'll feel sick. Go!
+1581	Sierra Pass
+1583	Silvio Valcourt won.
+1584	Silvio Valcourt thinks he's untouchable. Armed guards, high walls, his own helipad.
+1585	Siren (patrol car)
+1587	Snacks · Drinks · Tobacco · Lottery
+1588	As soon as the alarm goes off, things get uncomfortable. Lose the police and drive to your safehouse.
+1589	Use now
+1590	Instantly full health.
+1599	Summer
+1600	Request a song – $20
+1601	song(s) added to PULSE 132
+1602	song(s) added to "My Radio"
+1603	Sunny, twenty-nine degrees, hardly any clouds
+1605	Save
+1606	Save & rest
+1607	Save & quit
+1608	Save slot
+1609	Save slot {0} ({1}) will be overwritten.
+1610	Roadblocks ahead and behind you!
+1611	Play a round at a <b>slot machine, roulette, blackjack</b> or the <b>wheel of fortune</b>.
+1612	Game saved
+1613	Load game
+1614	Save game
+1615	Players
+1616	Game error:
+1617	Save game
+1618	Save {0} loaded
+1619	Play together in Port Solera! One player <b>hosts</b> a game and gets a code, the others <b>join</b> by entering the code. Up to 4 players.
+1620	Playtime
+1622	Sport
+1623	Sports car
+1624	Talk to <b>Sami</b> at the counter (yellow <b>24</b>).
+1625	Jump out (F / OUT) and open your <b>parachute</b> with <b>SPACE</b> or the 🪂 button!
+1626	Jump / Handbrake
+1627	Jump!
+1628	Jump! {0} m · +${1}
+1629	Jumps
+1630	Jumps (≥ 1 s): <b>
+1631	Jumps (≥ 1 s): <b>{0}/3</b>
+1632	Later
+1633	Public Enemy
+1634	Public Enemy No. 1
+1635	Steel & Salt
+1636	Strong zoom when aiming, more precise, 40 % more range.
+1637	Start the Albatros and lose the police those guys called!
+1638	Take off and climb to <b>150 m</b>.
+1639	Statistics
+1640	Stand
+1641	Waiting outside the dealership when you leave · Phone → Cars
+1642	Get out first to use this.
+1643	Get out first.
+1644	Get into Inés' <b>Kiwi</b>.
+1645	Get into Nina's <b>Zephyra</b>.
+1646	Get into Rosa's <b>delivery van</b>.
+1647	Get into your <b>speedboat</b> at the jetty.
+1648	Get into the <b>Albatros</b>.
+1649	Get into the <b>Brecher</b>.
+1650	Get into the <b>armored truck</b>.
+1651	Get into the <b>harbor pickup</b>.
+1652	Get into the <b>ambulance</b>.
+1653	Get into the <b>pickup</b> with the wine crates.
+1654	Get into the <b>smuggling plane</b> and take off from the strip.
+1655	Get into the <b>tanker</b>.
+1656	Get into the <b>van</b>.
+1657	Get into the <b>Vortex</b>.
+1658	Get into the <b>Zephyra GT</b>.
+1659	Get into the <b>Barracuda</b> at the jetty.
+1660	Get into a <b>boat</b> (buy or rent one at the ⚓ jetty).
+1661	Get into a <b>boat</b> or swim out.
+1662	Get into a <b>boat</b>.
+1663	Get into a <b>vehicle</b>.
+1664	Controls
+1665	Stop <b>Rico</b> in the pink Vortex!
+1666	Stop the cattle thieves' <b>pickup</b>!
+1667	Stop the <b>black Atlas</b> with the cross.
+1668	Laying out beach & pier …
+1669	Beachcomber King
+1670	Beach Jetty
+1671	Paving roads …
+1672	Street dealer
+1673	Street Race
+1674	Street race · Dex's Tuning
+1675	Street goods
+1677	Patrol car
+1678	Stage 1
+1679	Stage 2

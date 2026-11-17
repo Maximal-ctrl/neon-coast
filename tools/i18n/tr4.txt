@@ -1,0 +1,441 @@
+1680	Stunt Show
+1682	Stunt jumps
+1683	Storm over the Bay
+1684	Assault rifle
+1687	Supercar
+1689	bags  ·  Your share: +$
+1690	Clear the <b>forecourt</b>.
+1691	Sweet and warm: +30 health
+1695	LOW-LEVEL FLIGHT · BETWEEN THE TOWERS
+1700	Tobacco
+1701	Day
+1702	Dish of the day – $14
+1703	Valley Road
+1704	Aunt Rosa
+1705	Greet Aunt Rosa and meet Dex.
+1706	Pickpocket fleeing on foot!
+1707	Pickpocket caught.
+1708	Buttons
+1709	Arrange buttons …
+1711	Taxi rides
+1712	Taxi job cancelled – police!
+1713	Taxi job ended.
+1714	Taxi job: pick up passengers and take them to their destination.
+1715	Taxi teleports
+1716	Taxi Driver
+1717	Team kills: <b>
+1718	Team kills: <b>{0}/{1}</b> · Yours: <b>{2}</b>
+1720	Team: {0} kills  ·  +${1}
+1721	Team: {0}/{1} bags  ·  Your share: +${2}
+1723	Tequila shot
+1724	Painting textures …
+1726	Lower
+1727	Underground garage
+1728	Estate underground garage
+1729	Safehouse underground garage
+1731	Tap PARACHUTE to open it!
+1732	Tap: waypoint · Drag (with momentum): pan · Two fingers / mouse wheel: zoom · ◎ to player
+1733	Table 21 · Limit $25 – $2,500
+1734	Titan (tank)
+1735	Title scene:
+1736	Touch buttons (iPad)
+1737	Tourists from the north! They want to see everything: Ferris wheel, casino, villa, Mirador, Valverde.
+1738	Hit from more than 120 m away.
+1739	Flotsam
+1740	Drink
+1741	Give a tip – $50
+1743	Tuning · Paint · Performance
+1744	Tuning parts installed
+1746	Turbocharger
+1748	Turquoise
+1749	Clock
+1750	Look around (click = capture mouse)
+1751	And Leo – traffic lights are just decoration today.
+1752	And Leo … you won't get far on foot here. Get yourself a car.
+1753	And Marco himself?
+1754	And then?
+1755	And drive carefully – it's my only car!
+1756	And now?
+1757	And take a look in the garage. Silvio had an … unusual toy. It's yours now.
+1758	And they're off!
+1759	And if I'm too slow?
+1760	Push (
+1761	Push ({0}) – stake returned.
+1762	Unbelievable!
+1763	Odd
+1764	Flying under bridges is illegal. And awesome.
+1765	Under the Bridges
+1766	Fly under three valley bridges.
+1767	Underglow neon
+1768	Safehouse
+1769	Intact bottles · Bonus +$
+1770	Intact bottles · Bonus +${0}
+1771	Update loaded – active on next start.
+1772	Veteran
+1775	PURSUIT
+1776	PURSUIT · DOWNTOWN
+1777	LOST
+1780	VIP drink – $40
+1784	Valverde needs people like you.
+1786	Connecting …
+1787	Connection is taking a while … second attempt via relay server
+1788	Connection lost – reconnecting …
+1789	Disconnected from host.
+1790	Connection error.
+1791	Connected! You're now playing together.
+1792	Double
+1793	Suspect arrested.
+1794	Pursuit in
+1795	Pursuit in {0} – fleeing car!
+1796	Sale
+1797	Sale {0}/4: Drive to the <b>customer</b> in the city.
+1798	Leave the apartment.
+1799	Rentals
+1800	Take the injured from Pinar Alto to Valverde – fast and gently.
+1801	Lost –
+1802	Lost – {0} beats {1}.
+1803	Matchmaking server unreachable.
+1804	Sink the <b>pirate boats</b> (drive-by: fire from the boat).
+1805	Sink the <b>guard boats</b> and board the yacht (F next to the yacht).
+1806	Defend the ship! Tiburones left: <b>
+1807	Defend the ship! Tiburones left: <b>{0}</b>
+1808	Drive the <b>thugs</b> away from the café.
+1809	Cattle Thieves
+1810	Good luck!
+1811	Road Warrior
+1812	Four orders have to go out. My little Kiwi is parked outside. The coffee mustn't get cold!
+1813	Supply four remote farms with water.
+1815	Villa · Monte Solera
+1817	From the causeway up to Monte Solera · 1st place: $2,000
+1818	From Valverde up to Pinar Alto – against the clock.
+1819	Fly from the finca to the harbor – and get the goods onto the big ship.
+1820	Careful, the tank sloshes – no wild jumps!
+1822	WEAPONS
+1823	WEAPONS & AMMO
+1824	GUN SHOP
+1826	NEXT ▸
+1827	WAVE
+1828	WAVE {0}/3
+1830	APARTMENT
+1831	Guard
+1832	Weapon
+1833	Tap weapon
+1834	Drop the weapon! Now!
+1835	Switch weapon
+1836	weapon(s)
+1837	Weapons
+1838	Gun shop
+1839	Weapon icon
+1840	Election Night
+1841	Campaign Posters
+1842	Put up campaign posters in four towns.
+1843	Wanderer
+1844	Goods
+1845	Fetch goods from the harbor and supply the new branch.
+1846	Waiting for other players …
+1847	Wait for the crew. <b>Stay at the bank!</b>
+1848	Why is it called a traffic light anyway?
+1849	What'll it be?
+1850	Water
+1851	Water for the Farms
+1852	Water – free
+1853	Water Taxi
+1854	Waypoint
+1855	Waypoint removed
+1856	Waypoint set – follow the purple route
+1857	Wine from Don Aurelio? Leo … who are you hanging out with up there?
+1858	Grape Harvest
+1859	Continue
+1860	Longest hit
+1861	Wave Rider
+1862	Globetrotter
+1863	Nimble, economical, fits in any parking spot.
+1864	If the Tiburones show up again, I'll call you.
+1865	Whoever's faster has my respect from today. 3 … 2 … 1 …
+1866	Garage
+1867	Vest:
+1868	Vest: {0} %
+1869	West Route
+1871	Bet & start
+1872	Whiskey (flask)
+1873	Like straight out of the showroom! The collector will be thrilled.
+1874	Same as above – the clock jumps to 9:30 PM so you can see the city lights.
+1875	How much is the cross worth?
+1876	I wonder how many stars there are …
+1877	Reconnected!
+1878	Welcome to the top, Leo.
+1879	Welcome to <b>Solera Motors</b>!<br>Walk to the pink <b>A</b> in front of the turntable to view and buy cars.
+1880	Welcome to <b>Club Velvet</b>!<br>Stand on the dance floor to <b>dance</b>. Bar: <b>B</b> · Stage: <b>$</b>
+1881	Welcome to the Gran Casino
+1882	Welcome to the Gran Casino. I'm Luna Ferrer, I own the place.
+1883	Welcome to Solera Marina! I'm Marisol, the harbor master.
+1884	Welcome home,
+1885	Welcome home, {0}.
+1886	Welcome back,
+1887	Welcome back, {0}! Come by the diner.
+1888	Wind from the southwest, perfect conditions!
+1889	Will be brought to a free mooring at
+1890	Will be brought to a free mooring at {0}.
+1891	Throw 10 grenades.
+1892	Drop the mail over <b>
+1893	Drop the mail over <b>{0}</b> (fly over low).
+1894	Swipe to look around
+1895	Apartment
+1896	Apartment (sleep)
+1897	Pick a horse and your stake.
+1898	You can't save during a mission.
+1899	Desert Rally
+1900	Desert rally: Gate
+1901	Desert rally: Gate {0}/{1}
+1902	Invert Y axis
+1903	MARINA
+1906	Southwest Marina
+1907	TIME'S UP
+1908	Time trial in the Zephyra GT – the car is yours afterwards.
+1909	Time trial from Dex's Tuning to Santa Cruz.
+1910	Newspaper – $2
+1911	Timeout – room unreachable.
+1913	Destroy <b>Marco's Brutus</b> on Seaside Boulevard.
+1914	Drag the buttons to where you want them.
+1915	Aim
+1916	Scope
+1917	Cigarettes
+1918	Cigarettes (loose)
+1919	Cigarettes – $8
+1920	On foot
+1921	Launch
+1922	Too expensive
+1923	Too many crashes – the injured are getting worse.
+1924	Too many wine bottles broke.
+1925	San Lúcar Access
+1926	Santa Cruz Access
+1927	Back to the main menu?
+1928	To the runway
+1929	Back
+1930	Back to the <b>drill</b> – it stops without you!
+1931	Reset
+1932	Two decks, tinted windows, sun deck. Every nouveau riche's dream.
+1934	tap to switch
+1935	on the map)
+1952	the city
+1953	the beach bar
+1954	own songs
+1955	a money bag (
+1956	 drift smoke
+1957	appears next to vehicles
+1958	wins – your horse wasn't fast enough.
+1959	wins!</b> You collect
+1960	left the game.
+1962	is up!
+1963	in game
+1964	joined.
+1965	joined your game!
+1966	got away
+1967	clear night, warm, a light sea breeze
+1969	free delivery
+1970	is at
+1971	m far ·
+1981	s airtime · +$
+1983	s in the air
+1985	beats
+1990	is playing version
+1991	is parked on the street outside the dealership!
+1992	is ready – blue dot on the map.
+2001	connecting …
+2002	brought right away
+2003	was caught
+2004	was delivered – blue dot on the map.
+2005	to Ortega Bakery
+2006	to the waterfront promenade
+2008	{0}  ·  Select: {1}
+2009	{0} (+{1} rounds)
+2010	{0} ({1}) was saved to your phone
+2011	{0} +{1} rounds
+2012	{0} missions available – see the "Missions" app
+2013	{0} checkpoints · 1st place: $2,000
+2014	{0} ACHIEVEMENT: {1}
+2015	{0} jingle(s) added to PULSE 132
+2016	{0} points
+2017	{0} rounds
+2018	{0} song(s) added to PULSE 132
+2019	{0} song(s) added to "My Radio"
+2020	{0} o'clock {1}
+2021	{0} at {1} (yellow {2} on the map)
+2022	{0} own songs
+2023	{0} wins – your horse wasn't fast enough.
+2024	{0} left the game.
+2025	{0} joined.
+2026	{0} joined your game!
+2027	{0} got away
+2028	Meet {0}
+2029	{0} m far · {1} s airtime · +${2}  ({3}/{4})
+2030	{0} s in the air
+2031	{0} of {1}
+2032	{0} was caught
+2033	{0} {1} – select to open.
+2034	{0} {1}× {2} → Inventory
+2035	{0} · up to {1} km/h · {2}
+2036	{0} – available on your phone under "Cars"
+2037	{0} ammo
+2038	{0} ammo (+{1})
+2039	{0}: Wave {1}/{2} – take them all out.
+2042	{1}/{2} missions · ${3} · {4}
+2045	¡Dios mío! You must be Leo – Rosa has told me so much about you.
+2046	¡Hola Leo! Coffee's on the house today.
+2047	¡Hola! Paco Reyes, best pilot between the Sierra and the sea. And the only one.
+2048	¡Muchacho! The Coyotes loaded three of my best calves into a pickup!
+2049	·  Select:
+2050	· health restored
+2051	· up to
+2052	· incl.
+2053	Trouble, Leo. The Tiburones – the harbor gang – want to sabotage the Solera Star.
+2054	ROBBERY!
+2055	Above the Clouds
+2056	Robbery aborted.
+2057	Robbery failed – the loot is gone.
+2058	Bust (
+2059	Bust ({0}) – lost.
+2060	Overwrite?
+2061	ASL
+2062	ASL 0 m
+2063	– select to open.
+2064	– fleeing car!
+2065	– available on your phone under "Cars"
+2066	– only the winner counts.
+2067	– take them all out.
+2068	– unlocked through missions.
+2069	". Come by!
+2070	"I've got a job for you …"
+2071	‹ Back
+2072	→ Inventory
+2073	↻<br>Please rotate your device to landscape
+2074	▶ Now playing: <b>
+2075	▶ Now playing: <b>{0}</b>
+2076	★ SCRATCH ★
+2078	☕ Wonderful! +15 health, a bit more stamina for a while
+2080	♠ Luna: "There you go. You've got what it takes to be a regular."
+2081	⚓ Marisol radios: "Nicely driven, sailor!"
+2082	⚓ New boat – at the jetty (⚓) under "My boats"
+2083	⚓ {0} is ready at {1}.
+2084	⚖️ Clear wanted level <em>$
+2085	⚖️ Clear wanted level <em>${0}</em>
+2086	⚠️ Attack on the mayor!
+2087	⚠️ Too low – pull up!
+2088	⚠️ The host is playing version
+2089	⚠️ The host is playing version {0}, you {1}. Please reload both devices!
+2090	⚠️ Too slow – stall!
+2091	⚠️ {0} is playing version {1}, you {2}. Please reload both devices!
+2092	⚡ Energy!
+2093	⚡ Sprint boost for
+2094	⚡ Sprint boost for {0} seconds!
+2095	⛴️ Fare +$150
+2096	✈️ Your own plane – pick it up at Los Ranchos airfield
+2097	✈️ Paco: "Smooth as butter! Almost."
+2098	✈️ Get in (F). <b>Gas</b> to accelerate, <b>pull up</b> above 100 km/h (W / stick up). A/D = turn, Space = slower.
+2099	✉️ Mail for
+2100	✉️ Mail for {0} dropped!
+2101	✓ Purchased
+2102	✝ Silver cross secured
+2104	⭐ The manhunt is cooling down …
+2105	🅿️ Underground garage ·
+2106	🅿️ Underground garage · {0} car(s) ready
+2107	🅿️ Underground garage – buy cars at Solera Motors and they'll be parked here.
+2108	🌐 Host game
+2109	🌿 The world gets slower and softer …
+2110	🍔 +40 health
+2111	🍟 +15 health
+2112	🍹 Cheers!
+2113	🍽️ Full health
+2114	🎙️ Add your own jingles
+2115	🎙️ Add your own jingles{2}
+2116	🎟️ Scratch now
+2117	🎡 Thanks for riding!
+2118	🎡 Enjoy the view!<br><b>Getting off</b> (F / Enter button) only works at the bottom.
+2119	🎧 Add songs to PULSE 132
+2120	🎧 Add songs to PULSE 132{1}
+2121	🎰 Starting credit from the casino
+2122	🎲 Random
+2123	🎵 Add your own music
+2124	🏁 New record! Don Aurelio was watching …
+2125	🏁 Made it in time! Nina writes: "Not bad for a beginner."
+2126	🏗️ Container loaded
+2127	🏠 Car added to your garage (Phone → Cars).
+2128	🏠 Your garage
+2129	🏠 Add to garage ·
+2130	🏠 Add to garage · {0}
+2131	🐄 Benito: "My calves! Gracias!"
+2132	👕 New outfit:
+2133	👕 New outfit: {0}
+2134	💊 The pill kicks in – everything pulses!
+2135	💤 Well rested – full health
+2136	💧 Refreshing.
+2137	💧 Farm
+2138	💧 Farm {0} supplied
+2139	💬 You:
+2140	💬 You: {0}
+2141	💰 +${0}  (Loot: ${1})
+2142	💰 Day's takings recovered – Sami texts you: "You're the best!"
+2143	💰 {0} a money bag ({1}/{2})
+2144	💵 Debt collected (
+2145	💵 Debt collected ({0}/3)
+2146	💸 Sold
+2147	💸 Sold {0}/4 · +${1}
+2148	📍 Navigation to
+2149	📍 Navigation to {0}: "{1}"
+2150	📦 The workers are loading the goods …
+2151	📦 Goods on board!
+2152	📱 Newly unlocked:
+2153	📱 Newly unlocked: {0}
+2154	📲 Play as an app: in Safari tap <b>Share</b> → <b>Add to Home Screen</b>.
+2155	📻 Police radio:
+2156	📻 Police radio: {0}
+2157	📻 Guards: "Intruder at the gate! Everyone to the forecourt!"
+2158	🔒 {0} more contact(s){1}{2} – unlocked through missions.
+2159	🔥 Nitro: hold Shift while driving (touch: NITRO button).
+2160	🔧 Dex's rentals
+2161	🔧 Repair ·
+2162	🔧 Repair · {0}
+2163	🔧 Repair car <em>$150</em>
+2164	🔧 {0}: {1} installed
+2165	🔫 Assault rifle +120 rounds · Body armor equipped
+2166	🔫 Val gives you an assault rifle, a shotgun and body armor.
+2167	🖱️ Click the screen to look around with the mouse
+2168	🗑 Delete your music (
+2169	🗑 Delete your music ({0})
+2170	🗑 Delete PULSE files
+2171	🗳️ Poster in
+2172	🗳️ Poster in {0} is up!
+2173	🚁 Police helicopter hit – it's going down!
+2174	🚑 Injured on board – drive carefully!
+2175	🚔 The police are storming the bank!
+2176	🚔 More units incoming!
+2177	🚕 Arrived! Fare
+2178	🚕 Arrived! Fare {0}.
+2179	🚕 No driver will take you while the police are after you.
+2180	🚕 Not during a mission.
+2181	🚕 Call taxi · {4}
+2182	🚕<b>No destination marked</b>
+2183	🚗 Order a car ("Cars" app)
+2184	🚗 Your
+2185	🚗 Your {0} was delivered – blue dot on the map.
+2186	🚗 The Cuervos are attacking!
+2187	🚗 Salgado's men are after you!
+2188	🚗 A car is waiting for you outside the hospital.
+2189	🚤 The Coast Guard is here. The Solera Star is saved!
+2190	🚧 Police radio: roadblock ahead!
+2191	🚨 The Coast Guard spotted you!
+2192	🚨 An undercover cop saw you!
+2193	🚨 Silent alarm triggered – the police are on the way!
+2194	🛗 Elevator · 34th floor · Solera Heights
+2195	🛗 Elevator · Ground floor
+2196	🛟 Swimmer on board!
+2197	🛫 Takeoff!
+2198	🛬 Landed!
+2199	🥂 To luck!
+2200	🥃 Phew!
+2201	🥤 +20 health, sugar rush!
+2202	🥪 Snack from the fridge: +25 health
+2203	🧍 Passenger on board
+2204	🪂 OPEN PARACHUTE
+2205	🪂 FREE FALL
+2206	🪂 Parachute open! Steer with movement, sprint = descend faster
