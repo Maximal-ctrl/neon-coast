@@ -231,7 +231,7 @@ function inventory() {
       r.push({ kind: 'info', name: 'Bargeld', val: money(P.money), desc: 'Dein Bargeld. Verdiene mehr mit Aufträgen, Taxi-Fahrten oder … anderen Methoden.' });
       return r;
     }
-    if (cat === 'weapons') return Object.keys(WEAPONS).filter((w) => w === 'fists' || P.ammo[w] > 0).map((w) => ({ kind: 'weapon', id: w, name: WEAPONS[w].name, val: WEAPONS[w].melee ? '' : P.ammo[w] + ' Schuss', desc: P.weapon === w ? 'Aktuell ausgerüstet.' : 'Auswählen zum Ausrüsten. Tipp: Tab gedrückt halten (oder Waffensymbol antippen) öffnet das Waffenrad.' }));
+    if (cat === 'weapons') return Object.keys(WEAPONS).filter((w) => !WEAPONS[w].hidden && (w === 'fists' || WEAPONS[w].tool || P.ammo[w] > 0)).map((w) => ({ kind: 'weapon', id: w, name: WEAPONS[w].name, val: WEAPONS[w].melee ? '' : P.ammo[w] + ' Schuss', desc: P.weapon === w ? 'Aktuell ausgerüstet.' : 'Auswählen zum Ausrüsten. Tipp: Tab gedrückt halten (oder Waffensymbol antippen) öffnet das Waffenrad.' }));
     const f = cats.find((c) => c[0] === cat)[2];
     const r = list.filter(([k]) => f(ITEMS[k])).map(([k, n]) => ({ kind: 'item', id: k, name: ITEMS[k].name, icon: ITEMS[k].icon, val: '×' + n, desc: ITEMS[k].desc }));
     return r.length ? r : [{ kind: 'info', name: 'Nichts vorhanden', val: '', desc: 'Kauf Nachschub in einem der Samis 24/7-Läden.' }];

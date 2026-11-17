@@ -3,7 +3,9 @@ import * as THREE from 'three';
 import { G } from './state.js';
 import * as C from './config.js';
 import { playerLook } from './models.js';
-import { WEAPONS, WEAPON_ORDER, wstats } from './combat.js';
+import { WEAPONS, WEAPON_ORDER, wstats, isArmed, hasWeapon } from './combat.js';
+import { STATIONS } from './audio.js';
+import { RADIO } from './radio-stations.js';
 import { nitroUpdate } from './tuning.js';
 import { circleVsBox, circleVsVeh } from './physics.js';
 import { clamp, damp, dampAngle, angleDiff, dist2, rand, lerp } from './utils.js';
@@ -48,6 +50,43 @@ export class Player {
     this.money = Math.max(0, this.money + n);
     G.hud.money(n);
     if (msg) G.hud.toast(msg);
+  }
+
+  // Boombox auf der rechten Schulter (4.24)
+  updateBoombox(dt) {
+    const on = this.weapon === 'boombox' && this.state === 'foot' && this.visible !== false && !this.parachute;
+    if (!on && !this._boom) return;
+    if (!this._boom) {
+      const T = THREE, g = new T.Group();
+      const body = new T.Mesh(new T.BoxGeometry(0.5, 0.26, 0.15), new T.MeshStandardMaterial({ color: 0x2a2d36, roughness: 0.4, metalness: 0.35 }));
+      g.add(body);
+      const trim = new T.Mesh(new T.BoxGeometry(0.52, 0.03, 0.16), new T.MeshStandardMaterial({ color: 0xc0c4cc, roughness: 0.3, metalness: 0.8 }));
+      trim.position.y = 0.115; g.add(trim);
+      const grill = new T.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.9 });
+      const ring = new T.MeshStandardMaterial({ color: 0xc0c4cc, roughness: 0.3, metalness: 0.8 });
+      this._boomLed = new T.MeshStandardMaterial({ color: 0xff2e88, emissive: 0xff2e88, emissiveIntensity: 1.6 });
+      for (const side of [1, -1]) for (const sx of [-0.15, 0.15]) {
+        const z = side * 0.076;
+        const sp = new T.Mesh(new T.CylinderGeometry(0.085, 0.085, 0.02, 20), grill); sp.rotation.x = Math.PI / 2; sp.position.set(sx, -0.015, z); g.add(sp);
+        const rg = new T.Mesh(new T.TorusGeometry(0.085, 0.011, 6, 20), ring); rg.position.set(sx, -0.015, z * 1.06); g.add(rg);
+        const cone = new T.Mesh(new T.CylinderGeometry(0.03, 0.03, 0.03, 12), ring); cone.rotation.x = Math.PI / 2; cone.position.set(sx, -0.015, z * 1.1); g.add(cone);
+        const disp = new T.Mesh(new T.BoxGeometry(0.1, 0.05, 0.01), this._boomLed); disp.position.set(0, 0.06, z * 1.06); g.add(disp);
+      }
+      const handle = new T.Mesh(new T.TorusGeometry(0.15, 0.014, 6, 16, Math.PI), ring); handle.position.set(0, 0.13, 0); g.add(handle);
+      const ant = new T.Mesh(new T.CylinderGeometry(0.005, 0.005, 0.34, 4), ring); ant.position.set(-0.2, 0.27, -0.03); ant.rotation.z = 0.35; g.add(ant);
+      g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+      this._boom = g; G.scene.add(g);
+    }
+    const g = this._boom; g.visible = on;
+    if (!on) return;
+    const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), rx = -fz, rz = fx; // rechts
+    const bob = Math.abs(Math.sin(this.anim.phase || 0)) * 0.03 * (this.anim.amp || 0);
+    const playing = this.boomOn !== false && G.audio && G.audio.station < STATIONS.length - 1;
+    const beat = playing ? Math.max(0, Math.sin(this.anim.t * 13)) * 0.012 : 0;
+    g.position.set(this.x + rx * 0.21 - fx * 0.03, this.y + 1.53 + bob + beat, this.z + rz * 0.21 - fz * 0.03);
+    g.rotation.set(0, this.yaw + Math.PI / 2, 0.12); // längs zur Schulter, leicht zum Kopf geneigt
+    g.scale.setScalar(1 + beat * 2);
+    if (this._boomLed) { const RD = playing && RADIO[G.audio.station]; this._boomLed.emissive.set(RD ? RD.c1 : '#333'); this._boomLed.color.set(RD ? RD.c1 : '#333'); }
   }
 
   // Fallschirm-Kappe (sichtbar, solange der Schirm offen ist)
@@ -96,6 +135,7 @@ export class Player {
       default: this.footUpdate(dt, I);
     }
     this.updateChute(dt);
+    this.updateBoombox(dt);
     if (this.boostT > 0) this.boostT -= dt;
     if (this.reloadT > 0) {
       this.reloadT -= dt;
@@ -124,7 +164,7 @@ export class Player {
     if (this.useItem) speed = Math.min(speed, 2.2);
     if (G.trip) speed *= G.trip.walk;
     if (mag < 0.12) speed = 0;
-    const armed = this.weapon !== 'fists';
+    const armed = isArmed(this);
     // Zielen
     const wantAim = I.held('aim') || (I.held('fire') && armed);
     if (wantAim && armed) this.aimT = 0.5;
@@ -182,7 +222,7 @@ export class Player {
       if (v && (!swim || v.T.boat)) this.startEnter(v);
     }
     if (I.pressed('weapon')) this.nextWeapon();
-    if (I.pressed('radio') || I.pressed('reload')) this.startReload();
+    if (I.pressed('radio') || I.pressed('reload')) { if (WEAPONS[this.weapon].tool) { this.boomOn = true; G.audio.nextStation(); G.hud.weapon(); } else this.startReload(); }
     // Feuern
     if (I.held('fire') && this.fireT <= 0 && !swim && !this.useItem) this.fire();
     // Animation
@@ -279,7 +319,8 @@ export class Player {
     const i = WEAPON_ORDER.indexOf(this.weapon);
     for (let k = 1; k <= WEAPON_ORDER.length; k++) {
       const w = WEAPON_ORDER[(i + k) % WEAPON_ORDER.length];
-      if (this.ammo[w] > 0) { this.weapon = w; G.audio.click(); G.hud.weapon(); return; }
+      if (w !== 'fists' && hasWeapon(this, w)) { this.weapon = w; G.audio.click(); G.hud.weapon(); return; }
+      if (w === 'fists') { this.weapon = w; G.audio.click(); G.hud.weapon(); return; }
     }
   }
   giveWeapon(w, ammo) {
@@ -291,6 +332,10 @@ export class Player {
 
   fire() {
     const w = WEAPONS[this.weapon];
+    if (w.tool) { // Boombox an/aus
+      if (G.input.pressed('fire')) { this.boomOn = this.boomOn === false; G.audio.click(); G.hud.weapon(); if (this.boomOn && G.audio.ready) G.hud.radioShow(G.audio.station, G.audio.radio ? G.audio.radio.track(G.audio.station) : null); }
+      this.fireT = w.rate; return;
+    }
     if (w.melee) {
       this.fireT = w.rate;
       this.anim.punch = 1;

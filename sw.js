@@ -1,5 +1,5 @@
 // Service Worker: immer zuerst die neueste Version laden, offline auf den Speicher zurückgreifen
-const VERSION = 'neoncoast-4.23';
+const VERSION = 'neoncoast-4.24';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
@@ -7,6 +7,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  // Radio-Songs (große Dateien, Teil-Anfragen) nicht über den Speicher leiten
+  if (req.headers.has('range') || req.url.includes('/assets/radio/')) return;
   e.respondWith(
     fetch(req, { cache: 'no-cache' }).then((res) => {
       if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(req, copy)); }

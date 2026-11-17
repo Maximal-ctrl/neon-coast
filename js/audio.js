@@ -2,15 +2,14 @@
 import { G } from './state.js';
 import { clamp, rand, pick, lerp } from './utils.js';
 import { PulseRadio } from './pulse.js';
+import { RADIO } from './radio-stations.js';
+import { RadioPlayer } from './radio.js';
 
 const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
-// 4.22: Radio wird neu aufgebaut – keine selbst komponierte Musik mehr.
-// Drei Sender, noch ohne Songs (tracks: [{ name, artist, url }] kommen mit dem Radio-Update).
+// 4.24: Drei Sender mit echten Songs (js/radio-stations.js), abgespielt von der Radio-Engine (js/radio.js)
 export const STATIONS = [
-  { name: 'SUNSHINE RADIO', genre: 'Bald verfügbar', style: 'radio', tracks: [] },
-  { name: 'MOONSHINE RADIO', genre: 'Bald verfügbar', style: 'radio', tracks: [] },
-  { name: 'STARSHINE RADIO', genre: 'Bald verfügbar', style: 'radio', tracks: [] },
+  ...RADIO.map((r) => ({ name: r.name, key: r.key, genre: r.tracks.length ? r.tagline : 'Bald verfügbar', style: 'radio', tracks: r.tracks })),
   { name: 'RADIO AUS', style: 'off' },
 ];
 
@@ -97,6 +96,7 @@ export class AudioSys {
     this.userGain = ctx.createGain(); this.userGain.gain.value = 0;
     try { ctx.createMediaElementSource(this.userEl).connect(this.userGain); this.userGain.connect(this.music); } catch (e) { /* */ }
     this.pulse = new PulseRadio(this);
+    this.radio = new RadioPlayer(this);
     this.loadLibrary();
     this.loadPulse();
     this.applyVolumes();
@@ -247,10 +247,14 @@ export class AudioSys {
     const st = STATIONS[this.station];
     const clubMusic = playing && !v && G.interior && G.interior.kind === 'club';
     const pv = this.preview && G.state === 'menu'; // Vorschau in der Radio-App
-    const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic || (pv && st.style !== 'off');
+    // Boombox auf der Schulter: Radio auch zu Fuß
+    const boom = !v && playing && P && P.state === 'foot' && P.weapon === 'boombox' && P.boomOn !== false;
+    const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic || (pv && st.style !== 'off') || (boom && st.style !== 'off');
     const userOn = !!(((v && playing) || pv) && st.style === 'user' && !clubMusic && this.tracks.length);
     if (this.userGain) this.userGain.gain.setTargetAtTime(userOn ? 1.6 : 0, t, 0.3);
     this.musicBus.gain.setTargetAtTime(wantMusic && !userOn ? (G.state === 'title' ? 0.32 : 1) : 0, t, 0.4); // im Titel leise im Hintergrund
+    if (this.titleSt == null || this.titleSt >= RADIO.length) this.titleSt = Math.floor(Math.random() * RADIO.length);
+    if (this.radio) this.radio.update(wantMusic && !clubMusic && (G.state === 'title' || st.style === 'radio'), G.state === 'title' ? this.titleSt : this.station);
     if (wantMusic && !userOn) this.schedule();
     else this.nextBar = 0;
   }
@@ -258,8 +262,8 @@ export class AudioSys {
   nextStation() {
     this.station = (this.station + 1) % STATIONS.length;
     this.nextBar = 0;
-    G.hud.radio(this.stationInfo(this.station));
-    if (STATIONS[this.station].style === 'radio' && !STATIONS[this.station].tracks.length) G.hud.toast('📻 Noch keine Songs – das Radio-Update kommt bald.');
+    G.hud.radioShow(this.station, this.radio ? this.radio.track(this.station) : null);
+    if (STATIONS[this.station].style === 'radio' && !STATIONS[this.station].tracks.length) G.hud.toast('📻 Auf diesem Sender laufen noch keine Songs.');
     this.noiseHit(0.25, 'bandpass', 2500, 0.15, 800, 1);
   }
 

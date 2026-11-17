@@ -1,5 +1,6 @@
 // Patch-Notes im Titelbild (neueste Version zuerst) – kurze Stichpunkte
 export const PATCH_NOTES = [
+  ['4.24', ['Sunshine, Tung Tung & Underground Radio', 'Radio-Engine mit Übergängen', 'Neues Radio-Overlay', 'Boombox im Waffenrad', 'Radio zu Fuß']],
   ['4.23', ['Feedback landet in GitHub', 'Kein Konto nötig']],
   ['4.22', ['Feedback & Ideen', 'Standard-Grafik: Niedrig', 'Flüssigere Grafik', 'Neue Radiosender', 'Neue Titel-Anordnung']],
   ['4.21', ['Straßensperren weiter entfernt', 'Zeit zum Abbiegen']],

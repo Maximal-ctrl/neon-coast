@@ -726,7 +726,7 @@ function phoneRadio() {
     + STATIONS.map((s, i) => { const info = A.ready ? A.stationInfo(i) : s; return `<button class="ph-row ${A.station === i ? 'on' : ''}" data-st="${i}"><b>${info.name}</b><span>${info.genre || ''}</span></button>`; }).join('')
     + '<div class="ph-note">📻 Das große Radio-Update kommt bald – dann laufen hier echte Songs.</div>');
   void n; void pc; void cur;
-  const set = (i) => { A.station = (i + STATIONS.length) % STATIONS.length; A.nextBar = 0; if (A.ready) G.hud.radio(A.stationInfo(A.station)); phoneRadio(); };
+  const set = (i) => { A.station = (i + STATIONS.length) % STATIONS.length; A.nextBar = 0; if (A.ready) G.hud.radioShow(A.station, A.radio ? A.radio.track(A.station) : null); phoneRadio(); };
   $('ph-screen').querySelectorAll('[data-st]').forEach((b) => b.onclick = () => set(+b.dataset.st));
   $('ph-screen').querySelectorAll('[data-step]').forEach((b) => b.onclick = () => set(A.station + +b.dataset.step));
   $('ph-screen').querySelectorAll('[data-mus]').forEach((b) => b.onclick = async () => {
@@ -1189,7 +1189,7 @@ function autoQuality(dt) {
 
 // PWA: Service Worker
 // Versionsnummer: kleines Update -> 1.01, 1.02 …; großes Update -> 2.0, danach 2.01 …
-export const GAME_VERSION = 'Beta 4.23';
+export const GAME_VERSION = 'Beta 4.24';
 document.getElementById('ver').textContent = 'VERSION ' + GAME_VERSION;
 G.version = GAME_VERSION;
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

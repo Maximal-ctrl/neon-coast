@@ -1219,7 +1219,7 @@ export class Interiors {
     R.rob.group.visible = ready;
     if (!ready) { R.rob.latch = dist2(G.player.x, G.player.z, R.rob.x, R.rob.z) < 1.69; return; }
     if (on(R.rob)) {
-      if (G.player.weapon === 'fists') { G.hud.toast('Für einen Überfall brauchst du eine Waffe (Waffenladen „W“).'); return; }
+      if (G.player.weapon === 'fists' || G.player.weapon === 'boombox') { G.hud.toast('Für einen Überfall brauchst du eine Waffe (Waffenladen „W“).'); return; }
       this.heistReady = G.time + 120;
       G.missions.start(heistDef(this));
     }

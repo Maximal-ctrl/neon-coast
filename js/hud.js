@@ -2,13 +2,15 @@
 import * as THREE from 'three';
 import { G } from './state.js';
 import * as C from './config.js';
-import { WEAPONS } from './combat.js';
+import { WEAPONS, isArmed } from './combat.js';
+import { RADIO } from './radio-stations.js';
 import { STATIONS } from './audio.js';
 import { clamp, fmtMoney, fmtTime, lerp } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
 
 export const ICONS = {
+  boombox: '<svg viewBox="0 0 64 40"><path d="M20 9a12 7 0 0 1 24 0" fill="none" stroke="currentColor" stroke-width="3"/><rect x="4" y="10" width="56" height="26" rx="4" fill="currentColor"/><circle cx="17" cy="24" r="8" fill="#000" opacity=".55"/><circle cx="47" cy="24" r="8" fill="#000" opacity=".55"/><circle cx="17" cy="24" r="3" fill="currentColor"/><circle cx="47" cy="24" r="3" fill="currentColor"/><rect x="27" y="14" width="10" height="5" rx="1" fill="#000" opacity=".55"/></svg>',
   sniper: '<svg viewBox="0 0 64 40"><path d="M0 15h58v4H40v3h-5l2 12h-6l-2-12h-6l-6 9H9l5-9v-3H0z" fill="currentColor"/><rect x="20" y="8" width="16" height="5" rx="2" fill="currentColor"/><rect x="26" y="12" width="3" height="4" fill="currentColor"/></svg>',
   grenade: '<svg viewBox="0 0 64 40"><ellipse cx="30" cy="24" rx="11" ry="13" fill="currentColor"/><rect x="26" y="6" width="9" height="6" rx="1" fill="currentColor"/><path d="M35 9l9-4v4l-8 3z" fill="currentColor"/><circle cx="44" cy="6" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   fist: '<svg viewBox="0 0 64 40"><path d="M14 10h30a6 6 0 0 1 6 6v10a8 8 0 0 1-8 8H22a8 8 0 0 1-8-8z" fill="currentColor"/><path d="M20 10v8M28 10v8M36 10v8M44 10v8" stroke="#000" stroke-width="2" opacity=".35"/></svg>',
@@ -81,7 +83,7 @@ export class HUD {
   weapon() {
     const P = G.player, w = WEAPONS[P.weapon];
     $('weapon-icon').innerHTML = ICONS[w.icon];
-    $('weapon-ammo').textContent = w.melee ? '' : w.throw ? `${P.ammo[P.weapon] || 0}` : P.reloadT > 0 ? 'NACHLADEN …' : `${P.clipOf(P.weapon)} / ${P.ammo[P.weapon] - P.clipOf(P.weapon)}`;
+    $('weapon-ammo').textContent = w.melee ? '' : w.tool ? (P.boomOn !== false ? '♫ AN' : 'AUS') : w.throw ? `${P.ammo[P.weapon] || 0}` : P.reloadT > 0 ? 'NACHLADEN …' : `${P.clipOf(P.weapon)} / ${P.ammo[P.weapon] - P.clipOf(P.weapon)}`;
     $('weapon-name').textContent = w.name;
   }
   vehicleName(n) { const el = $('veh-name'); el.textContent = n; el.classList.add('show'); this.vehT = 3; }
@@ -91,6 +93,23 @@ export class HUD {
     el.innerHTML = `<small>${station}</small><b>${title}</b><span>${artist}</span>`;
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
     clearTimeout(this.npT); this.npT = setTimeout(() => el.classList.remove('show'), 6000);
+  }
+  // 4.24: großes Radio-Overlay oben in der Mitte
+  radioShow(si, track) {
+    const el = $('radio-box'); if (!el) return;
+    const R = RADIO[si];
+    if (!R) {
+      el.style.cssText = '';
+      el.innerHTML = '<div class="rb-card rb-off"><div class="rb-logo">⏻</div><div class="rb-main"><small class="rb-kicker">RADIO</small><b class="rb-name">RADIO AUS</b></div></div>';
+    } else {
+      el.style.setProperty('--c1', R.c1); el.style.setProperty('--c2', R.c2);
+      const dots = RADIO.map((_, i) => `<i class="${i === si ? 'on' : ''}"></i>`).join('');
+      const song = track ? `<div class="rb-song"><span class="rb-eq"><i></i><i></i><i></i><i></i><i></i></span><span class="rb-title">${track.title || ''}</span><span class="rb-artist">${track.artist || ''}</span></div><div class="rb-prog"><div></div></div>`
+        : `<div class="rb-song rb-soon"><span>${R.tracks.length ? R.tagline : 'Bald verfügbar'}</span></div>`;
+      el.innerHTML = `<div class="rb-card"><div class="rb-logo">${R.logo}</div><div class="rb-main"><small class="rb-kicker">FM ${R.freq} <em>LIVE</em></small><b class="rb-name">${R.name}</b><span class="rb-tag">${R.tagline}</span>${song}</div><div class="rb-dots">${dots}</div></div>`;
+    }
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    this.radioT = track ? 6 : 4;
   }
   radio(st) { const el = $('radio-box'); el.innerHTML = `<b>${st.name}</b>${st.genre ? '<span>' + st.genre + '</span>' : ''}`; el.classList.add('show'); this.radioT = 3; }
   hitMarker(kill) { const el = $('hitmark'); el.className = kill ? 'show kill' : 'show'; this.hitT = 0.25; }
@@ -139,6 +158,7 @@ export class HUD {
     if ((this.areaT -= dt) <= 0) $('area-name').classList.remove('show');
     if ((this.vehT -= dt) <= 0) $('veh-name').classList.remove('show');
     if ((this.radioT -= dt) <= 0) $('radio-box').classList.remove('show');
+    else { const pb = document.querySelector('#radio-box .rb-prog div'), RP = G.audio && G.audio.radio; if (pb && RP) pb.style.width = `${(RP.progress || 0) * 100}%`; }
     if ((this.bannerT -= dt) <= 0) $('banner').classList.remove('show');
     if ((this.bigT -= dt) <= 0) $('bigtoast').classList.remove('show');
     if ((this.hitT -= dt) <= 0) $('hitmark').className = '';
@@ -171,7 +191,7 @@ export class HUD {
     }
     document.body.classList.toggle('in-car', !!P.inCar);
     document.body.classList.toggle('scoped', !G.isTouch && !P.inCar && P.weapon === 'sniper' && !!P.anim.aim);
-    document.body.classList.toggle('armed', P.weapon !== 'fists');
+    document.body.classList.toggle('armed', isArmed(P));
     // Fadenkreuz / Ziel
     // Fallschirm-Taste im freien Fall
     const cb = $('chute-btn');
@@ -183,13 +203,13 @@ export class HUD {
     }
     // Fadenkreuz für Fahrzeugwaffen (oberer Bildschirmteil – dorthin wird gezielt)
     const vc = $('veh-cross');
-    if (vc) { const v = P.inCar ? P.vehicle : null; vc.classList.toggle('show', !!(v && !v.T.plane && !v.T.boat && (v.T.tank || v.T.mg || (P.weapon !== 'fists' && !WEAPONS[P.weapon].throw)))); }
+    if (vc) { const v = P.inCar ? P.vehicle : null; vc.classList.toggle('show', !!(v && !v.T.plane && !v.T.boat && (v.T.tank || v.T.mg || (isArmed(P) && !WEAPONS[P.weapon].throw)))); }
     const ch = $('crosshair');
-    ch.classList.toggle('show', !G.isTouch && !P.inCar && P.weapon !== 'fists' && P.state === 'foot');
+    ch.classList.toggle('show', !G.isTouch && !P.inCar && isArmed(P) && P.state === 'foot');
     ch.classList.toggle('aim', P.anim.aim);
     const tm = $('target-mark');
     const tgt = G.isTouch ? P.target : null;
-    if (tgt && P.state === 'foot' && P.weapon !== 'fists') {
+    if (tgt && P.state === 'foot' && isArmed(P)) {
       this.v3.set(tgt.x, tgt.y + (tgt.isPed ? 1.2 : 1), tgt.z).project(G.camera);
       if (this.v3.z < 1) {
         tm.style.left = ((this.v3.x + 1) / 2) * 100 + '%';

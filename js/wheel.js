@@ -1,7 +1,7 @@
 // Waffenrad: Tab gedrückt halten (PC) oder Waffensymbol antippen (iPad).
 // Während das Rad offen ist, läuft das Spiel in Zeitlupe.
 import { G } from './state.js';
-import { WEAPONS, WEAPON_ORDER } from './combat.js';
+import { WEAPONS, WEAPON_ORDER, hasWeapon } from './combat.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -30,7 +30,7 @@ export class WeaponWheel {
       e.preventDefault(); e.stopPropagation();
     });
   }
-  owned(w) { return w === 'fists' || G.player.ammo[w] > 0; }
+  owned(w) { return hasWeapon(G.player, w); }
   show(byKey) {
     if (this.open || G.state !== 'playing') return;
     this.open = true; this.byKey = byKey;
@@ -55,11 +55,11 @@ export class WeaponWheel {
       const w = b.dataset.w, own = this.owned(w);
       b.classList.toggle('lock', !own);
       b.classList.toggle('on', w === this.sel);
-      b.querySelector('.ww-am').textContent = WEAPONS[w].melee ? '' : own ? P.ammo[w] : '';
+      b.querySelector('.ww-am').textContent = WEAPONS[w].melee ? '' : WEAPONS[w].tool ? (P.boomOn !== false ? '♫' : '') : own ? P.ammo[w] : '';
     });
     const W = WEAPONS[this.sel] || WEAPONS.fists;
     this.el.querySelector('.ww-name').textContent = W.name.toUpperCase();
-    this.el.querySelector('.ww-ammo').textContent = W.melee ? 'Nahkampf' : this.owned(this.sel) ? `${P.ammo[this.sel]} Schuss` : 'Nicht im Besitz';
+    this.el.querySelector('.ww-ammo').textContent = W.melee ? 'Nahkampf' : W.tool ? 'Radio auf der Schulter' : this.owned(this.sel) ? `${P.ammo[this.sel]} Schuss` : 'Nicht im Besitz';
     const i = WEAPON_ORDER.indexOf(this.sel), n = WEAPON_ORDER.length;
     this.el.querySelector('.ww-hl').style.transform = `rotate(${(i / n) * 360}deg)`;
   }

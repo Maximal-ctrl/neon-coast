@@ -12,9 +12,15 @@ export const WEAPONS = {
   rifle: { name: 'Sturmgewehr', icon: 'rifle', dmg: 34, rate: 0.12, spread: 0.014, range: 130, auto: true, twoHand: true, price: 4500, ammoPrice: 250, ammoPack: 90, mag: 30, reload: 1.9 },
   sniper: { name: 'Scharfschützengewehr', icon: 'sniper', dmg: 130, rate: 1.25, spread: 0.0015, range: 340, twoHand: true, price: 7500, ammoPrice: 300, ammoPack: 20, mag: 5, reload: 2.4, zoom: 14 },
   grenade: { name: 'Granate', icon: 'grenade', throw: true, dmg: 0, rate: 0.9, price: 900, ammoPrice: 600, ammoPack: 5 },
+  // 4.24: Boombox – keine Waffe, sondern Radio auf der Schulter (Feuern = an/aus, R = Sender)
+  boombox: { name: 'Boombox', icon: 'boombox', tool: true, dmg: 0, rate: 0.35 },
   mg: { name: 'Bord-MG', icon: 'rifle', dmg: 24, rate: 0.085, spread: 0.022, range: 150, hidden: true },
 };
-export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun', 'rifle', 'sniper', 'grenade'];
+export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun', 'rifle', 'sniper', 'grenade', 'boombox'];
+// besitzt der Spieler das Item? (Fäuste & Werkzeuge immer)
+export const hasWeapon = (P, w) => w === 'fists' || !!(WEAPONS[w] && WEAPONS[w].tool) || P.ammo[w] > 0;
+// trägt der Spieler eine echte Waffe?
+export const isArmed = (P) => P.weapon !== 'fists' && !(WEAPONS[P.weapon] && WEAPONS[P.weapon].tool);
 
 // Waffen-Aufsätze (Waffenladen → „Aufsätze“)
 export const WMODS = {

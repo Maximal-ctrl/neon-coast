@@ -97,6 +97,15 @@ EXTRA.update({
     '📻 Noch keine Songs – das Radio-Update kommt bald.': '📻 No songs yet – the radio update is coming soon.',
     '📻 Das große Radio-Update kommt bald – dann laufen hier echte Songs.': '📻 The big radio update is coming soon – then real songs will play here.',
     'Standard-Grafik: Niedrig': 'Default graphics: Low', 'Flüssigere Grafik': 'Smoother graphics', 'Neue Radiosender': 'New radio stations', 'Neue Titel-Anordnung': 'New title layout',
+    # 4.24 Radio & Boombox
+    'Gute Laune für Port Solera': 'Good vibes for Port Solera',
+    'Tung, tung, tung – der Beat der Straße': 'Tung, tung, tung – the beat of the street',
+    'Aus dem Keller von Port Solera': 'Straight from the basements of Port Solera',
+    'Radio auf der Schulter': 'Radio on your shoulder', 'Boombox': 'Boombox', '♫ AN': '♫ ON', 'AUS': 'OFF',
+    '📻 Auf diesem Sender laufen noch keine Songs.': '📻 No songs on this station yet.',
+    'Neue Radiosender': 'New radio stations', 'Radio-Engine mit Übergängen': 'Radio engine with transitions',
+    'Neues Radio-Overlay': 'New radio overlay', 'Boombox im Waffenrad': 'Boombox in the weapon wheel',
+    'Radio zu Fuß': 'Radio on foot',
 })
 en.update(EXTRA)
 import html as _h
