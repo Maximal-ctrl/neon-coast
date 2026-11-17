@@ -17,6 +17,8 @@ export const RADIO = [
       { file: 'links-und-rechts.mp3', title: 'Links und rechts', artist: 'ruinousform526' },
       { file: 'mama-hat-den-verlauf-gesehen.mp3', title: 'Mama hat den Verlauf gesehen', artist: 'ruinousform526' },
       { file: 'mein-eigener-valentin.mp3', title: 'Mein eigener Valentin', artist: 'calypsoviola640' },
+      { file: 'opa-hat-die-blauen-genommen.mp3', title: 'Opa hat die Blauen genommen', artist: 'ruinousform526' },
+      { file: 'super-mega-gay.mp3', title: 'Super Mega Gay', artist: 'calypsoviola640' },
     ],
     idents: [],
   },
