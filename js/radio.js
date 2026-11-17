@@ -84,10 +84,18 @@ export class RadioPlayer {
     const old = this.decks[this.cur], c = this.ctx.currentTime;
     old.g.gain.cancelScheduledValues(c); old.g.gain.setValueAtTime(old.g.gain.value, c); old.g.gain.linearRampToValueAtTime(0, c + fade);
     setTimeout(() => old.el.pause(), fade * 1000 + 100);
-    S.cur = this.pick(st.tracks.length, S.cur); S.offset = 0; S.n++;
-    if (!ident) { this.start(si, 0, FADE); return; }
-    S.lastIdent = this.pick(st.idents.length, S.lastIdent);
-    const id = st.idents[S.lastIdent], tok = ++this.tok;
+    const prev = S.cur;
+    let id = null;
+    if (ident) { // Einsprecher wählen: nicht derselbe wie zuletzt, und keiner, der den gerade gelaufenen Song erzwingen würde
+      const forced = (x) => (x.next ? st.tracks.findIndex((t) => t.file === x.next) : -1);
+      let ok = st.idents.map((x, i) => i).filter((i) => i !== S.lastIdent && forced(st.idents[i]) !== prev);
+      if (!ok.length) ok = st.idents.map((x, i) => i).filter((i) => forced(st.idents[i]) !== prev);
+      if (ok.length) { S.lastIdent = ok[Math.floor(Math.random() * ok.length)]; id = st.idents[S.lastIdent]; }
+    }
+    const f = id ? (id.next ? st.tracks.findIndex((t) => t.file === id.next) : -1) : -1;
+    S.cur = f >= 0 ? f : this.pick(st.tracks.length, prev); S.offset = 0; S.n++;
+    if (!id) { this.start(si, 0, ident ? IDENT_FADE * 0.6 : FADE); return; }
+    const tok = ++this.tok;
     this.inIdent = true;
     setTimeout(() => { // Einsprecher setzt in der zweiten Hälfte der Ausblendung ein
       if (tok !== this.tok || !this.playing) return;

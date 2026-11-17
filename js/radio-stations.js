@@ -1,6 +1,6 @@
 // Radiosender. Songs und Einsprecher liegen unter assets/radio/<key>/songs/ bzw. assets/radio/<key>/idents/.
 // tracks:  { file, title, artist, gain } – file relativ zu assets/radio/<key>/songs/, gain gleicht die Lautstärke an
-// idents:  { file }                   – kurze Zwischeneinsprecher/Jingles, relativ zu assets/radio/<key>/idents/
+// idents:  { file, gain, next }       – Zwischeneinsprecher, relativ zu assets/radio/<key>/idents/; next = Song, der danach immer kommt
 // nosignal: true                      – Platzhalter: Sender zeigt „Kein Signal“ und rauscht nur
 export const RADIO = [
   { key: 'sunshine', name: 'SUNSHINE RADIO', freq: '98.6', tagline: 'Gute Laune für Port Solera', c1: '#ffd23f', c2: '#ff7b00', logo: '☀️', nosignal: true, tracks: [], idents: [] },
@@ -21,7 +21,9 @@ export const RADIO = [
       { file: 'super-mega-gay.mp3', title: 'Super Mega Gay', artist: 'calypsoviola640', gain: 0.94 },
     ],
     // Moderatorin Sarah – aus den Aufnahmen geschnitten und auf Song-Lautstärke angeglichen
-    idents: [{ file: 'sarah-1.mp3', gain: 1.06 }, { file: 'sarah-2.mp3', gain: 1.06 }, { file: 'sarah-3.mp3', gain: 1.07 }],
+    idents: [{ file: 'sarah-1.mp3', gain: 1.06 }, { file: 'sarah-2.mp3', gain: 1.06 }, { file: 'sarah-3.mp3', gain: 1.07 },
+      // „Warum genau jetzt, Sir?“ – danach kommt immer „Opa hat die Blauen genommen“
+      { file: 'sarah-4.mp3', gain: 1.06, next: 'opa-hat-die-blauen-genommen.mp3' }],
   },
   { key: 'underground', name: 'UNDERGROUND RADIO', freq: '89.9', tagline: 'Aus dem Keller von Port Solera', c1: '#19e6ff', c2: '#111827', logo: '🎧', nosignal: true, tracks: [], idents: [] },
 ];
