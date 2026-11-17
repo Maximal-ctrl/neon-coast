@@ -6,6 +6,7 @@ import { G } from './state.js';
 import { RADIO } from './radio-stations.js';
 
 const FADE = 2.6, GUESS = 180; // Sekunden Überblendung, angenommene Songlänge bis zur echten Länge
+const IDENT_FADE = 5, IDENT_LEAD = 2.6; // Ausblendung vor dem Einsprecher, Einsatz des Einsprechers
 
 export class RadioPlayer {
   constructor(audio) {
@@ -13,7 +14,7 @@ export class RadioPlayer {
     this.out = this.ctx.createGain(); this.out.gain.value = 1; this.out.connect(audio.musicBus);
     this.decks = [this.deck(), this.deck()]; this.cur = 0;
     this.identEl = new Audio(); this.identEl.preload = 'auto';
-    this.identG = this.ctx.createGain(); this.identG.gain.value = 1.15;
+    this.identG = this.ctx.createGain(); this.identG.gain.value = 1; this.tok = 0;
     try { this.ctx.createMediaElementSource(this.identEl).connect(this.identG); } catch (e) { /* */ }
     this.identG.connect(audio.musicBus);
     this.state = RADIO.map((st) => ({ cur: Math.floor(Math.random() * Math.max(1, st.tracks.length)), lastIdent: -1, offset: Math.random() * 0.6, left: null, n: 0 }));
@@ -51,7 +52,7 @@ export class RadioPlayer {
   // Sender einschalten / wechseln
   tune(si) {
     if (si === this.active && this.playing) return;
-    this.stopDecks(0.4);
+    this.stopDecks(0.4); this.stopIdent();
     if (this.active >= 0 && this.state[this.active]) this.state[this.active].left = performance.now();
     this.active = si; this.playing = false;
     if (!this.hasMusic(si)) return;
@@ -64,42 +65,52 @@ export class RadioPlayer {
     D.el.dataset.url = u; D.el.src = u;
     const go = () => { const d = this.dur.get(u); if (d && offset) D.el.currentTime = Math.min(d - 8, d * offset); D.el.play().catch(() => {}); };
     if (this.dur.has(u)) go(); else D.el.addEventListener('loadedmetadata', go, { once: true });
-    D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(1, c + fadeIn);
-    this.playing = true; this.changing = false;
+    D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(t.gain || 1, c + fadeIn);
+    this.playing = true; this.changing = false; this.inIdent = false;
     G.hud.radioShow(si, t);
   }
   stopDecks(fade) {
     const c = this.ctx.currentTime;
     for (const D of this.decks) { D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(0, c + fade); setTimeout(() => { if (D.g.gain.value < 0.02) D.el.pause(); }, fade * 1000 + 80); }
   }
-  // Übergang zum nächsten Song (mit gelegentlichem Einsprecher)
+  // Übergang zum nächsten Song. Nach jedem zweiten Song: Song blendet über ~5 s aus,
+  // in die Ausblendung hinein spricht der Moderator, danach startet der nächste Song.
   next() {
     const si = this.active, st = RADIO[si], S = this.state[si]; if (!st) return;
     this.changing = true;
+    S.done = (S.done || 0) + 1;
+    const ident = this.identDue(si);
+    const fade = ident ? IDENT_FADE : FADE;
     const old = this.decks[this.cur], c = this.ctx.currentTime;
-    old.g.gain.cancelScheduledValues(c); old.g.gain.setValueAtTime(old.g.gain.value, c); old.g.gain.linearRampToValueAtTime(0, c + FADE);
-    setTimeout(() => old.el.pause(), FADE * 1000 + 100);
+    old.g.gain.cancelScheduledValues(c); old.g.gain.setValueAtTime(old.g.gain.value, c); old.g.gain.linearRampToValueAtTime(0, c + fade);
+    setTimeout(() => old.el.pause(), fade * 1000 + 100);
     S.cur = this.pick(st.tracks.length, S.cur); S.offset = 0; S.n++;
-    let ident = null;
-    if (st.idents.length && (S.n % 2 === 1 || Math.random() < 0.35)) { S.lastIdent = this.pick(st.idents.length, S.lastIdent); ident = st.idents[S.lastIdent]; }
-    this.start(si, 0, FADE);
-    if (ident) { // Musik absenken, Einsprecher drüberlegen
-      const o = this.out.gain; o.cancelScheduledValues(c); o.setValueAtTime(o.value, c); o.linearRampToValueAtTime(0.32, c + 0.6);
-      this.identEl.src = `assets/radio/${st.key}/idents/${ident.file}`;
-      this.identEl.play().catch(() => {});
-      this.identEl.onended = () => { const c2 = this.ctx.currentTime; o.cancelScheduledValues(c2); o.setValueAtTime(o.value, c2); o.linearRampToValueAtTime(1, c2 + 1.2); };
-    }
+    if (!ident) { this.start(si, 0, FADE); return; }
+    S.lastIdent = this.pick(st.idents.length, S.lastIdent);
+    const id = st.idents[S.lastIdent], tok = ++this.tok;
+    this.inIdent = true;
+    setTimeout(() => { // Einsprecher setzt in der zweiten Hälfte der Ausblendung ein
+      if (tok !== this.tok || !this.playing) return;
+      this.identG.gain.setValueAtTime(id.gain || 1, this.ctx.currentTime);
+      this.identEl.src = `assets/radio/${st.key}/idents/${id.file}`;
+      this.identEl.play().catch(() => { if (tok === this.tok) { this.inIdent = false; this.start(si, 0, 1); } });
+    }, IDENT_LEAD * 1000);
+    this.identEl.onended = () => { if (tok !== this.tok || !this.playing) return; this.inIdent = false; this.start(si, 0, 0.8); };
   }
+  // kommt beim nächsten Wechsel ein Einsprecher? (nach jedem zweiten Song)
+  identDue(si) { const st = RADIO[si], S = this.state[si]; return !!(st.idents.length && S.done && S.done % 2 === 0); }
+  stopIdent() { this.tok++; this.inIdent = false; this.identEl.pause(); }
   // jedes Bild: want = Musik soll hörbar sein, si = gewählter Sender
   update(want, si) {
     this.setStatic(!!(want && RADIO[si] && RADIO[si].nosignal));
     if (!want || !RADIO[si]) {
-      if (this.playing) { this.stopDecks(0.5); this.state[this.active].left = performance.now(); this.playing = false; this.identEl.pause(); }
+      if (this.playing) { this.stopDecks(0.5); this.state[this.active].left = performance.now(); this.playing = false; this.stopIdent(); }
       return;
     }
     if (!this.playing || si !== this.active) { this.tune(si); return; }
     const D = this.decks[this.cur], el = D.el;
-    if (!this.changing && el.duration && isFinite(el.duration) && el.duration - el.currentTime < FADE + 0.3) this.next();
+    const S = this.state[si], lead = RADIO[si].idents.length && ((S.done || 0) + 1) % 2 === 0 ? IDENT_FADE : FADE;
+    if (!this.changing && el.duration && isFinite(el.duration) && el.duration - el.currentTime < lead + 0.3) this.next();
     if (el.ended && !this.changing) this.next();
     this.progress = el.duration ? el.currentTime / el.duration : 0;
   }
