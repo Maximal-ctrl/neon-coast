@@ -50,7 +50,8 @@ export const Save = {
     const P = G.player, M = G.missions;
     P.money = d.money || 0; P.health = d.health || 100; P.armor = d.armor || 0;
     for (const k in d.ammo || {}) if (k !== 'fists') P.ammo[k] = d.ammo[k];
-    P.weapon = P.ammo[d.weapon] > 0 || d.weapon === 'boombox' ? d.weapon : 'fists';
+    P.weapon = P.ammo[d.weapon] > 0 ? d.weapon : 'fists'; // Start immer mit Fäusten statt Boombox
+    P.boomOn = false;
     M.done = new Set(d.done || []); M.rewards = new Set(d.rewards || []);
     if (!d.done) M.progress = d.progress || 0;
     M.shells = new Set(d.shells || []);

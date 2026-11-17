@@ -1,5 +1,6 @@
 // Patch-Notes im Titelbild (neueste Version zuerst) – kurze Stichpunkte
 export const PATCH_NOTES = [
+  ['4.32', ['WASD im Feedback tippbar', 'Boombox startet aus', 'Start mit Fäusten', 'Radio merkt sich die Stelle']],
   ['4.31', ['Radio-Overlay neu', 'Radio-Ton auf iPad & Handy']],
   ['4.3', ['Radio-Update', 'Tung Tung Radio: 12 Songs', 'Moderatorin Sarah', 'Weiche Übergänge', 'Einheitliche Lautstärke', 'Keine Wiederholungen']],
   ['4.25', ['Tung Tung Radio mit 5 Songs', 'Sunshine & Underground: kein Signal', 'Keine Wiederholung direkt hintereinander']],

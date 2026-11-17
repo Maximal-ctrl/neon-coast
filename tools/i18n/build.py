@@ -110,6 +110,7 @@ EXTRA.update({
     'Tung Tung Radio mit 5 Songs': 'Tung Tung Radio with 5 songs', 'Sunshine & Underground: kein Signal': 'Sunshine & Underground: no signal',
     'Keine Wiederholung direkt hintereinander': 'No back-to-back repeats',
     '🔈 Tippe kurz auf den Bildschirm, damit das Radio spielt.': '🔈 Tap the screen once so the radio can play.', 'Radio-Overlay neu': 'New radio overlay', 'Radio-Ton auf iPad & Handy': 'Radio sound on iPad & phone',
+    'WASD im Feedback tippbar': 'WASD typable in feedback', 'Boombox startet aus': 'Boombox starts off', 'Start mit Fäusten': 'Start with fists', 'Radio merkt sich die Stelle': 'Radio remembers the position',
     'Radio-Update': 'Radio update', 'Tung Tung Radio: 12 Songs': 'Tung Tung Radio: 12 songs', 'Moderatorin Sarah': 'Host Sarah',
     'Weiche Übergänge': 'Smooth transitions', 'Einheitliche Lautstärke': 'Even volume', 'Keine Wiederholungen': 'No repeats',
 })

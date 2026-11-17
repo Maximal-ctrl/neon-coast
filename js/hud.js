@@ -83,7 +83,7 @@ export class HUD {
   weapon() {
     const P = G.player, w = WEAPONS[P.weapon];
     $('weapon-icon').innerHTML = ICONS[w.icon];
-    $('weapon-ammo').textContent = w.melee ? '' : w.tool ? (P.boomOn !== false ? '♫ AN' : 'AUS') : w.throw ? `${P.ammo[P.weapon] || 0}` : P.reloadT > 0 ? 'NACHLADEN …' : `${P.clipOf(P.weapon)} / ${P.ammo[P.weapon] - P.clipOf(P.weapon)}`;
+    $('weapon-ammo').textContent = w.melee ? '' : w.tool ? (P.boomOn === true ? '♫ AN' : 'AUS') : w.throw ? `${P.ammo[P.weapon] || 0}` : P.reloadT > 0 ? 'NACHLADEN …' : `${P.clipOf(P.weapon)} / ${P.ammo[P.weapon] - P.clipOf(P.weapon)}`;
     $('weapon-name').textContent = w.name;
   }
   vehicleName(n) { const el = $('veh-name'); el.textContent = n; el.classList.add('show'); this.vehT = 3; }

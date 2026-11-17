@@ -81,7 +81,7 @@ export class Player {
     if (!on) return;
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), rx = -fz, rz = fx; // rechts
     const bob = Math.abs(Math.sin(this.anim.phase || 0)) * 0.03 * (this.anim.amp || 0);
-    const playing = this.boomOn !== false && G.audio && G.audio.station < STATIONS.length - 1;
+    const playing = this.boomOn === true && G.audio && G.audio.station < STATIONS.length - 1;
     const beat = playing ? Math.max(0, Math.sin(this.anim.t * 13)) * 0.012 : 0;
     g.position.set(this.x + rx * 0.21 - fx * 0.03, this.y + 1.53 + bob + beat, this.z + rz * 0.21 - fz * 0.03);
     g.rotation.set(0, this.yaw + Math.PI / 2, 0.12); // längs zur Schulter, leicht zum Kopf geneigt
@@ -333,7 +333,7 @@ export class Player {
   fire() {
     const w = WEAPONS[this.weapon];
     if (w.tool) { // Boombox an/aus
-      if (G.input.pressed('fire')) { this.boomOn = this.boomOn === false; G.audio.click(); G.hud.weapon(); if (this.boomOn && G.audio.ready) G.hud.radioShow(G.audio.station, G.audio.radio ? G.audio.radio.track(G.audio.station) : null); }
+      if (G.input.pressed('fire')) { this.boomOn = !this.boomOn; G.audio.click(); G.hud.weapon(); if (this.boomOn && G.audio.ready) G.hud.radioShow(G.audio.station, G.audio.radio ? G.audio.radio.track(G.audio.station) : null); }
       this.fireT = w.rate; return;
     }
     if (w.melee) {

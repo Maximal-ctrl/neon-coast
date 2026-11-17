@@ -33,7 +33,8 @@ export class Input {
 
   bind() {
     window.addEventListener('keydown', (e) => {
-      if (e.target && (e.target.tagName === 'INPUT')) return;
+      // in Textfeldern (Feedback, Chat, Konto …) normal tippen – auch W, A, S, D, Leertaste usw.
+      const tg = e.target; if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.tagName === 'SELECT' || tg.isContentEditable)) return;
       if (e.code === 'Tab') e.preventDefault();
       const k = KEYMAP[e.code];
       if (k) {

@@ -77,11 +77,18 @@ export class RadioPlayer {
     }
     S.left = null;
   }
+  // Stelle des laufenden Songs merken (Sender läuft ab hier „im Hintergrund“ weiter)
+  saveState() {
+    if (!this.playing || this.active < 0 || !this.state[this.active]) return;
+    const S = this.state[this.active], el = this.decks[this.cur].el;
+    if (!this.inIdent && !this.changing && el.duration && isFinite(el.duration) && el.dataset.url === this.url(RADIO[this.active], this.track(this.active))) S.offset = Math.min(0.999, el.currentTime / el.duration);
+    S.left = performance.now();
+  }
   // Sender einschalten / wechseln
   tune(si) {
     if (si === this.active && this.playing) return;
+    this.saveState();
     this.stopDecks(0.4); this.stopIdent();
-    if (this.active >= 0 && this.state[this.active]) this.state[this.active].left = performance.now();
     this.active = si; this.playing = false;
     if (!this.hasMusic(si)) return;
     this.advance(si);
@@ -91,7 +98,7 @@ export class RadioPlayer {
     const st = RADIO[si], t = this.track(si); if (!t) return;
     const D = this.decks[this.cur = 1 - this.cur], c = this.ctx.currentTime, u = this.url(st, t);
     D.el.dataset.url = u; D.el.src = u; D.want = true;
-    const go = () => { if (D.el.dataset.url !== u) return; const d = this.dur.get(u); if (d && offset) { try { D.el.currentTime = Math.min(d - 8, d * offset); } catch (e) { /* */ } } this.play(D.el); };
+    const go = () => { if (D.el.dataset.url !== u) return; const d = this.dur.get(u); if (d && offset) { try { D.el.currentTime = Math.min(d - 1, d * offset); } catch (e) { /* */ } } this.play(D.el); };
     if (this.dur.has(u)) go(); else D.el.addEventListener('loadedmetadata', go, { once: true });
     D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(t.gain || 1, c + fadeIn);
     this.playing = true; this.changing = false; this.inIdent = false;
@@ -140,7 +147,7 @@ export class RadioPlayer {
   update(want, si) {
     this.setStatic(!!(want && RADIO[si] && RADIO[si].nosignal));
     if (!want || !RADIO[si]) {
-      if (this.playing) { this.stopDecks(0.5); this.state[this.active].left = performance.now(); this.playing = false; this.stopIdent(); }
+      if (this.playing) { this.saveState(); this.stopDecks(0.5); this.playing = false; this.stopIdent(); }
       return;
     }
     if (!this.playing || si !== this.active) { this.tune(si); return; }

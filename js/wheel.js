@@ -55,7 +55,7 @@ export class WeaponWheel {
       const w = b.dataset.w, own = this.owned(w);
       b.classList.toggle('lock', !own);
       b.classList.toggle('on', w === this.sel);
-      b.querySelector('.ww-am').textContent = WEAPONS[w].melee ? '' : WEAPONS[w].tool ? (P.boomOn !== false ? '♫' : '') : own ? P.ammo[w] : '';
+      b.querySelector('.ww-am').textContent = WEAPONS[w].melee ? '' : WEAPONS[w].tool ? (P.boomOn === true ? '♫' : '') : own ? P.ammo[w] : '';
     });
     const W = WEAPONS[this.sel] || WEAPONS.fists;
     this.el.querySelector('.ww-name').textContent = W.name.toUpperCase();

@@ -248,7 +248,7 @@ export class AudioSys {
     const clubMusic = playing && !v && G.interior && G.interior.kind === 'club';
     const pv = this.preview && G.state === 'menu'; // Vorschau in der Radio-App
     // Boombox auf der Schulter: Radio auch zu Fuß
-    const boom = !v && playing && P && P.state === 'foot' && P.weapon === 'boombox' && P.boomOn !== false;
+    const boom = !v && playing && P && P.state === 'foot' && P.weapon === 'boombox' && P.boomOn === true;
     const wantMusic = (G.state === 'title') || (v && playing && st.style !== 'off') || clubMusic || (pv && st.style !== 'off') || (boom && st.style !== 'off');
     const userOn = !!(((v && playing) || pv) && st.style === 'user' && !clubMusic && this.tracks.length);
     if (this.userGain) this.userGain.gain.setTargetAtTime(userOn ? 1.6 : 0, t, 0.3);
