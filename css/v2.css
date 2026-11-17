@@ -544,3 +544,15 @@ body.touch #chute-btn small { display: none; }
 @keyframes rbBlink { 50% { opacity: .55; } }
 @keyframes rbEq { 0%,100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
 @media (max-width: 600px) { #radio-box .rb-card { min-width: 0; gap: 10px; padding: 9px 12px 9px 9px; } #radio-box .rb-logo { flex-basis: 48px; height: 48px; font-size: 24px; } #radio-box .rb-name { font-size: 20px !important; } }
+/* 4.25 Kein Signal */
+#radio-box .rb-nosig { filter: saturate(.35); }
+#radio-box .rb-nosig .rb-logo { animation: rbFlicker 2.2s steps(1) infinite; }
+#radio-box .rb-nosig .rb-logo::after { animation: none; opacity: .25; }
+#radio-box .rb-kicker em.off { background: #555; animation: none; }
+#radio-box .rb-nosig-txt span:last-child { font: 700 13px var(--ui); color: #ff6b6b; letter-spacing: .04em; animation: rbFlicker 1.6s steps(1) infinite; }
+#radio-box .rb-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; align-self: center; }
+#radio-box .rb-bars i { width: 3px; border-radius: 1px; background: rgba(255,255,255,.18); }
+#radio-box .rb-bars i:nth-child(1) { height: 30%; background: #ff6b6b; } #radio-box .rb-bars i:nth-child(2) { height: 55%; } #radio-box .rb-bars i:nth-child(3) { height: 80%; } #radio-box .rb-bars i:nth-child(4) { height: 100%; }
+#radio-box .rb-nosig::before { background: repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 1px, transparent 1px 3px); animation: rbStatic .25s steps(3) infinite; }
+@keyframes rbFlicker { 0%,100% { opacity: 1; } 47% { opacity: .35; } 52% { opacity: 1; } 80% { opacity: .6; } }
+@keyframes rbStatic { to { background-position: 0 3px; } }

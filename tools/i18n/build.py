@@ -106,6 +106,9 @@ EXTRA.update({
     'Neue Radiosender': 'New radio stations', 'Radio-Engine mit Übergängen': 'Radio engine with transitions',
     'Neues Radio-Overlay': 'New radio overlay', 'Boombox im Waffenrad': 'Boombox in the weapon wheel',
     'Radio zu Fuß': 'Radio on foot',
+    'Kein Signal': 'No signal', 'Kein Signal – Sender nicht erreichbar': 'No signal – station out of reach',
+    'Tung Tung Radio mit 5 Songs': 'Tung Tung Radio with 5 songs', 'Sunshine & Underground: kein Signal': 'Sunshine & Underground: no signal',
+    'Keine Wiederholung direkt hintereinander': 'No back-to-back repeats',
 })
 en.update(EXTRA)
 import html as _h

@@ -9,7 +9,7 @@ const NOTE = (n) => 440 * Math.pow(2, (n - 69) / 12);
 
 // 4.24: Drei Sender mit echten Songs (js/radio-stations.js), abgespielt von der Radio-Engine (js/radio.js)
 export const STATIONS = [
-  ...RADIO.map((r) => ({ name: r.name, key: r.key, genre: r.tracks.length ? r.tagline : 'Bald verfügbar', style: 'radio', tracks: r.tracks })),
+  ...RADIO.map((r) => ({ name: r.name, key: r.key, genre: r.nosignal ? 'Kein Signal' : r.tracks.length ? r.tagline : 'Bald verfügbar', style: 'radio', tracks: r.tracks })),
   { name: 'RADIO AUS', style: 'off' },
 ];
 
@@ -253,7 +253,7 @@ export class AudioSys {
     const userOn = !!(((v && playing) || pv) && st.style === 'user' && !clubMusic && this.tracks.length);
     if (this.userGain) this.userGain.gain.setTargetAtTime(userOn ? 1.6 : 0, t, 0.3);
     this.musicBus.gain.setTargetAtTime(wantMusic && !userOn ? (G.state === 'title' ? 0.32 : 1) : 0, t, 0.4); // im Titel leise im Hintergrund
-    if (this.titleSt == null || this.titleSt >= RADIO.length) this.titleSt = Math.floor(Math.random() * RADIO.length);
+    if (this.titleSt == null || this.titleSt >= RADIO.length || !RADIO[this.titleSt].tracks.length) { const ok = RADIO.map((r, i) => (r.tracks.length ? i : -1)).filter((i) => i >= 0); this.titleSt = ok.length ? ok[Math.floor(Math.random() * ok.length)] : 0; }
     if (this.radio) this.radio.update(wantMusic && !clubMusic && (G.state === 'title' || st.style === 'radio'), G.state === 'title' ? this.titleSt : this.station);
     if (wantMusic && !userOn) this.schedule();
     else this.nextBar = 0;
@@ -263,7 +263,6 @@ export class AudioSys {
     this.station = (this.station + 1) % STATIONS.length;
     this.nextBar = 0;
     G.hud.radioShow(this.station, this.radio ? this.radio.track(this.station) : null);
-    if (STATIONS[this.station].style === 'radio' && !STATIONS[this.station].tracks.length) G.hud.toast('📻 Auf diesem Sender laufen noch keine Songs.');
     this.noiseHit(0.25, 'bandpass', 2500, 0.15, 800, 1);
   }
 

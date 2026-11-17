@@ -6,7 +6,6 @@ import { G } from './state.js';
 import { RADIO } from './radio-stations.js';
 
 const FADE = 2.6, GUESS = 180; // Sekunden Überblendung, angenommene Songlänge bis zur echten Länge
-const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 export class RadioPlayer {
   constructor(audio) {
@@ -17,7 +16,7 @@ export class RadioPlayer {
     this.identG = this.ctx.createGain(); this.identG.gain.value = 1.15;
     try { this.ctx.createMediaElementSource(this.identEl).connect(this.identG); } catch (e) { /* */ }
     this.identG.connect(audio.musicBus);
-    this.state = RADIO.map((st) => ({ order: shuffle(st.tracks.map((_, i) => i)), idx: Math.floor(Math.random() * Math.max(1, st.tracks.length)), offset: Math.random() * 0.6, left: null, n: 0 }));
+    this.state = RADIO.map((st) => ({ cur: Math.floor(Math.random() * Math.max(1, st.tracks.length)), lastIdent: -1, offset: Math.random() * 0.6, left: null, n: 0 }));
     this.dur = new Map(); this.active = -1; this.playing = false; this.duck = 1;
   }
   deck() {
@@ -29,7 +28,15 @@ export class RadioPlayer {
     return { el, g };
   }
   url(st, t) { return `assets/radio/${st.key}/songs/${t.file}`; }
-  track(si) { const st = RADIO[si], S = this.state[si]; if (!st || !st.tracks.length) return null; return st.tracks[S.order[S.idx % S.order.length]]; }
+  track(si) { const st = RADIO[si], S = this.state[si]; if (!st || !st.tracks.length) return null; return st.tracks[S.cur % st.tracks.length]; }
+  // Zufallsauswahl, aber nie zweimal dasselbe direkt hintereinander
+  pick(n, last) { if (n <= 1) return 0; if (last < 0 || last >= n) return Math.floor(Math.random() * n); let i = Math.floor(Math.random() * (n - 1)); if (i >= last) i++; return i; }
+  // Rauschen für Sender ohne Signal
+  setStatic(on) {
+    if (!this.stat && on && this.A.noiseBuf) { this.stat = this.A.loopNoise('bandpass', 1800, 0.6); this.stat.g.disconnect(); this.stat.g.connect(this.A.musicBus); }
+    if (!this.stat) return;
+    const c = this.ctx.currentTime; this.stat.g.gain.setTargetAtTime(on ? 0.05 + Math.random() * 0.015 : 0, c, on ? 0.25 : 0.15);
+  }
   hasMusic(si) { return !!(RADIO[si] && RADIO[si].tracks.length); }
   // Zeitleiste weiterlaufen lassen, während der Sender nicht gehört wurde
   advance(si) {
@@ -37,7 +44,7 @@ export class RadioPlayer {
     let gone = (performance.now() - S.left) / 1000;
     for (let k = 0; k < 200 && gone > 0; k++) {
       const t = this.track(si), d = this.dur.get(this.url(st, t)) || GUESS, rest = d * (1 - S.offset);
-      if (gone < rest) { S.offset += gone / d; gone = 0; } else { gone -= rest; S.idx++; S.offset = 0; }
+      if (gone < rest) { S.offset += gone / d; gone = 0; } else { gone -= rest; S.cur = this.pick(st.tracks.length, S.cur); S.offset = 0; }
     }
     S.left = null;
   }
@@ -72,9 +79,9 @@ export class RadioPlayer {
     const old = this.decks[this.cur], c = this.ctx.currentTime;
     old.g.gain.cancelScheduledValues(c); old.g.gain.setValueAtTime(old.g.gain.value, c); old.g.gain.linearRampToValueAtTime(0, c + FADE);
     setTimeout(() => old.el.pause(), FADE * 1000 + 100);
-    S.idx++; S.offset = 0; S.n++;
-    if (S.idx % S.order.length === 0) S.order = shuffle(S.order);
-    const ident = st.idents.length && (S.n % 2 === 1 || Math.random() < 0.35) ? st.idents[Math.floor(Math.random() * st.idents.length)] : null;
+    S.cur = this.pick(st.tracks.length, S.cur); S.offset = 0; S.n++;
+    let ident = null;
+    if (st.idents.length && (S.n % 2 === 1 || Math.random() < 0.35)) { S.lastIdent = this.pick(st.idents.length, S.lastIdent); ident = st.idents[S.lastIdent]; }
     this.start(si, 0, FADE);
     if (ident) { // Musik absenken, Einsprecher drüberlegen
       const o = this.out.gain; o.cancelScheduledValues(c); o.setValueAtTime(o.value, c); o.linearRampToValueAtTime(0.32, c + 0.6);
@@ -85,6 +92,7 @@ export class RadioPlayer {
   }
   // jedes Bild: want = Musik soll hörbar sein, si = gewählter Sender
   update(want, si) {
+    this.setStatic(!!(want && RADIO[si] && RADIO[si].nosignal));
     if (!want || !RADIO[si]) {
       if (this.playing) { this.stopDecks(0.5); this.state[this.active].left = performance.now(); this.playing = false; this.identEl.pause(); }
       return;

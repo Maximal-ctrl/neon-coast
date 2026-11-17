@@ -104,12 +104,13 @@ export class HUD {
     } else {
       el.style.setProperty('--c1', R.c1); el.style.setProperty('--c2', R.c2);
       const dots = RADIO.map((_, i) => `<i class="${i === si ? 'on' : ''}"></i>`).join('');
-      const song = track ? `<div class="rb-song"><span class="rb-eq"><i></i><i></i><i></i><i></i><i></i></span><span class="rb-title">${track.title || ''}</span><span class="rb-artist">${track.artist || ''}</span></div><div class="rb-prog"><div></div></div>`
+      const song = R.nosignal ? '<div class="rb-song rb-nosig-txt"><span class="rb-bars"><i></i><i></i><i></i><i></i></span><span>Kein Signal – Sender nicht erreichbar</span></div>'
+        : track ? `<div class="rb-song"><span class="rb-eq"><i></i><i></i><i></i><i></i><i></i></span><span class="rb-title">${track.title || ''}</span><span class="rb-artist">${track.artist || ''}</span></div><div class="rb-prog"><div></div></div>`
         : `<div class="rb-song rb-soon"><span>${R.tracks.length ? R.tagline : 'Bald verfügbar'}</span></div>`;
-      el.innerHTML = `<div class="rb-card"><div class="rb-logo">${R.logo}</div><div class="rb-main"><small class="rb-kicker">FM ${R.freq} <em>LIVE</em></small><b class="rb-name">${R.name}</b><span class="rb-tag">${R.tagline}</span>${song}</div><div class="rb-dots">${dots}</div></div>`;
+      el.innerHTML = `<div class="rb-card${R.nosignal ? ' rb-nosig' : ''}"><div class="rb-logo">${R.nosignal ? '📡' : R.logo}</div><div class="rb-main"><small class="rb-kicker">FM ${R.freq} ${R.nosignal ? '<em class="off">OFFLINE</em>' : '<em>LIVE</em>'}</small><b class="rb-name">${R.name}</b><span class="rb-tag">${R.tagline}</span>${song}</div><div class="rb-dots">${dots}</div></div>`;
     }
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
-    this.radioT = track ? 6 : 4;
+    this.radioT = track ? 6 : R && R.nosignal ? 5 : 4;
   }
   radio(st) { const el = $('radio-box'); el.innerHTML = `<b>${st.name}</b>${st.genre ? '<span>' + st.genre + '</span>' : ''}`; el.classList.add('show'); this.radioT = 3; }
   hitMarker(kill) { const el = $('hitmark'); el.className = kill ? 'show kill' : 'show'; this.hitT = 0.25; }
