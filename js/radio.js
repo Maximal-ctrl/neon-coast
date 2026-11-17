@@ -6,7 +6,7 @@ import { G } from './state.js';
 import { RADIO } from './radio-stations.js';
 
 const FADE = 2.6, GUESS = 180; // Sekunden Überblendung, angenommene Songlänge bis zur echten Länge
-const IDENT_FADE = 5, IDENT_LEAD = 2.6; // Ausblendung vor dem Einsprecher, Einsatz des Einsprechers
+const IDENT_FADE = 5, IDENT_LEAD = 4; // Ausblendung vor dem Einsprecher, Einsatz des Einsprechers
 
 // winzige stille WAV-Datei – zum Freischalten der Audio-Elemente beim ersten Antippen (iPad/iPhone/Safari)
 const SILENT = (() => { const n = 800, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
@@ -41,7 +41,7 @@ export class RadioPlayer {
   // in einer Nutzer-Geste aufrufen: jedes Element einmal abspielen, damit es später ohne Geste spielen darf
   unlock() {
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
-    const all = [...this.decks.map((D) => [D.el, D.want]), [this.identEl, this.inIdent]];
+    const all = [...this.decks.map((D) => [D.el, D.want]), [this.identEl, this.identOn]];
     for (const [el, want] of all) {
       if (want) { if (el.paused && !el.ended) this.play(el); continue; }
       if (el._ok || !SILENT) continue;
@@ -49,7 +49,7 @@ export class RadioPlayer {
       if (el === this.identEl && !own) continue; // Einsprecher nie hörbar „anspielen“
       if (own) el.src = SILENT;
       const p = el.play();
-      if (p && p.then) p.then(() => { el._ok = true; if (!this.decks.some((D) => D.el === el && D.want) && !(el === this.identEl && this.inIdent)) el.pause(); }).catch(() => {});
+      if (p && p.then) p.then(() => { el._ok = true; if (!this.decks.some((D) => D.el === el && D.want) && !(el === this.identEl && this.identOn)) el.pause(); }).catch(() => {});
     }
   }
   play(el) {
@@ -130,19 +130,30 @@ export class RadioPlayer {
     const f = id ? (id.next ? st.tracks.findIndex((t) => t.file === id.next) : -1) : -1;
     S.cur = f >= 0 ? f : this.pick(st.tracks.length, prev); S.offset = 0; S.n++;
     if (!id) { this.start(si, 0, ident ? IDENT_FADE * 0.6 : FADE); return; }
-    const tok = ++this.tok;
-    this.inIdent = true;
-    setTimeout(() => { // Einsprecher setzt in der zweiten Hälfte der Ausblendung ein
+    // Ablauf strikt nacheinander: Song blendet 5 s aus → Sprecher (ohne Musik) → nächster Song blendet 5 s ein
+    const tok = ++this.tok, E = this.identEl, url = `assets/radio/${st.key}/idents/${id.file}`;
+    this.inIdent = true; this.identOn = false; this.identSi = si;
+    clearTimeout(this.identTimer); clearTimeout(this.identSafe); E.onended = null;
+    this.identTimer = setTimeout(() => {
       if (tok !== this.tok || !this.playing) return;
       this.identG.gain.setValueAtTime(id.gain || 1, this.ctx.currentTime);
-      this.identEl.src = `assets/radio/${st.key}/idents/${id.file}`;
-      const p = this.identEl.play(); if (p && p.catch) p.catch(() => { if (tok === this.tok) { this.inIdent = false; this.start(si, 0, 1); } });
+      E.onended = () => this.afterIdent(tok);
+      E.onloadedmetadata = () => { if (tok === this.tok && isFinite(E.duration)) { clearTimeout(this.identSafe); this.identSafe = setTimeout(() => this.afterIdent(tok, true), (E.duration + 5) * 1000); } };
+      E.src = url; this.identOn = true;
+      const p = E.play(); if (p && p.catch) p.catch((e) => { if (e && e.name === 'AbortError') return; this.afterIdent(tok, true); });
     }, IDENT_LEAD * 1000);
-    this.identEl.onended = () => { if (tok !== this.tok || !this.playing) return; this.inIdent = false; this.start(si, 0, 0.8); };
+  }
+  // Sprecher ist fertig → nächsten Song einblenden (nie, solange noch gesprochen wird)
+  afterIdent(tok, force) {
+    const E = this.identEl;
+    if (tok !== this.tok || !this.inIdent || !this.playing) return;
+    if (!force && !E.ended && !E.paused && isFinite(E.duration) && E.currentTime < E.duration - 0.25) return;
+    this.inIdent = false; this.identOn = false; clearTimeout(this.identSafe); E.onended = null;
+    this.start(this.identSi, 0, IDENT_FADE);
   }
   // kommt beim nächsten Wechsel ein Einsprecher? (nach jedem zweiten Song)
   identDue(si) { const st = RADIO[si], S = this.state[si]; return !!(st.idents.length && S.done && S.done % 2 === 0); }
-  stopIdent() { this.tok++; this.inIdent = false; this.identEl.pause(); }
+  stopIdent() { this.tok++; this.inIdent = false; this.identOn = false; clearTimeout(this.identTimer); clearTimeout(this.identSafe); this.identEl.onended = null; this.identEl.pause(); }
   // jedes Bild: want = Musik soll hörbar sein, si = gewählter Sender
   update(want, si) {
     this.setStatic(!!(want && RADIO[si] && RADIO[si].nosignal));
