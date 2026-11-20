@@ -121,7 +121,7 @@ const inTown = (key, m = 6) => { const t = TOWNS.find((q) => q.key === key), r =
 
 // ---------------------------------------------------------------- Landstraßen
 export const HILL_ROAD = (() => {
-  const pts = spline([[40, -490], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]]);
+  const pts = spline([[40, -492], [40, -540], [34, -585], [8, -618], [-36, -640], [-70, -672], [-94, -696], [-110, -716], [-115, -734]]);
   const vfix = ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null);
   _pts = pts; _slope = 0.11;
   const fx = pts.map((p, i) => i === 0 || vfix(p) != null);
@@ -164,7 +164,7 @@ function road(name, ctrl, o = {}) {
 const V = TOWNS[0], B = TOWNS[1], Rn = TOWNS[2];
 const vill = ([x, z]) => (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < VILLAGE.r + 4 ? VILLAGE.y : null);
 // Westdamm -> Los Ranchos
-export const WEST_ROAD = road('Westroute', [[-520, -490], [-520, -545], [-560, -612], [-680, -720], [-860, -900], [-1020, -1090], [-1100, -1200], C.townNode(Rn, 3, 1)], { y0: 0.9, y1: Rn.y, fixed: [inTown('ranchos')] });
+export const WEST_ROAD = road('Westroute', [[-520, -492], [-520, -545], [-560, -612], [-680, -720], [-860, -900], [-1020, -1090], [-1100, -1200], C.townNode(Rn, 3, 1)], { y0: 0.9, y1: Rn.y, fixed: [inTown('ranchos')] });
 // Küstenstraße West: Westroute -> Bergstraße
 export const COAST_W = road('Küstenstraße', [[-520, -545], [-420, -550], [-300, -546], [-180, -541], [-70, -538], [40, -536]], { from: WEST_ROAD, to: HILL_ROAD });
 // Küstenstraße Ost: Gipfelstraße -> Bahía Blanca
@@ -278,6 +278,32 @@ export function hillRoadAt(x, z) {
 // 3.12: weiche Fahrbahnhöhe – Catmull-Rom entlang der Straße, mehrere nahe Straßen werden stufenlos gemischt
 const _hs = [0, 0, 0, 0], _best = new Map();
 const crY = (hs, i, t) => { const n = hs.length, p0 = hs[Math.max(0, i - 1)], p1 = hs[i], p2 = hs[Math.min(n - 1, i + 1)], p3 = hs[Math.min(n - 1, i + 2)], t2 = t * t, t3 = t2 * t; return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3); };
+// Höhe auf einer Straße an Segment i/t, mit „Gehrungs“-Projektion: an jedem Knickpunkt teilen sich beide
+// Segmente dieselbe Querlinie (Winkelhalbierende). So läuft die Höhe auch am Spurrand in Kurven stufenlos
+// weiter, statt beim Wechsel des nächstgelegenen Segments zu springen (→ Buckel/Kanten beim Fahren).
+function miterN(P, k) {
+  const n = P.length; let nx = 0, nz = 0;
+  for (const s of [k - 1, k]) { if (s < 0 || s >= n - 1) continue; const dx = P[s + 1][0] - P[s][0], dz = P[s + 1][1] - P[s][1], L = Math.hypot(dx, dz) || 1; nx += dz / L; nz -= dx / L; }
+  const L = Math.hypot(nx, nz) || 1; return [nx / L, nz / L];
+}
+function miterT(P, i, x, z, t0) {
+  const A = P[i], B = P[i + 1], Dx = B[0] - A[0], Dz = B[1] - A[1], qx = x - A[0], qz = z - A[1];
+  const mA = miterN(P, i), mB = miterN(P, i + 1), Mx = mB[0] - mA[0], Mz = mB[1] - mA[1];
+  const cr = (ax, az, bx, bz) => ax * bz - az * bx;
+  const a = -cr(Dx, Dz, Mx, Mz), b = cr(qx, qz, Mx, Mz) - cr(Dx, Dz, mA[0], mA[1]), c = cr(qx, qz, mA[0], mA[1]);
+  if (Math.abs(a) < 1e-9) return Math.abs(b) < 1e-9 ? t0 : -c / b;
+  const disc = b * b - 4 * a * c; if (disc < 0) return t0;
+  const r = Math.sqrt(disc), t1 = (-b + r) / (2 * a), t2 = (-b - r) / (2 * a);
+  return Math.abs(t1 - t0) < Math.abs(t2 - t0) ? t1 : t2;
+}
+function roadY(R, i, t, d, x, z) {
+  const P = R.pts, n = P.length;
+  let tt = miterT(P, i, x, z, t);
+  if (tt < 0 && i > 0) { i--; tt = miterT(P, i, x, z, 1); }
+  else if (tt > 1 && i < n - 2) { i++; tt = miterT(P, i, x, z, 0); }
+  tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+  return crY(R.hs, i, tt);
+}
 export function hillRoadSmooth(x, z, band = 9.6) {
   const l = segHash.get(hk(Math.floor(x / HC), Math.floor(z / HC)));
   if (!l) return null;
@@ -293,9 +319,9 @@ export function hillRoadSmooth(x, z, band = 9.6) {
     if (d2 < gd) { gd = d2; gr = ri; gi = i; }
   }
   let ws = 0, ys = 0;
-  const dmin = Math.sqrt(gd), g0 = _best.get(gr), yNear = crY(HILL_ROADS[gr].hs, g0[1], g0[2]);
+  const dmin = Math.sqrt(gd), g0 = _best.get(gr), yNear = roadY(HILL_ROADS[gr], g0[1], g0[2], dmin, x, z);
   for (const [ri, [d2, i, t]] of _best) {
-    const d = Math.sqrt(d2), y = ri === gr ? yNear : crY(HILL_ROADS[ri].hs, i, t);
+    const d = Math.sqrt(d2), y = ri === gr ? yNear : roadY(HILL_ROADS[ri], i, t, d, x, z);
     if (d > band || Math.abs(y - yNear) > 2.5) continue; // Über-/Unterführungen nicht mischen
     const w = (band - d) * (band - d) + 1e-6;
     ws += w; ys += w * y;
@@ -376,7 +402,13 @@ export function terrainExact(x, z) {
     else h = lerp(h, tgt, 1 - smoothstep(11, Math.min(80, 30 + dh * 1.3), r[0]));
   }
   // Orte immer exakt eben (inkl. Randstraßen), egal was Straßen-Böschungen vorher gemacht haben
-  for (const t of TOWNS) { const tr = t._r10 || (t._r10 = C.townRect(t, 10)); if (x > tr.x0 && x < tr.x1 && z > tr.z0 && z < tr.z1) { h = t.y; break; } }
+  // (Rand 16 m + weicher Übergang bis 36 m: sonst liegt die Geländekante im 10-m-Raster noch unter der äußeren Spur der Randstraßen)
+  for (const t of TOWNS) {
+    const tr = t._r10 || (t._r10 = C.townRect(t, 16));
+    const dx = Math.max(tr.x0 - x, 0, x - tr.x1), dz = Math.max(tr.z0 - z, 0, z - tr.z1);
+    if (dx === 0 && dz === 0) { h = t.y; break; }
+    const d = Math.hypot(dx, dz); if (d < 20) h = lerp(h, t.y, 1 - smoothstep(0, 20, d));
+  }
   // unter den Dämmen: Gelände unter Wasser halten
   for (const cw of CAUSEWAYS) if (z > cw.z0 && Math.abs(x - (cw.x0 + cw.x1) / 2) < 16) h = Math.min(h, -1.2);
   return Math.max(-6, h);

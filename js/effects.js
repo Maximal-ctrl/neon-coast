@@ -87,6 +87,9 @@ export class Effects {
     this.alpha = new ParticleSystem(scene, 900, TX.smokeTexture(), false);
     this.flash = new THREE.PointLight(0xffaa55, 0, 40, 1.6);
     scene.add(this.flash);
+    // Innenraum-Licht schon hier anlegen: gleiche Lichterzahl im Titel und im Spiel → keine Shader-Neukompilierung beim Start
+    this.roomLight = new THREE.PointLight(0xffffff, 0, 45, 1.3);
+    scene.add(this.roomLight);
     this.flashT = 0;
     // Leuchtspuren
     this.tracerN = 48;

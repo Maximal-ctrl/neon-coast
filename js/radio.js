@@ -102,7 +102,7 @@ export class RadioPlayer {
     if (this.dur.has(u)) go(); else D.el.addEventListener('loadedmetadata', go, { once: true });
     D.g.gain.cancelScheduledValues(c); D.g.gain.setValueAtTime(D.g.gain.value, c); D.g.gain.linearRampToValueAtTime(t.gain || 1, c + fadeIn);
     this.playing = true; this.changing = false; this.inIdent = false;
-    G.hud.radioShow(si, t);
+    if (G.state === 'playing' || G.state === 'menu') G.hud.radioShow(si, t); // nicht über dem Titelbild einblenden
   }
   stopDecks(fade) {
     const c = this.ctx.currentTime;

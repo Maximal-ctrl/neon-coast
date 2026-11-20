@@ -34,8 +34,8 @@ export class Interiors {
     this.drunk = 0;
     this.cheer = 0;
     this.t = 0;
-    this.light = new THREE.PointLight(0xffffff, 0, 45, 1.3);
-    scene.add(this.light);
+    this.light = (G.effects && G.effects.roomLight) || new THREE.PointLight(0xffffff, 0, 45, 1.3);
+    if (!this.light.parent) scene.add(this.light);
     this.buildClub();
     this.buildBank();
     this.buildHome();
@@ -539,7 +539,7 @@ export class Interiors {
       B(x, 0.28, 293.75, 0.7, 0.56, 0.6, oak, true);                  // Nachttisch
       add(new THREE.CylinderGeometry(0.08, 0.1, 0.32, 10), brass, x, 0.72, 293.75);
       add(new THREE.CylinderGeometry(0.16, 0.22, 0.24, 14, 1, true), E(0xffd59a, 1.4), x, 0.98, 293.75);
-      const L = new THREE.PointLight(0xffc98a, 3.2, 5, 1.6); L.position.set(x, 1.05, 294.1); R.g.add(L);
+      // (keine eigene Punktlampe: eine wechselnde Lichterzahl zwingt three.js, alle Shader neu zu bauen → Ruckler)
     }
     // ---------------- Küche (Nordwest) mit Kochinsel
     const navy = M(0x23324a, { roughness: 0.55 }), stone = M(0xeae6df, { roughness: 0.25, metalness: 0.05 });
@@ -560,7 +560,6 @@ export class Interiors {
       add(new THREE.SphereGeometry(0.22, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), black, x, 2.2, 296.3).rotation.x = Math.PI;
       add(new THREE.SphereGeometry(0.1, 10, 8), E(0xffd59a, 2), x, 2.12, 296.3);
     }
-    { const L = new THREE.PointLight(0xffcf96, 5, 6, 1.5); L.position.set(1496.5, 2.0, 296.3); R.g.add(L); }
     add(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(0xe9e1d6), 1496.9, 0.98, 296.2).rotation.x = Math.PI;
     for (let k = 0; k < 4; k++) add(new THREE.SphereGeometry(0.08, 8, 6), M([0xe63946, 0xffb703, 0x7cc243, 0xff8c1a][k]), 1496.8 + (k % 2) * 0.12, 1.05 + (k > 1 ? 0.06 : 0), 296.15 + (k % 3) * 0.08);
     // ---------------- Wohnecke (Süd/West): Ecksofa, Couchtisch, Teppich, TV-Wand
@@ -601,7 +600,6 @@ export class Interiors {
     add(new THREE.CylinderGeometry(0.18, 0.2, 0.05, 16), black, 1493.4, 0.03, 305.2);
     add(new THREE.CylinderGeometry(0.02, 0.02, 1.55, 6), brass, 1493.4, 0.8, 305.2);
     add(new THREE.CylinderGeometry(0.24, 0.3, 0.38, 18, 1, true), M(0xf3e6cf, { emissive: 0xffb060, emissiveIntensity: 0.9, side: THREE.DoubleSide, roughness: 1 }), 1493.4, 1.7, 305.2);
-    { const L = new THREE.PointLight(0xffc98a, 4.5, 6, 1.6); L.position.set(1493.6, 1.7, 304.8); R.g.add(L); }
     // ---------------- Pflanzen (Monstera & Olivenbaum)
     const leaf = M(0x2f7d4f, { roughness: 0.75, side: THREE.DoubleSide }), pot = M(0xe9e1d6, { roughness: 0.8 });
     const plant = (x, z, s) => {
@@ -1028,7 +1026,7 @@ export class Interiors {
     } else if (kind === 'home') {
       this.light.position.set(1500, 3, 300);
       this.light.color.setHex(0xffd9b0);
-      this.light.intensity = 30;
+      this.light.intensity = 36;
       if (!this.noLift) G.hud.toast('🛗 Aufzug · 34. Etage · Solera Heights');
       this.noLift = false;
     } else if (kind === 'shop') {

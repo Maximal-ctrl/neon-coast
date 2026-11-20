@@ -132,24 +132,28 @@ export class HUD {
   countdown(t) { const el = $('countdown'); if (!t) { el.classList.remove('show'); return; } el.textContent = t; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
 
   // ------------------------------------------------------------ Update
+  // DOM nur anfassen, wenn sich etwas ändert (jede Zuweisung kostet Layout/Übersetzung – spürbar auf iPad)
+  _el(id) { const c = this._els || (this._els = {}); return c[id] || (c[id] = $(id)); }
+  _tx(id, v) { const c = this._txc || (this._txc = {}); v = String(v); if (c[id] !== v) { c[id] = v; const e = this._el(id); if (e) e.textContent = v; } }
+  _st(id, p, v) { const c = this._stc || (this._stc = {}), k = id + '.' + p; if (typeof v === 'number') v = String(Math.round(v * 10) / 10); if (c[k] !== v) { c[k] = v; const e = this._el(id); if (e) e.style[p] = v; } }
   update(dt) {
     const P = G.player;
     // Geld
     this.moneyShown = lerp(this.moneyShown, P.money, Math.min(1, dt * 6));
     if (Math.abs(this.moneyShown - P.money) < 1) this.moneyShown = P.money;
-    $('money').textContent = fmtMoney(this.moneyShown);
+    this._tx('money', fmtMoney(this.moneyShown));
     // Uhr
     const h = Math.floor(G.timeOfDay), m = Math.floor((G.timeOfDay % 1) * 60);
-    $('clock').textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    this._tx('clock', String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'));
     // Sterne
     const lvl = G.police.level, blink = G.police.searching && Math.floor(G.time * 3) % 2 === 0;
     const stars = $('wanted').children;
-    for (let i = 0; i < 5; i++) stars[i].className = 'star' + (i < lvl ? (blink ? ' on dim' : ' on') : '');
+    for (let i = 0; i < 5; i++) { const cn = 'star' + (i < lvl ? (blink ? ' on dim' : ' on') : ''); if (stars[i].className !== cn) stars[i].className = cn; }
     $('wanted').classList.toggle('active', lvl > 0);
     // Leben/Panzer
-    $('hb-health').style.width = clamp(P.health, 0, 100) + '%';
+    this._st('hb-health', 'width', clamp(P.health, 0, 100) + '%');
     $('hb-health').classList.toggle('low', P.health < 30);
-    $('hb-armor').style.width = clamp(P.armor, 0, 100) + '%';
+    this._st('hb-armor', 'width', clamp(P.armor, 0, 100) + '%');
     $('bars').classList.toggle('noarmor', P.armor <= 0);
     // Gebiet
     const area = G.interior ? G.interior.kind : C.districtAt(P.x, P.z);
@@ -160,7 +164,7 @@ export class HUD {
     if ((this.areaT -= dt) <= 0) $('area-name').classList.remove('show');
     if ((this.vehT -= dt) <= 0) $('veh-name').classList.remove('show');
     if ((this.radioT -= dt) <= 0) $('radio-box').classList.remove('show');
-    else { const pb = document.querySelector('#radio-box .rb-pr i'), RP = G.audio && G.audio.radio; if (pb && RP) pb.style.width = `${(RP.progress || 0) * 100}%`; }
+    else { const pb = document.querySelector('#radio-box .rb-pr i'), RP = G.audio && G.audio.radio; if (pb && RP) { const w = `${((RP.progress || 0) * 100).toFixed(1)}%`; if (pb.style.width !== w) pb.style.width = w; } }
     if ((this.bannerT -= dt) <= 0) $('banner').classList.remove('show');
     if ((this.bigT -= dt) <= 0) $('bigtoast').classList.remove('show');
     if ((this.hitT -= dt) <= 0) $('hitmark').className = '';
@@ -170,10 +174,10 @@ export class HUD {
     if (P.inCar) {
       sp.classList.add('show');
       const kmh = Math.round(Math.abs(P.vehicle.fwdSpeed) * 3.6);
-      $('speed-val').textContent = kmh;
-      $('speed-bar').style.width = clamp(kmh / (P.vehicle.T.maxSpeed * 3.6), 0, 1) * 100 + '%';
+      this._tx('speed-val', kmh);
+      this._st('speed-bar', 'width', clamp(kmh / (P.vehicle.T.maxSpeed * 3.6), 0, 1) * 100 + '%');
       const hp = P.vehicle.health / P.vehicle.maxHealth;
-      $('car-hp').style.width = hp * 100 + '%';
+      this._st('car-hp', 'width', hp * 100 + '%');
       $('car-hp').classList.toggle('low', hp < 0.3);
     } else sp.classList.remove('show');
     // Höhenmesser im Flugzeug
@@ -183,11 +187,11 @@ export class HUD {
       am.classList.toggle('show', !!pv);
       if (pv) {
         const W = G.world, gh = Math.max(W.groundHeight(pv.x, pv.z, pv.y), C.WATER_Y), agl = Math.max(0, pv.y - gh);
-        $('alt-val').textContent = Math.round(agl);
-        $('alt-msl').textContent = 'ü. NN ' + Math.round(pv.y) + ' m';
+        this._tx('alt-val', Math.round(agl));
+        this._tx('alt-msl', 'ü. NN ' + Math.round(pv.y) + ' m');
         const vs = pv.grounded ? 0 : (pv.vy || 0);
-        $('alt-vs').textContent = (vs > 0.5 ? '▲ ' : vs < -0.5 ? '▼ ' : '▬ ') + Math.abs(vs).toFixed(0) + ' m/s';
-        $('alt-bar').style.height = clamp(agl / 400, 0, 1) * 100 + '%';
+        this._tx('alt-vs', (vs > 0.5 ? '▲ ' : vs < -0.5 ? '▼ ' : '▬ ') + Math.abs(vs).toFixed(0) + ' m/s');
+        this._st('alt-bar', 'height', clamp(agl / 400, 0, 1) * 100 + '%');
         am.classList.toggle('warn', !pv.grounded && agl < 25 && vs < -1);
       }
     }
@@ -223,7 +227,7 @@ export class HUD {
     // Schaden
     this.dmg = Math.max(0, this.dmg - dt * 1.2);
     const low = P.health < 25 && P.state !== 'dead' ? 0.35 + Math.sin(G.time * 5) * 0.1 : 0;
-    $('dmg').style.opacity = Math.max(this.dmg, low);
+    this._st('dmg', 'opacity', Math.max(this.dmg, low));
     // Einsteigen-Taste nur bei Fahrzeug in der Nähe
     const near = !P.inCar && P.state === 'foot' && P.nearestVehicle(6);
     document.body.classList.toggle('can-enter', !!near || !!P.inCar);
@@ -232,8 +236,10 @@ export class HUD {
       this.fpsAcc += dt; this.fpsN++;
       if (this.fpsAcc > 0.5) { $('fps').textContent = Math.round(this.fpsN / this.fpsAcc) + ' FPS · ' + G.quality; this.fpsAcc = 0; this.fpsN = 0; }
     }
-    $('fps').style.display = G.settings.showFps ? 'block' : 'none';
-    this.drawMinimap(dt);
+    this._st('fps', 'display', G.settings.showFps ? 'block' : 'none');
+    // Minikarte: auf „Niedrig“ mit 30 Bildern/s zeichnen (spart viel Canvas-Arbeit, sieht gleich aus)
+    this.mmAcc = (this.mmAcc || 0) + dt;
+    if (this.mmAcc >= (G.quality === 'low' ? 1 / 31 : 0)) { this.drawMinimap(this.mmAcc); this.mmAcc = 0; }
   }
 
   // ------------------------------------------------------------ Minikarte

@@ -1,5 +1,6 @@
 // Patch-Notes im Titelbild (neueste Version zuerst) – kurze Stichpunkte
 export const PATCH_NOTES = [
+  ['4.34', ['Weniger Ruckler (Shader)', 'Glattere Bergstraßen', 'Ortsränder ohne Kanten', 'Schnelleres HUD', 'Bugfixes']],
   ['4.33', ['Sprecher ohne Musik darunter', '5 s Übergang vor und nach dem Sprecher']],
   ['4.32', ['WASD im Feedback tippbar', 'Boombox startet aus', 'Start mit Fäusten', 'Radio merkt sich die Stelle']],
   ['4.31', ['Radio-Overlay neu', 'Radio-Ton auf iPad & Handy']],
